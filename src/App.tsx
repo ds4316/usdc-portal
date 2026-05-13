@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useConnect, useDisconnect, useConnections, useSwitchChain } from 'wagmi'
-import { createPublicClient, fallback, http, formatUnits } from 'viem'
+import { createPublicClient, fallback, http, formatUnits, isAddress } from 'viem'
 import { mainnet, base, polygon, arbitrum, sepolia, baseSepolia } from 'wagmi/chains'
 import { AppKit } from '@circle-fin/app-kit'
 import { createViemAdapterFromProvider } from '@circle-fin/adapter-viem-v2'
@@ -27,10 +27,9 @@ export const CHAIN_META: Record<number, { label: string; color: string; isTestne
   [baseSepolia.id]: { label: 'Base Sepolia', color: '#0052ff', isTestnet: true  },
 }
 
-// ─── 토큰 ─────────────────────────────────────────────────────────────────
 const TOKEN_COLORS: Record<string, string> = {
   ETH: '#627eea', WETH: '#627eea', USDC: '#2775ca', 'USDC (gas)': '#2775ca',
-  USDT: '#26a17b', DAI: '#f5ac37', MATIC: '#8247e5', POL: '#8247e5', ARB: '#12aaff',
+  USDT: '#26a17b', DAI: '#f5ac37', POL: '#8247e5', MATIC: '#8247e5', ARB: '#12aaff',
 }
 
 type TokenInfo = { symbol: string; address: `0x${string}`; decimals: number; coingeckoId: string }
@@ -66,11 +65,10 @@ const TOKENS: Record<number, TokenInfo[]> = {
   [baseSepolia.id]: [{ symbol: 'USDC', address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', decimals: 6, coingeckoId: 'usd-coin' }],
 }
 
-// ─── 지갑 설치 링크 ────────────────────────────────────────────────────────
 const INSTALL_LINKS: Record<string, { url: string; label: string }> = {
-  MetaMask:          { url: 'https://metamask.io/download/',             label: 'MetaMask 설치하기'       },
+  MetaMask:          { url: 'https://metamask.io/download/',             label: 'MetaMask 설치하기'        },
   'Coinbase Wallet': { url: 'https://www.coinbase.com/wallet/downloads', label: 'Coinbase Wallet 설치하기' },
-  WalletConnect:     { url: 'https://walletconnect.com/',                label: 'WalletConnect 열기'      },
+  WalletConnect:     { url: 'https://walletconnect.com/',                label: 'WalletConnect 열기'       },
 }
 
 function friendlyConnectError(error: Error | null, name: string): string | null {
@@ -81,59 +79,115 @@ function friendlyConnectError(error: Error | null, name: string): string | null 
   return '연결에 실패했어요. 다시 시도해주세요.'
 }
 
-// ─── 가격 조회 ────────────────────────────────────────────────────────────
-async function fetchPrices(ids: string[]): Promise<Record<string, number>> {
+// ─── CoinGecko (24h 변동 포함) ─────────────────────────────────────────────
+interface PriceData { usd: number; change24h: number }
+
+async function fetchPrices(ids: string[]): Promise<Record<string, PriceData>> {
   if (!ids.length) return {}
   try {
-    const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(',')}&vs_currencies=usd`)
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(',')}&vs_currencies=usd&include_24hr_change=true`
+    const res = await fetch(url)
     const data = await res.json()
-    return Object.fromEntries(ids.map((id) => [id, data[id]?.usd ?? 0]))
+    return Object.fromEntries(ids.map((id) => [id, { usd: data[id]?.usd ?? 0, change24h: data[id]?.usd_24h_change ?? 0 }]))
   } catch { return {} }
 }
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────
-interface AssetRow { wallet: string; chain: number; symbol: string; balance: string; usdcValue: string; coingeckoId: string }
+interface AssetRow {
+  wallet: string; chain: number; symbol: string
+  balance: string; usdcValue: string; coingeckoId: string; change24h: number
+}
+
+interface TxRecord {
+  type: 'swap' | 'bridge' | 'send'
+  summary: string
+  txHash: string
+  timestamp: number
+  status: 'success' | 'fail'
+}
+
+interface ConfirmState {
+  title: string
+  lines: string[]
+  warnings: string[]
+  onConfirm: () => void
+}
+
 type ChainFilter = 'all' | 'mainnet' | 'testnet'
 type ActionTab = 'swap' | 'bridge' | 'send'
+type MainTab = 'assets' | 'history'
 type Theme = 'dark' | 'light'
 
-// ─── Public clients (fallback transport) ──────────────────────────────────
+// ─── Public clients ────────────────────────────────────────────────────────
 const publicClients = Object.fromEntries(
   CHAINS.map((chain) => {
     const rpcs: Record<number, string[]> = {
-      [mainnet.id]:     ['https://eth.llamarpc.com', 'https://1rpc.io/eth'],
-      [base.id]:        ['https://mainnet.base.org', 'https://1rpc.io/base'],
-      [polygon.id]:     ['https://polygon.llamarpc.com', 'https://1rpc.io/matic'],
-      [arbitrum.id]:    ['https://arb1.arbitrum.io/rpc', 'https://1rpc.io/arb'],
-      [arcTestnet.id]:  ['https://rpc.testnet.arc.network'],
+      [mainnet.id]:    ['https://eth.llamarpc.com', 'https://1rpc.io/eth'],
+      [base.id]:       ['https://mainnet.base.org', 'https://1rpc.io/base'],
+      [polygon.id]:    ['https://polygon.llamarpc.com', 'https://1rpc.io/matic'],
+      [arbitrum.id]:   ['https://arb1.arbitrum.io/rpc', 'https://1rpc.io/arb'],
+      [arcTestnet.id]: ['https://rpc.testnet.arc.network'],
     }
     const urls = rpcs[chain.id]
-    const transport = urls ? fallback(urls.map((u) => http(u))) : http()
-    return [chain.id, createPublicClient({ chain, transport })]
+    return [chain.id, createPublicClient({ chain, transport: urls ? fallback(urls.map((u) => http(u))) : http() })]
   })
 )
 
-// ─── 스켈레톤 ─────────────────────────────────────────────────────────────
-function SkeletonRows() {
-  return (
-    <>
-      {[1, 2, 3, 4, 5].map((i) => (
-        <tr key={i} className="skeleton-row">
-          <td><div className="skel skel-med" /></td>
-          <td><div className="skel skel-sm" /></td>
-          <td><div className="skel skel-sm" /></td>
-          <td><div className="skel skel-med" /></td>
-          <td><div className="skel skel-sm" /></td>
-        </tr>
-      ))}
-    </>
-  )
+// ─── TX 히스토리 ────────────────────────────────────────────────────────────
+const TX_KEY = 'usdc_portal_history'
+function loadHistory(): TxRecord[] {
+  try { return JSON.parse(localStorage.getItem(TX_KEY) ?? '[]') } catch { return [] }
+}
+function saveHistory(records: TxRecord[]) {
+  localStorage.setItem(TX_KEY, JSON.stringify(records.slice(0, 50)))
+}
+function addHistory(records: TxRecord[], entry: TxRecord): TxRecord[] {
+  const next = [entry, ...records].slice(0, 50)
+  saveHistory(next)
+  return next
 }
 
-// ─── 토큰 아이콘 ──────────────────────────────────────────────────────────
+// ─── 작은 컴포넌트들 ──────────────────────────────────────────────────────
 function TokenIcon({ symbol }: { symbol: string }) {
   const color = TOKEN_COLORS[symbol] ?? '#555'
   return <span className="token-icon" style={{ background: color + '22', color }}>{symbol.replace(' (gas)', '').charAt(0)}</span>
+}
+
+function Change24h({ value }: { value: number }) {
+  if (value === 0) return null
+  const pos = value > 0
+  return <span className={`change24 ${pos ? 'pos' : 'neg'}`}>{pos ? '▲' : '▼'} {Math.abs(value).toFixed(2)}%</span>
+}
+
+function SkeletonRows() {
+  return <>{[1,2,3,4,5].map((i) => (
+    <tr key={i} className="skeleton-row">
+      {[120, 80, 80, 90, 70].map((w, j) => <td key={j}><div className="skel" style={{ width: w }} /></td>)}
+    </tr>
+  ))}</>
+}
+
+// ─── 확인 모달 ────────────────────────────────────────────────────────────
+function ConfirmModal({ state, onCancel }: { state: ConfirmState; onCancel: () => void }) {
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3 className="modal-title">{state.title}</h3>
+        <div className="modal-lines">
+          {state.lines.map((l, i) => <div key={i} className="modal-line">{l}</div>)}
+        </div>
+        {state.warnings.length > 0 && (
+          <div className="modal-warnings">
+            {state.warnings.map((w, i) => <div key={i} className="modal-warning">⚠️ {w}</div>)}
+          </div>
+        )}
+        <div className="modal-actions">
+          <button className="btn-cancel" onClick={onCancel}>취소</button>
+          <button className="btn-primary btn-confirm" onClick={() => { state.onConfirm(); onCancel() }}>확인 및 서명</button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ─── 메인 앱 ──────────────────────────────────────────────────────────────
@@ -143,15 +197,20 @@ export default function App() {
   const { disconnect } = useDisconnect()
   const { switchChain } = useSwitchChain()
 
-  const [theme, setTheme] = useState<Theme>('dark')
+  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) ?? 'dark')
+  const [mainTab, setMainTab] = useState<MainTab>('assets')
+  const [actionTab, setActionTab] = useState<ActionTab>('swap')
+  const [chainFilter, setChainFilter] = useState<ChainFilter>('all')
+  const [sortBy, setSortBy] = useState<'value' | 'symbol' | 'chain'>('value')
+
   const [assets, setAssets] = useState<AssetRow[]>([])
   const [totalUsdc, setTotalUsdc] = useState('0.00')
   const [loadingAssets, setLoadingAssets] = useState(false)
-  const [chainFilter, setChainFilter] = useState<ChainFilter>('all')
-  const [sortBy, setSortBy] = useState<'value' | 'symbol' | 'chain'>('value')
+  const [history, setHistory] = useState<TxRecord[]>(loadHistory)
+
   const [showConnectors, setShowConnectors] = useState(false)
   const [connectingId, setConnectingId] = useState<string | null>(null)
-  const [actionTab, setActionTab] = useState<ActionTab>('swap')
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null)
 
   // 거래 폼
   const [recipient, setRecipient] = useState('')
@@ -166,10 +225,11 @@ export default function App() {
   const isConnected = connections.length > 0
   const activeChainId = connections[0]?.chainId
 
-  useEffect(() => { if (allAddresses.length > 0) loadAssets() }, [connections.length, allAddresses.join(',')])
+  useEffect(() => { localStorage.setItem('theme', theme) }, [theme])
+  useEffect(() => { if (allAddresses.length) loadAssets() }, [connections.length, allAddresses.join(',')])
 
   // ─── 자산 조회 ──────────────────────────────────────────────────────────
-  async function loadAssets() {
+  const loadAssets = useCallback(async () => {
     if (!allAddresses.length) return
     setLoadingAssets(true)
     try {
@@ -178,25 +238,25 @@ export default function App() {
         const shortAddr = `${address.slice(0, 6)}...${address.slice(-4)}`
         for (const chain of CHAINS) {
           const client = publicClients[chain.id]
-          // 네이티브 잔액
           try {
             const bal = await client.getBalance({ address })
             if (bal > 0n) {
               const isArc = chain.id === arcTestnet.id
               const isPoly = chain.id === polygon.id
-              rows.push({ wallet: shortAddr, chain: chain.id, balance: parseFloat(formatUnits(bal, 18)).toFixed(6),
+              rows.push({ wallet: shortAddr, chain: chain.id,
                 symbol: isArc ? 'USDC (gas)' : isPoly ? 'POL' : 'ETH',
-                usdcValue: '0', coingeckoId: isArc ? 'usd-coin' : isPoly ? 'matic-network' : 'ethereum' })
+                balance: parseFloat(formatUnits(bal, 18)).toFixed(6), usdcValue: '0', change24h: 0,
+                coingeckoId: isArc ? 'usd-coin' : isPoly ? 'matic-network' : 'ethereum' })
             }
-          } catch { /* RPC 실패 무시 */ }
-          // ERC20 잔액
+          } catch { /* ignore */ }
           for (const token of TOKENS[chain.id] ?? []) {
             try {
               const bal = await client.readContract({ address: token.address, abi: ERC20_ABI, functionName: 'balanceOf', args: [address] })
               if ((bal as bigint) > 0n)
-                rows.push({ wallet: shortAddr, chain: chain.id, symbol: token.symbol,
-                  balance: parseFloat(formatUnits(bal as bigint, token.decimals)).toFixed(6), usdcValue: '0', coingeckoId: token.coingeckoId })
-            } catch { /* RPC 실패 무시 */ }
+                rows.push({ wallet: shortAddr, chain: chain.id, symbol: token.symbol, change24h: 0,
+                  balance: parseFloat(formatUnits(bal as bigint, token.decimals)).toFixed(6),
+                  usdcValue: '0', coingeckoId: token.coingeckoId })
+            } catch { /* ignore */ }
           }
         }
       }
@@ -204,24 +264,34 @@ export default function App() {
       const prices = await fetchPrices(ids)
       let total = 0
       const enriched = rows.map((r) => {
-        const val = parseFloat(r.balance) * (prices[r.coingeckoId] ?? 1)
+        const p = prices[r.coingeckoId] ?? { usd: 1, change24h: 0 }
+        const val = parseFloat(r.balance) * p.usd
         total += val
-        return { ...r, usdcValue: val.toFixed(2) }
-      })
+        return { ...r, usdcValue: val.toFixed(2), change24h: p.change24h }
+      }).sort((a, b) => parseFloat(b.usdcValue) - parseFloat(a.usdcValue))
       setAssets(enriched)
       setTotalUsdc(total.toFixed(2))
     } finally { setLoadingAssets(false) }
+  }, [allAddresses.join(',')])
+
+  // ─── 요약 수치 ──────────────────────────────────────────────────────────
+  const ethValue   = assets.filter((a) => a.symbol === 'ETH').reduce((s, a) => s + parseFloat(a.usdcValue), 0)
+  const usdcTotal  = assets.filter((a) => a.symbol.includes('USDC')).reduce((s, a) => s + parseFloat(a.usdcValue), 0)
+  const otherValue = parseFloat(totalUsdc) - ethValue - usdcTotal
+
+  // 체인별 분포 (포트폴리오 바)
+  const chainBreakdown = CHAINS
+    .map((c) => ({ id: c.id, val: assets.filter((a) => a.chain === c.id).reduce((s, a) => s + parseFloat(a.usdcValue), 0) }))
+    .filter((c) => c.val > 0)
+
+  // ─── 보안 검증 ──────────────────────────────────────────────────────────
+  function validateSend(to: string, amt: string): string[] {
+    const warnings: string[] = []
+    if (!isAddress(to)) { warnings.push('올바른 이더리움 주소 형식이 아니에요') }
+    if (allAddresses.some((a) => a.toLowerCase() === to.toLowerCase())) { warnings.push('본인 지갑 주소로 전송하려고 해요') }
+    if (parseFloat(amt) <= 0) { warnings.push('금액이 0이에요') }
+    return warnings
   }
-
-  // ─── 요약 카드 값 ────────────────────────────────────────────────────────
-  const ethValue  = assets.filter((a) => a.symbol === 'ETH').reduce((s, a) => s + parseFloat(a.usdcValue), 0)
-  const usdcValue = assets.filter((a) => a.symbol === 'USDC' || a.symbol === 'USDC (gas)').reduce((s, a) => s + parseFloat(a.usdcValue), 0)
-  const otherValue = parseFloat(totalUsdc) - ethValue - usdcValue
-
-  // ─── 필터 & 정렬 ────────────────────────────────────────────────────────
-  const displayed = assets
-    .filter((a) => chainFilter === 'all' ? true : chainFilter === 'mainnet' ? !CHAIN_META[a.chain]?.isTestnet : CHAIN_META[a.chain]?.isTestnet)
-    .sort((a, b) => sortBy === 'value' ? parseFloat(b.usdcValue) - parseFloat(a.usdcValue) : sortBy === 'symbol' ? a.symbol.localeCompare(b.symbol) : a.chain - b.chain)
 
   // ─── App Kit adapter ────────────────────────────────────────────────────
   async function getAdapter() {
@@ -230,46 +300,76 @@ export default function App() {
     return createViemAdapterFromProvider({ provider })
   }
 
-  async function handleBridge() {
-    if (!amount) return setTxError('금액을 입력하세요')
-    setTxLoading(true); setTxError(''); setTxHash(''); setTxStatus('브릿지 처리 중...')
+  // ─── 거래 실행 (히스토리 저장) ──────────────────────────────────────────
+  async function execTx(type: ActionTab, summary: string, fn: () => Promise<string>) {
+    setTxLoading(true); setTxError(''); setTxHash('')
+    setTxStatus(`${type === 'swap' ? '스왑' : type === 'bridge' ? '브릿지' : '전송'} 처리 중...`)
+    let hash = ''
     try {
-      const adapter = await getAdapter()
-      const result = await kit.unifiedBalance.deposit({ from: { adapter, chain: fromChain }, amount, token: 'USDC' })
-      setTxHash((result as { txHash?: string }).txHash ?? '')
-      setTxStatus(`✅ ${amount} USDC → Arc Unified Balance`)
-      setAmount('')
-    } catch (e) { setTxError(e instanceof Error ? e.message : String(e)); setTxStatus('') }
-    finally { setTxLoading(false) }
+      hash = await fn()
+      setTxHash(hash)
+      setTxStatus(`✅ 완료!`)
+      setHistory((prev) => addHistory(prev, { type, summary, txHash: hash, timestamp: Date.now(), status: 'success' }))
+      setAmount(''); setRecipient('')
+      loadAssets()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      setTxError(msg)
+      setTxStatus('')
+      setHistory((prev) => addHistory(prev, { type, summary, txHash: '', timestamp: Date.now(), status: 'fail' }))
+    } finally { setTxLoading(false) }
   }
 
-  async function handleSend() {
+  // ─── 확인 모달 열기 ──────────────────────────────────────────────────────
+  function openSwapConfirm() {
+    if (!amount) return setTxError('금액을 입력하세요')
+    setConfirmState({
+      title: '스왑 확인',
+      lines: [`${amount} ETH → USDC`, '네트워크: Arc Testnet', '수수료: Arc App Kit 자동 계산'],
+      warnings: parseFloat(amount) > 1 ? ['큰 금액을 스왑하려고 해요. 확인해주세요.'] : [],
+      onConfirm: () => execTx('swap', `${amount} ETH → USDC`, async () => {
+        const adapter = await getAdapter()
+        const r = await (kit as unknown as { swap: { execute: (p: { fromToken: string; toToken: string; amount: string; adapter: unknown; networkType: string }) => Promise<{ txHash?: string }> } })
+          .swap.execute({ fromToken: 'ETH', toToken: 'USDC', amount, adapter, networkType: 'testnet' })
+        return r.txHash ?? ''
+      }),
+    })
+  }
+
+  function openBridgeConfirm() {
+    if (!amount) return setTxError('금액을 입력하세요')
+    setConfirmState({
+      title: '브릿지 확인',
+      lines: [`${amount} USDC`, `출발: ${fromChain === 'Ethereum_Sepolia' ? 'Ethereum Sepolia' : 'Base Sepolia'}`, '도착: Arc Unified Balance'],
+      warnings: [],
+      onConfirm: () => execTx('bridge', `${amount} USDC → Arc`, async () => {
+        const adapter = await getAdapter()
+        const r = await kit.unifiedBalance.deposit({ from: { adapter, chain: fromChain }, amount, token: 'USDC' })
+        return (r as { txHash?: string }).txHash ?? ''
+      }),
+    })
+  }
+
+  function openSendConfirm() {
     if (!recipient || !amount) return setTxError('주소와 금액을 입력하세요')
-    setTxLoading(true); setTxError(''); setTxHash(''); setTxStatus('전송 중...')
-    try {
-      const adapter = await getAdapter()
-      const result = await kit.unifiedBalance.spend({ amount, token: 'USDC', from: [{ adapter }],
-        to: { adapter, chain: 'Arc_Testnet', recipientAddress: recipient as `0x${string}` } })
-      setTxHash((result as { txHash?: string }).txHash ?? '')
-      setTxStatus(`✅ ${amount} USDC → ${recipient.slice(0, 6)}...${recipient.slice(-4)}`)
-      setAmount(''); setRecipient(''); loadAssets()
-    } catch (e) { setTxError(e instanceof Error ? e.message : String(e)); setTxStatus('') }
-    finally { setTxLoading(false) }
+    const warnings = validateSend(recipient, amount)
+    setConfirmState({
+      title: '전송 확인',
+      lines: [`${amount} USDC`, `받는 주소: ${recipient.slice(0, 10)}...${recipient.slice(-6)}`, '네트워크: Arc Testnet'],
+      warnings,
+      onConfirm: () => execTx('send', `${amount} USDC → ${recipient.slice(0, 8)}...`, async () => {
+        const adapter = await getAdapter()
+        const r = await kit.unifiedBalance.spend({ amount, token: 'USDC', from: [{ adapter }],
+          to: { adapter, chain: 'Arc_Testnet', recipientAddress: recipient as `0x${string}` } })
+        return (r as { txHash?: string }).txHash ?? ''
+      }),
+    })
   }
 
-  async function handleSwap() {
-    if (!amount) return setTxError('금액을 입력하세요')
-    setTxLoading(true); setTxError(''); setTxHash(''); setTxStatus('스왑 처리 중...')
-    try {
-      const adapter = await getAdapter()
-      const result = await (kit as unknown as { swap: { execute: (p: { fromToken: string; toToken: string; amount: string; adapter: unknown; networkType: string }) => Promise<{ txHash?: string }> } })
-        .swap.execute({ fromToken: 'ETH', toToken: 'USDC', amount, adapter, networkType: 'testnet' })
-      setTxHash(result.txHash ?? '')
-      setTxStatus(`✅ ${amount} ETH → USDC`)
-      setAmount(''); loadAssets()
-    } catch (e) { setTxError(e instanceof Error ? e.message : String(e)); setTxStatus('') }
-    finally { setTxLoading(false) }
-  }
+  // ─── 필터 & 정렬 ────────────────────────────────────────────────────────
+  const displayed = assets
+    .filter((a) => chainFilter === 'all' ? true : chainFilter === 'mainnet' ? !CHAIN_META[a.chain]?.isTestnet : CHAIN_META[a.chain]?.isTestnet)
+    .sort((a, b) => sortBy === 'value' ? parseFloat(b.usdcValue) - parseFloat(a.usdcValue) : sortBy === 'symbol' ? a.symbol.localeCompare(b.symbol) : a.chain - b.chain)
 
   // ─── 커넥터 목록 ────────────────────────────────────────────────────────
   function ConnectorList() {
@@ -286,12 +386,7 @@ export default function App() {
                 onClick={() => { setConnectingId(connector.uid); connect({ connector }); setShowConnectors(false) }}>
                 {isThis ? '연결 중...' : connector.name}
               </button>
-              {errMsg && (
-                <div className="connector-error">
-                  <span>{errMsg}</span>
-                  {info && <a href={info.url} target="_blank" rel="noopener noreferrer">{info.label} →</a>}
-                </div>
-              )}
+              {errMsg && <div className="connector-error"><span>{errMsg}</span>{info && <a href={info.url} target="_blank" rel="noopener noreferrer">{info.label} →</a>}</div>}
             </div>
           )
         })}
@@ -305,10 +400,17 @@ export default function App() {
       <div className="root" data-theme={theme}>
         <div className="landing">
           <div className="landing-inner">
+            <div className="landing-badge">Arc Network · USDC-First</div>
             <h1 className="landing-title">USDC Portal</h1>
-            <p className="landing-sub">모든 체인의 자산을 한 곳에서 — 실시간 USDC 환산</p>
+            <p className="landing-sub">모든 체인의 자산을 한 곳에서<br />실시간 USDC 환산 · 원클릭 스왑 · 보안 거래</p>
             <button className="btn-primary btn-lg" onClick={() => setShowConnectors((v) => !v)}>지갑 연결하기</button>
-            {showConnectors && <ConnectorList />}
+            {showConnectors && <div className="landing-connectors"><ConnectorList /></div>}
+            <div className="landing-features">
+              <span>🔒 비공개 키 없음</span>
+              <span>⚡ 서브초 정산</span>
+              <span>🌐 7개 체인</span>
+              <span>✅ 거래 확인 보호</span>
+            </div>
           </div>
         </div>
       </div>
@@ -318,16 +420,15 @@ export default function App() {
   // ─── 메인 대시보드 ──────────────────────────────────────────────────────
   return (
     <div className="root" data-theme={theme}>
+      {confirmState && <ConfirmModal state={confirmState} onCancel={() => setConfirmState(null)} />}
 
-      {/* 상단 내비바 */}
+      {/* 내비바 */}
       <nav className="navbar">
         <span className="nav-logo">USDC Portal</span>
         <div className="nav-right">
-          {/* 체인 전환 */}
           <select className="chain-select" value={activeChainId ?? ''} onChange={(e) => switchChain({ chainId: Number(e.target.value) })}>
             {CHAINS.map((c) => <option key={c.id} value={c.id}>{CHAIN_META[c.id].label}</option>)}
           </select>
-          {/* 지갑 */}
           <div className="nav-wallets">
             {connections.map((conn) =>
               conn.accounts.map((addr) => (
@@ -339,24 +440,18 @@ export default function App() {
               ))
             )}
             <button className="btn-add-wallet" onClick={() => setShowConnectors((v) => !v)}>+ 지갑 추가</button>
-            {showConnectors && (
-              <div className="wallet-dropdown">
-                <ConnectorList />
-              </div>
-            )}
+            {showConnectors && <div className="wallet-dropdown"><ConnectorList /></div>}
           </div>
-          {/* 테마 토글 */}
-          <button className="btn-theme" onClick={() => setTheme((t) => t === 'dark' ? 'light' : 'dark')} title="테마 전환">
+          <button className="btn-theme" onClick={() => setTheme((t) => t === 'dark' ? 'light' : 'dark')}>
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
         </div>
       </nav>
 
       <main className="dashboard">
-
         {/* 요약 카드 */}
         <div className="summary-grid">
-          <div className="summary-card">
+          <div className="summary-card summary-main">
             <span className="summary-label">총 자산 가치</span>
             <span className="summary-value">${totalUsdc}</span>
             <span className="summary-unit">USDC</span>
@@ -364,84 +459,117 @@ export default function App() {
           <div className="summary-card">
             <span className="summary-label">ETH 가치</span>
             <span className="summary-value" style={{ color: '#627eea' }}>${ethValue.toFixed(2)}</span>
-            <span className="summary-unit">USD</span>
           </div>
           <div className="summary-card">
             <span className="summary-label">USDC 잔액</span>
-            <span className="summary-value" style={{ color: '#2775ca' }}>${usdcValue.toFixed(2)}</span>
-            <span className="summary-unit">USDC</span>
+            <span className="summary-value" style={{ color: '#2775ca' }}>${usdcTotal.toFixed(2)}</span>
           </div>
           <div className="summary-card">
             <span className="summary-label">기타 자산</span>
             <span className="summary-value">${otherValue.toFixed(2)}</span>
-            <span className="summary-unit">USD</span>
           </div>
         </div>
 
-        {/* 자산 테이블 + 액션 패널 */}
-        <div className="content-grid">
-
-          {/* 자산 테이블 */}
-          <div className="panel">
-            <div className="panel-header">
-              <div className="panel-title-row">
-                <h2 className="panel-title">자산 목록</h2>
-                <button className="btn-icon" onClick={loadAssets} disabled={loadingAssets} title="새로고침">
-                  {loadingAssets ? '⟳' : '↻'}
-                </button>
-              </div>
-              <div className="table-controls">
-                <div className="filter-tabs">
-                  {(['all', 'mainnet', 'testnet'] as ChainFilter[]).map((f) => (
-                    <button key={f} className={`filter-tab ${chainFilter === f ? 'active' : ''}`} onClick={() => setChainFilter(f)}>
-                      {{ all: '전체', mainnet: '메인넷', testnet: '테스트넷' }[f]}
-                    </button>
-                  ))}
-                </div>
-                <select className="sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
-                  <option value="value">가치 순</option>
-                  <option value="symbol">토큰 순</option>
-                  <option value="chain">체인 순</option>
-                </select>
-              </div>
+        {/* 포트폴리오 분포 바 */}
+        {chainBreakdown.length > 0 && parseFloat(totalUsdc) > 0 && (
+          <div className="portfolio-bar-wrap">
+            <div className="portfolio-bar">
+              {chainBreakdown.map((c) => (
+                <div key={c.id} className="bar-seg" title={`${CHAIN_META[c.id].label}: $${c.val.toFixed(2)}`}
+                  style={{ width: `${(c.val / parseFloat(totalUsdc)) * 100}%`, background: CHAIN_META[c.id].color }} />
+              ))}
             </div>
-            <div className="table-wrap">
-              <table className="asset-table">
-                <thead>
-                  <tr>
-                    <th>토큰</th>
-                    <th>체인</th>
-                    <th>지갑</th>
-                    <th className="text-right">잔액</th>
-                    <th className="text-right">USDC 가치</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loadingAssets ? <SkeletonRows /> : displayed.length === 0 ? (
-                    <tr><td colSpan={5} className="empty-cell">보유 자산이 없어요</td></tr>
-                  ) : displayed.map((a, i) => (
-                    <tr key={i} className="asset-tr">
-                      <td>
-                        <div className="token-cell">
-                          <TokenIcon symbol={a.symbol} />
-                          <span className="token-name">{a.symbol}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="chain-dot" style={{ background: CHAIN_META[a.chain]?.color }} />
-                        <span className="chain-label">{CHAIN_META[a.chain]?.label}</span>
-                      </td>
-                      <td className="wallet-cell">{a.wallet}</td>
-                      <td className="text-right mono">{a.balance}</td>
-                      <td className="text-right usdc-val">${a.usdcValue}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="bar-legend">
+              {chainBreakdown.map((c) => (
+                <span key={c.id} className="legend-item">
+                  <span className="legend-dot" style={{ background: CHAIN_META[c.id].color }} />
+                  {CHAIN_META[c.id].label} {((c.val / parseFloat(totalUsdc)) * 100).toFixed(1)}%
+                </span>
+              ))}
             </div>
           </div>
+        )}
 
-          {/* 액션 패널 */}
+        {/* 메인 콘텐츠 그리드 */}
+        <div className="content-grid">
+
+          {/* 왼쪽: 자산 테이블 / 히스토리 */}
+          <div className="panel">
+            <div className="panel-header">
+              <div className="main-tabs">
+                <button className={`main-tab ${mainTab === 'assets' ? 'active' : ''}`} onClick={() => setMainTab('assets')}>자산 목록</button>
+                <button className={`main-tab ${mainTab === 'history' ? 'active' : ''}`} onClick={() => setMainTab('history')}>
+                  거래 기록 {history.length > 0 && <span className="history-badge">{history.length}</span>}
+                </button>
+              </div>
+              {mainTab === 'assets' && (
+                <div className="table-controls">
+                  <div className="filter-tabs">
+                    {(['all', 'mainnet', 'testnet'] as ChainFilter[]).map((f) => (
+                      <button key={f} className={`filter-tab ${chainFilter === f ? 'active' : ''}`} onClick={() => setChainFilter(f)}>
+                        {{ all: '전체', mainnet: '메인넷', testnet: '테스트넷' }[f]}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <select className="sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
+                      <option value="value">가치 순</option>
+                      <option value="symbol">토큰 순</option>
+                      <option value="chain">체인 순</option>
+                    </select>
+                    <button className="btn-icon" onClick={loadAssets} disabled={loadingAssets}>↻</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {mainTab === 'assets' ? (
+              <div className="table-wrap">
+                <table className="asset-table">
+                  <thead>
+                    <tr>
+                      <th>토큰</th><th>체인</th><th>지갑</th>
+                      <th className="text-right">잔액</th><th className="text-right">USDC 가치</th><th className="text-right">24h</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingAssets ? <SkeletonRows /> : displayed.length === 0 ? (
+                      <tr><td colSpan={6} className="empty-cell">보유 자산이 없어요</td></tr>
+                    ) : displayed.map((a, i) => (
+                      <tr key={i} className="asset-tr">
+                        <td><div className="token-cell"><TokenIcon symbol={a.symbol} /><span className="token-name">{a.symbol}</span></div></td>
+                        <td><span className="chain-dot" style={{ background: CHAIN_META[a.chain]?.color }} /><span className="chain-label">{CHAIN_META[a.chain]?.label}</span></td>
+                        <td className="wallet-cell">{a.wallet}</td>
+                        <td className="text-right mono">{a.balance}</td>
+                        <td className="text-right usdc-val">${a.usdcValue}</td>
+                        <td className="text-right"><Change24h value={a.change24h} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="history-list">
+                {history.length === 0 ? (
+                  <div className="empty-cell">아직 거래 기록이 없어요</div>
+                ) : history.map((h, i) => (
+                  <div key={i} className={`history-row ${h.status}`}>
+                    <div className="history-left">
+                      <span className={`history-type ${h.type}`}>{{ swap: '스왑', bridge: '브릿지', send: '전송' }[h.type]}</span>
+                      <span className="history-summary">{h.summary}</span>
+                    </div>
+                    <div className="history-right">
+                      <span className="history-time">{new Date(h.timestamp).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                      {h.txHash && <a className="history-link" href={`https://testnet.arcscan.app/tx/${h.txHash}`} target="_blank" rel="noopener noreferrer">ArcScan →</a>}
+                      <span className={`history-status ${h.status}`}>{h.status === 'success' ? '✅' : '❌'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 오른쪽: 액션 패널 */}
           <div className="panel action-panel">
             <div className="action-tabs">
               {(['swap', 'bridge', 'send'] as ActionTab[]).map((t) => (
@@ -451,46 +579,33 @@ export default function App() {
                 </button>
               ))}
             </div>
-
             <div className="action-body">
-              {actionTab === 'swap' && (
-                <>
-                  <p className="action-desc">ETH → USDC 스왑 (Arc Testnet)</p>
-                  <div className="swap-row">
-                    <div className="swap-badge">ETH</div>
-                    <span className="swap-arrow">→</span>
-                    <div className="swap-badge">USDC</div>
-                  </div>
-                  <label className="input-label">금액 (ETH)</label>
-                  <input className="action-input" type="number" placeholder="0.0" value={amount} onChange={(e) => setAmount(e.target.value)} />
-                  <button className="btn-primary" onClick={handleSwap} disabled={txLoading}>{txLoading ? '처리 중...' : 'USDC로 스왑'}</button>
-                </>
-              )}
-
-              {actionTab === 'bridge' && (
-                <>
-                  <p className="action-desc">다른 체인 USDC → Arc Unified Balance</p>
-                  <label className="input-label">출발 체인</label>
-                  <select className="action-input" value={fromChain} onChange={(e) => setFromChain(e.target.value as typeof fromChain)}>
-                    <option value="Ethereum_Sepolia">Ethereum Sepolia</option>
-                    <option value="Base_Sepolia">Base Sepolia</option>
-                  </select>
-                  <label className="input-label">금액 (USDC)</label>
-                  <input className="action-input" type="number" placeholder="0.0" value={amount} onChange={(e) => setAmount(e.target.value)} />
-                  <button className="btn-primary" onClick={handleBridge} disabled={txLoading}>{txLoading ? '처리 중...' : 'Arc로 브릿지'}</button>
-                </>
-              )}
-
-              {actionTab === 'send' && (
-                <>
-                  <p className="action-desc">USDC 전송 (Arc Testnet)</p>
-                  <label className="input-label">받는 주소</label>
-                  <input className="action-input" type="text" placeholder="0x..." value={recipient} onChange={(e) => setRecipient(e.target.value)} />
-                  <label className="input-label">금액 (USDC)</label>
-                  <input className="action-input" type="number" placeholder="0.0" value={amount} onChange={(e) => setAmount(e.target.value)} />
-                  <button className="btn-primary" onClick={handleSend} disabled={txLoading}>{txLoading ? '전송 중...' : 'USDC 전송'}</button>
-                </>
-              )}
+              {actionTab === 'swap' && <>
+                <p className="action-desc">ETH → USDC 스왑 (Arc Testnet)</p>
+                <div className="swap-row"><div className="swap-badge">ETH</div><span className="swap-arrow">→</span><div className="swap-badge">USDC</div></div>
+                <label className="input-label">금액 (ETH)</label>
+                <input className="action-input" type="number" placeholder="0.0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                <button className="btn-primary" onClick={openSwapConfirm} disabled={txLoading}>{txLoading ? '처리 중...' : 'USDC로 스왑'}</button>
+              </>}
+              {actionTab === 'bridge' && <>
+                <p className="action-desc">USDC → Arc Unified Balance</p>
+                <label className="input-label">출발 체인</label>
+                <select className="action-input" value={fromChain} onChange={(e) => setFromChain(e.target.value as typeof fromChain)}>
+                  <option value="Ethereum_Sepolia">Ethereum Sepolia</option>
+                  <option value="Base_Sepolia">Base Sepolia</option>
+                </select>
+                <label className="input-label">금액 (USDC)</label>
+                <input className="action-input" type="number" placeholder="0.0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                <button className="btn-primary" onClick={openBridgeConfirm} disabled={txLoading}>{txLoading ? '처리 중...' : 'Arc로 브릿지'}</button>
+              </>}
+              {actionTab === 'send' && <>
+                <p className="action-desc">USDC 전송 (Arc Testnet)</p>
+                <label className="input-label">받는 주소</label>
+                <input className="action-input" type="text" placeholder="0x..." value={recipient} onChange={(e) => setRecipient(e.target.value)} />
+                <label className="input-label">금액 (USDC)</label>
+                <input className="action-input" type="number" placeholder="0.0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                <button className="btn-primary" onClick={openSendConfirm} disabled={txLoading}>{txLoading ? '처리 중...' : 'USDC 전송'}</button>
+              </>}
 
               {(txStatus || txError) && (
                 <div className={`tx-status ${txError ? 'error' : 'success'}`}>
@@ -498,9 +613,14 @@ export default function App() {
                   {txHash && <a href={`https://testnet.arcscan.app/tx/${txHash}`} target="_blank" rel="noopener noreferrer">ArcScan →</a>}
                 </div>
               )}
+
+              {/* 보안 안내 */}
+              <div className="security-note">
+                🔒 거래 서명 전 내용을 반드시 확인하세요.<br />
+                USDC Portal은 개인키를 저장하지 않습니다.
+              </div>
             </div>
           </div>
-
         </div>
       </main>
     </div>

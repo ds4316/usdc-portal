@@ -560,6 +560,123 @@ body {
 .connector-error a { color: var(--accent); font-size: 0.78rem; text-decoration: none; white-space: nowrap; }
 .connector-error a:hover { text-decoration: underline; }
 
+/* ─── 랜딩 개선 ──────────────────────────────────────────────────────── */
+.landing-badge {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 20px;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 4px 14px;
+}
+.landing-connectors { width: 100%; max-width: 280px; }
+.landing-features {
+  display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;
+  color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;
+}
+
+/* ─── 포트폴리오 분포 바 ──────────────────────────────────────────────── */
+.portfolio-bar-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 18px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.portfolio-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; }
+.bar-seg { border-radius: 2px; transition: opacity 0.2s; min-width: 4px; cursor: default; }
+.bar-seg:hover { opacity: 0.75; }
+.bar-legend { display: flex; flex-wrap: wrap; gap: 12px; }
+.legend-item { display: flex; align-items: center; gap: 5px; color: var(--text-sub); font-size: 0.78rem; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ─── 메인 탭 ─────────────────────────────────────────────────────────── */
+.main-tabs {
+  display: flex; border-bottom: 1px solid var(--border);
+  margin: -1px -1px 0; padding: 0 4px;
+}
+.main-tab {
+  background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--text-muted); cursor: pointer; font-size: 0.85rem; font-weight: 500;
+  padding: 12px 16px; width: auto; transition: color 0.15s, border-color 0.15s;
+  display: flex; align-items: center; gap: 6px; margin-bottom: -1px;
+}
+.main-tab:hover { color: var(--text-sub); }
+.main-tab.active { border-bottom-color: var(--accent); color: var(--text); font-weight: 600; }
+.history-badge {
+  background: var(--accent); border-radius: 10px; color: #fff;
+  font-size: 0.7rem; font-weight: 700; padding: 1px 6px;
+}
+
+/* ─── 24h 변동 ────────────────────────────────────────────────────────── */
+.change24 { font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+.change24.pos { color: #26a17b; }
+.change24.neg { color: #f44336; }
+
+/* ─── 거래 히스토리 ───────────────────────────────────────────────────── */
+.history-list { display: flex; flex-direction: column; }
+.history-row {
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--border); padding: 12px 20px; gap: 12px;
+  transition: background 0.12s;
+}
+.history-row:last-child { border-bottom: none; }
+.history-row:hover { background: var(--surface2); }
+.history-left { display: flex; align-items: center; gap: 10px; }
+.history-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.history-type {
+  border-radius: 6px; font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.04em; padding: 3px 8px; text-transform: uppercase;
+}
+.history-type.swap   { background: color-mix(in srgb, #627eea 15%, transparent); color: #627eea; }
+.history-type.bridge { background: color-mix(in srgb, #00c2ff 15%, transparent); color: #00c2ff; }
+.history-type.send   { background: color-mix(in srgb, #26a17b 15%, transparent); color: #26a17b; }
+.history-summary { color: var(--text); font-size: 0.85rem; }
+.history-time    { color: var(--text-muted); font-size: 0.75rem; }
+.history-link    { color: var(--accent); font-size: 0.75rem; text-decoration: none; }
+.history-link:hover { text-decoration: underline; }
+.history-status  { font-size: 0.85rem; }
+
+/* ─── 확인 모달 ───────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; backdrop-filter: blur(4px);
+}
+.modal {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  padding: 28px; width: 100%; max-width: 400px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.modal-title { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+.modal-lines {
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 16px;
+}
+.modal-line { color: var(--text-sub); font-size: 0.88rem; }
+.modal-warnings { display: flex; flex-direction: column; gap: 6px; }
+.modal-warning {
+  background: color-mix(in srgb, #f5ac37 12%, transparent);
+  border: 1px solid color-mix(in srgb, #f5ac37 40%, transparent);
+  border-radius: 8px; color: #f5ac37; font-size: 0.82rem; padding: 8px 12px;
+}
+.modal-actions { display: flex; gap: 10px; }
+.btn-cancel {
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: 8px; color: var(--text-sub); cursor: pointer;
+  flex: 1; font-size: 0.9rem; padding: 11px; transition: border-color 0.2s;
+}
+.btn-confirm { flex: 2; }
+
+/* ─── 보안 안내 ───────────────────────────────────────────────────────── */
+.security-note {
+  border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-muted); font-size: 0.75rem;
+  line-height: 1.6; padding: 10px 14px; text-align: center;
+}
+
 /* ─── 스켈레톤 ──────────────────────────────────────────────────────── */
 @keyframes shimmer {
   0%, 100% { opacity: 0.25; }
