@@ -560,6 +560,129 @@ body {
 .connector-error a { color: var(--accent); font-size: 0.78rem; text-decoration: none; white-space: nowrap; }
 .connector-error a:hover { text-decoration: underline; }
 
+/* ─── 네트워크 토글 ──────────────────────────────────────────────────── */
+.network-toggle {
+  display: flex;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.net-btn {
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  transition: background 0.15s, color 0.15s;
+  width: auto;
+}
+
+.net-btn.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+.net-btn.active:first-child { color: #26a17b; }
+.net-btn.active:last-child  { color: var(--accent); }
+
+/* ─── 네트워크 인디케이터 ────────────────────────────────────────────── */
+.network-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.net-indicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.net-indicator.mainnet { background: #26a17b; }
+.net-indicator.testnet { background: var(--accent); }
+
+/* ─── 미연결 프롬프트 ────────────────────────────────────────────────── */
+.connect-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 20px;
+}
+
+.connect-prompt-icon { font-size: 2.5rem; }
+
+.connect-prompt-title {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.connect-prompt-sub {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+/* ─── 파우셋 ─────────────────────────────────────────────────────────── */
+.faucet-list { display: flex; flex-direction: column; }
+
+.faucet-header { padding: 14px 20px; border-bottom: 1px solid var(--border); }
+.faucet-desc { color: var(--text-muted); font-size: 0.82rem; line-height: 1.5; }
+
+.faucet-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding: 14px 20px;
+  text-decoration: none;
+  transition: background 0.12s;
+  gap: 12px;
+}
+
+.faucet-row:last-of-type { border-bottom: none; }
+.faucet-row:hover { background: var(--surface2); }
+
+.faucet-left { display: flex; align-items: center; gap: 10px; }
+
+.faucet-text { display: flex; flex-direction: column; gap: 3px; }
+.faucet-name  { color: var(--text); font-size: 0.88rem; font-weight: 600; }
+.faucet-chain { color: var(--text-muted); font-size: 0.75rem; }
+
+.faucet-tokens { display: flex; align-items: center; gap: 6px; }
+
+.faucet-token {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+}
+
+.faucet-arrow { color: var(--text-muted); font-size: 0.9rem; }
+
+.faucet-tip {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-top: 1px solid var(--border);
+  color: var(--text-sub);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  padding: 12px 20px;
+}
+
 /* ─── 랜딩 개선 ──────────────────────────────────────────────────────── */
 .landing-badge {
   background: color-mix(in srgb, var(--accent) 15%, transparent);

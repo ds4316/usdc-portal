@@ -113,10 +113,29 @@ interface ConfirmState {
   onConfirm: () => void
 }
 
-type ChainFilter = 'all' | 'mainnet' | 'testnet'
+type NetworkMode = 'mainnet' | 'testnet'
 type ActionTab = 'swap' | 'bridge' | 'send'
-type MainTab = 'assets' | 'history'
+type MainTab = 'assets' | 'history' | 'faucet'
 type Theme = 'dark' | 'light'
+
+const MAINNET_IDS = new Set<number>([mainnet.id, base.id, polygon.id, arbitrum.id])
+const TESTNET_IDS = new Set<number>([arcTestnet.id, sepolia.id, baseSepolia.id])
+
+// ─── 파우셋 데이터 ─────────────────────────────────────────────────────────
+interface FaucetInfo { chain: string; chainId: number; name: string; url: string; tokens: string[]; desc: string }
+
+const FAUCETS: FaucetInfo[] = [
+  { chain: 'Arc Testnet', chainId: arcTestnet.id, name: 'Circle Faucet', url: 'https://faucet.circle.com',
+    tokens: ['USDC'], desc: '공식 Circle 파우셋 — Arc Testnet USDC 지급' },
+  { chain: 'Ethereum Sepolia', chainId: sepolia.id, name: 'Alchemy Faucet', url: 'https://sepoliafaucet.com',
+    tokens: ['ETH'], desc: 'Sepolia 테스트 ETH — 하루 0.5 ETH' },
+  { chain: 'Ethereum Sepolia', chainId: sepolia.id, name: 'Chainlink Faucet', url: 'https://faucets.chain.link/sepolia',
+    tokens: ['ETH', 'LINK'], desc: 'ETH + LINK 동시 지급' },
+  { chain: 'Base Sepolia', chainId: baseSepolia.id, name: 'Base Faucet', url: 'https://faucet.quicknode.com/base/sepolia',
+    tokens: ['ETH'], desc: 'Base Sepolia 테스트 ETH' },
+  { chain: 'Base Sepolia', chainId: baseSepolia.id, name: 'Coinbase Faucet', url: 'https://www.coinbase.com/faucets/base-ethereum-goerli-faucet',
+    tokens: ['ETH'], desc: 'Coinbase 공식 Base 파우셋' },
+]
 
 // ─── Public clients ────────────────────────────────────────────────────────
 const publicClients = Object.fromEntries(
@@ -198,9 +217,9 @@ export default function App() {
   const { switchChain } = useSwitchChain()
 
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) ?? 'dark')
+  const [networkMode, setNetworkMode] = useState<NetworkMode>(() => (localStorage.getItem('networkMode') as NetworkMode) ?? 'mainnet')
   const [mainTab, setMainTab] = useState<MainTab>('assets')
   const [actionTab, setActionTab] = useState<ActionTab>('swap')
-  const [chainFilter, setChainFilter] = useState<ChainFilter>('all')
   const [sortBy, setSortBy] = useState<'value' | 'symbol' | 'chain'>('value')
 
   const [assets, setAssets] = useState<AssetRow[]>([])
@@ -226,6 +245,7 @@ export default function App() {
   const activeChainId = connections[0]?.chainId
 
   useEffect(() => { localStorage.setItem('theme', theme) }, [theme])
+  useEffect(() => { localStorage.setItem('networkMode', networkMode) }, [networkMode])
   useEffect(() => { if (allAddresses.length) loadAssets() }, [connections.length, allAddresses.join(',')])
 
   // ─── 자산 조회 ──────────────────────────────────────────────────────────
@@ -368,7 +388,7 @@ export default function App() {
 
   // ─── 필터 & 정렬 ────────────────────────────────────────────────────────
   const displayed = assets
-    .filter((a) => chainFilter === 'all' ? true : chainFilter === 'mainnet' ? !CHAIN_META[a.chain]?.isTestnet : CHAIN_META[a.chain]?.isTestnet)
+    .filter((a) => networkMode === 'mainnet' ? MAINNET_IDS.has(a.chain) : TESTNET_IDS.has(a.chain))
     .sort((a, b) => sortBy === 'value' ? parseFloat(b.usdcValue) - parseFloat(a.usdcValue) : sortBy === 'symbol' ? a.symbol.localeCompare(b.symbol) : a.chain - b.chain)
 
   // ─── 커넥터 목록 ────────────────────────────────────────────────────────
@@ -394,30 +414,7 @@ export default function App() {
     )
   }
 
-  // ─── 미연결 화면 ────────────────────────────────────────────────────────
-  if (!isConnected) {
-    return (
-      <div className="root" data-theme={theme}>
-        <div className="landing">
-          <div className="landing-inner">
-            <div className="landing-badge">Arc Network · USDC-First</div>
-            <h1 className="landing-title">USDC Portal</h1>
-            <p className="landing-sub">모든 체인의 자산을 한 곳에서<br />실시간 USDC 환산 · 원클릭 스왑 · 보안 거래</p>
-            <button className="btn-primary btn-lg" onClick={() => setShowConnectors((v) => !v)}>지갑 연결하기</button>
-            {showConnectors && <div className="landing-connectors"><ConnectorList /></div>}
-            <div className="landing-features">
-              <span>🔒 비공개 키 없음</span>
-              <span>⚡ 서브초 정산</span>
-              <span>🌐 7개 체인</span>
-              <span>✅ 거래 확인 보호</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // ─── 메인 대시보드 ──────────────────────────────────────────────────────
+  // ─── 메인 대시보드 (항상 표시) ─────────────────────────────────────────
   return (
     <div className="root" data-theme={theme}>
       {confirmState && <ConfirmModal state={confirmState} onCancel={() => setConfirmState(null)} />}
@@ -426,9 +423,19 @@ export default function App() {
       <nav className="navbar">
         <span className="nav-logo">USDC Portal</span>
         <div className="nav-right">
-          <select className="chain-select" value={activeChainId ?? ''} onChange={(e) => switchChain({ chainId: Number(e.target.value) })}>
-            {CHAINS.map((c) => <option key={c.id} value={c.id}>{CHAIN_META[c.id].label}</option>)}
-          </select>
+          {/* 메인넷 / 테스트넷 토글 */}
+          <div className="network-toggle">
+            <button className={`net-btn ${networkMode === 'mainnet' ? 'active' : ''}`} onClick={() => setNetworkMode('mainnet')}>Mainnet</button>
+            <button className={`net-btn ${networkMode === 'testnet' ? 'active' : ''}`} onClick={() => setNetworkMode('testnet')}>Testnet</button>
+          </div>
+          {/* 체인 전환 */}
+          {isConnected && (
+            <select className="chain-select" value={activeChainId ?? ''} onChange={(e) => switchChain({ chainId: Number(e.target.value) })}>
+              {CHAINS.filter((c) => networkMode === 'mainnet' ? MAINNET_IDS.has(c.id) : TESTNET_IDS.has(c.id))
+                .map((c) => <option key={c.id} value={c.id}>{CHAIN_META[c.id].label}</option>)}
+            </select>
+          )}
+          {/* 지갑 */}
           <div className="nav-wallets">
             {connections.map((conn) =>
               conn.accounts.map((addr) => (
@@ -439,7 +446,9 @@ export default function App() {
                 </div>
               ))
             )}
-            <button className="btn-add-wallet" onClick={() => setShowConnectors((v) => !v)}>+ 지갑 추가</button>
+            <button className="btn-add-wallet" onClick={() => setShowConnectors((v) => !v)}>
+              {isConnected ? '+ 지갑 추가' : '지갑 연결'}
+            </button>
             {showConnectors && <div className="wallet-dropdown"><ConnectorList /></div>}
           </div>
           <button className="btn-theme" onClick={() => setTheme((t) => t === 'dark' ? 'light' : 'dark')}>
@@ -501,15 +510,17 @@ export default function App() {
                 <button className={`main-tab ${mainTab === 'history' ? 'active' : ''}`} onClick={() => setMainTab('history')}>
                   거래 기록 {history.length > 0 && <span className="history-badge">{history.length}</span>}
                 </button>
+                {networkMode === 'testnet' && (
+                  <button className={`main-tab ${mainTab === 'faucet' ? 'active' : ''}`} onClick={() => setMainTab('faucet')}>
+                    🚰 파우셋
+                  </button>
+                )}
               </div>
               {mainTab === 'assets' && (
                 <div className="table-controls">
-                  <div className="filter-tabs">
-                    {(['all', 'mainnet', 'testnet'] as ChainFilter[]).map((f) => (
-                      <button key={f} className={`filter-tab ${chainFilter === f ? 'active' : ''}`} onClick={() => setChainFilter(f)}>
-                        {{ all: '전체', mainnet: '메인넷', testnet: '테스트넷' }[f]}
-                      </button>
-                    ))}
+                  <div className="network-label">
+                    <span className={`net-indicator ${networkMode}`} />
+                    {networkMode === 'mainnet' ? '메인넷 자산' : '테스트넷 자산'}
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <select className="sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
@@ -524,6 +535,14 @@ export default function App() {
             </div>
 
             {mainTab === 'assets' ? (
+              !isConnected ? (
+                <div className="connect-prompt">
+                  <div className="connect-prompt-icon">🔌</div>
+                  <p className="connect-prompt-title">지갑을 연결해주세요</p>
+                  <p className="connect-prompt-sub">지갑을 연결하면 보유 자산이 실시간으로 표시돼요</p>
+                  <button className="btn-primary" style={{ maxWidth: 200 }} onClick={() => setShowConnectors(true)}>지갑 연결하기</button>
+                </div>
+              ) : (
               <div className="table-wrap">
                 <table className="asset-table">
                   <thead>
@@ -548,7 +567,8 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
-            ) : (
+              )
+            ) : mainTab === 'history' ? (
               <div className="history-list">
                 {history.length === 0 ? (
                   <div className="empty-cell">아직 거래 기록이 없어요</div>
@@ -565,6 +585,31 @@ export default function App() {
                     </div>
                   </div>
                 ))}
+              </div>
+            ) : (
+              /* 파우셋 탭 */
+              <div className="faucet-list">
+                <div className="faucet-header">
+                  <p className="faucet-desc">테스트 토큰을 무료로 받을 수 있어요. 아래 파우셋을 클릭하면 외부 사이트로 이동해요.</p>
+                </div>
+                {FAUCETS.map((f, i) => (
+                  <a key={i} href={f.url} target="_blank" rel="noopener noreferrer" className="faucet-row">
+                    <div className="faucet-left">
+                      <span className="chain-dot" style={{ background: CHAIN_META[f.chainId]?.color }} />
+                      <div className="faucet-text">
+                        <span className="faucet-name">{f.name}</span>
+                        <span className="faucet-chain">{f.chain} · {f.desc}</span>
+                      </div>
+                    </div>
+                    <div className="faucet-tokens">
+                      {f.tokens.map((t) => <span key={t} className="faucet-token">{t}</span>)}
+                      <span className="faucet-arrow">→</span>
+                    </div>
+                  </a>
+                ))}
+                <div className="faucet-tip">
+                  💡 Arc Testnet USDC는 Circle Faucet에서 받으세요. 지갑 주소를 입력하면 즉시 지급돼요.
+                </div>
               </div>
             )}
           </div>
