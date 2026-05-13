@@ -1,4 +1,4 @@
-import { createConfig, http } from 'wagmi'
+import { createConfig, http, fallback } from 'wagmi'
 import { mainnet, base, polygon, arbitrum, sepolia, baseSepolia } from 'wagmi/chains'
 import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors'
 
@@ -28,10 +28,10 @@ export const wagmiConfig = createConfig({
     coinbaseWallet({ appName: 'USDC Portal' }),
   ],
   transports: {
-    [mainnet.id]:     http('https://cloudflare-eth.com'),
-    [base.id]:        http('https://mainnet.base.org'),
-    [polygon.id]:     http('https://polygon-rpc.com'),
-    [arbitrum.id]:    http('https://arb1.arbitrum.io/rpc'),
+    [mainnet.id]:     fallback([http('https://eth.llamarpc.com'), http('https://1rpc.io/eth')]),
+    [base.id]:        fallback([http('https://mainnet.base.org'), http('https://1rpc.io/base')]),
+    [polygon.id]:     fallback([http('https://polygon.llamarpc.com'), http('https://1rpc.io/matic')]),
+    [arbitrum.id]:    fallback([http('https://arb1.arbitrum.io/rpc'), http('https://1rpc.io/arb')]),
     [arcTestnet.id]:  http('https://rpc.testnet.arc.network'),
     [sepolia.id]:     http(),
     [baseSepolia.id]: http(),
