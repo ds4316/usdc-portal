@@ -169,3 +169,430 @@ button:disabled {
 .status a:hover {
   text-decoration: underline;
 }
+
+/* ─── 지갑 연결 ─────────────────────────────────────────────── */
+.connect-card {
+  text-align: center;
+  gap: 20px;
+}
+
+.connect-desc {
+  color: #888;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.connector-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.btn-connector {
+  background: #1e1e2e;
+  border: 1px solid #2a2a3a;
+  border-radius: 10px;
+  color: #e0e0e0;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  padding: 12px;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+
+.btn-connector:hover {
+  border-color: #00c2ff;
+}
+
+.btn-connector.has-error {
+  border-color: #f44336;
+}
+
+.connector-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.connector-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #1a0a0a;
+  border: 1px solid #3a1a1a;
+  border-radius: 8px;
+  color: #f44336;
+  font-size: 0.8rem;
+  padding: 8px 12px;
+}
+
+.connector-error a {
+  color: #00c2ff;
+  font-size: 0.8rem;
+  text-decoration: none;
+  white-space: nowrap;
+  margin-left: 8px;
+}
+
+.connector-error a:hover {
+  text-decoration: underline;
+}
+
+/* ─── 지갑 목록 ─────────────────────────────────────────────── */
+.wallets-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wallet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wallet-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #0a0a0f;
+  border: 1px solid #1e1e2e;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.wallet-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wallet-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4caf50;
+  flex-shrink: 0;
+}
+
+.wallet-address {
+  font-size: 0.9rem;
+  font-family: monospace;
+  color: #ccc;
+}
+
+.chain-badge {
+  border: 1px solid;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  color: #aaa;
+}
+
+.btn-disconnect {
+  background: transparent;
+  border: 1px solid #2a2a3a;
+  border-radius: 8px;
+  color: #666;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  width: auto;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.btn-disconnect:hover {
+  border-color: #f44336;
+  color: #f44336;
+}
+
+/* ─── 체인 전환 ─────────────────────────────────────────────── */
+.chain-switch-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-chain {
+  background: #0a0a0f;
+  border: 1px solid #2a2a3a;
+  border-radius: 8px;
+  color: #666;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 8px 14px;
+  width: auto;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.btn-chain.active {
+  background: #0a0a0f;
+}
+
+/* ─── 탭 ────────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 4px;
+  background: #13131a;
+  border: 1px solid #1e1e2e;
+  border-radius: 12px;
+  padding: 6px;
+}
+
+.tab {
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #666;
+  cursor: pointer;
+  flex: 1;
+  font-size: 0.9rem;
+  padding: 10px;
+  transition: background 0.2s, color 0.2s;
+  width: auto;
+}
+
+.tab.active {
+  background: #1e1e2e;
+  color: #fff;
+}
+
+.tab:hover:not(.active) {
+  color: #aaa;
+}
+
+/* ─── 자산 목록 ─────────────────────────────────────────────── */
+.assets-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.btn-refresh {
+  background: transparent;
+  border: 1px solid #2a2a3a;
+  border-radius: 8px;
+  color: #666;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  width: auto;
+  transition: border-color 0.2s;
+}
+
+.btn-refresh:hover:not(:disabled) {
+  border-color: #00c2ff;
+  color: #00c2ff;
+}
+
+.total-label {
+  color: #555;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.empty-msg {
+  color: #444;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 12px 0;
+}
+
+/* ─── 필터 ──────────────────────────────────────────────────── */
+.filter-row {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-filter {
+  background: #0a0a0f;
+  border: 1px solid #2a2a3a;
+  border-radius: 20px;
+  color: #555;
+  cursor: pointer;
+  font-size: 0.78rem;
+  padding: 5px 14px;
+  width: auto;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.btn-filter.active {
+  border-color: #00c2ff;
+  color: #00c2ff;
+}
+
+/* ─── 자산 목록 ─────────────────────────────────────────────── */
+.asset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.asset-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #0a0a0f;
+  border: 1px solid #1e1e2e;
+  border-left: 3px solid;
+  border-radius: 10px;
+  padding: 12px 14px;
+  transition: background 0.15s;
+}
+
+.asset-row:hover {
+  background: #0f0f18;
+}
+
+.asset-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.asset-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.asset-symbol {
+  color: #e0e0e0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.asset-chain {
+  color: #555;
+  font-size: 0.75rem;
+}
+
+.asset-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.asset-balance {
+  color: #ccc;
+  font-size: 0.9rem;
+}
+
+.asset-usdc {
+  color: #00c2ff;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* ─── 토큰 아이콘 ────────────────────────────────────────────── */
+.token-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ─── 총 자산 ────────────────────────────────────────────────── */
+.total-usdc {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0 4px;
+  gap: 2px;
+}
+
+.total-value {
+  color: #fff;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.total-unit {
+  color: #555;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+}
+
+/* ─── 스켈레톤 로딩 ─────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { opacity: 0.3; }
+  50%  { opacity: 0.7; }
+  100% { opacity: 0.3; }
+}
+
+.skeleton {
+  background: #1e1e2e;
+  border-radius: 6px;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-row {
+  pointer-events: none;
+}
+
+.skeleton-symbol  { width: 60px;  height: 14px; }
+.skeleton-chain   { width: 100px; height: 11px; margin-top: 4px; }
+.skeleton-balance { width: 70px;  height: 13px; }
+.skeleton-usdc    { width: 50px;  height: 12px; margin-top: 4px; }
+
+/* ─── 탭 공통 ───────────────────────────────────────────────── */
+.tab-desc {
+  color: #555;
+  font-size: 0.85rem;
+}
+
+.btn-primary {
+  background: linear-gradient(90deg, #0052ff, #00c2ff);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 14px;
+  width: 100%;
+  transition: opacity 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ─── 스왑 ──────────────────────────────────────────────────── */
+.swap-direction {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.swap-token {
+  background: #1e1e2e;
+  border: 1px solid #2a2a3a;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 10px 24px;
+}
+
+.swap-arrow {
+  color: #00c2ff;
+  font-size: 1.2rem;
+}
