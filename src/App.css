@@ -209,8 +209,6 @@ body {
 /* ─── 대시보드 레이아웃 ───────────────────────────────────────────────── */
 .dashboard {
   flex: 1;
-  max-width: 1440px;
-  margin: 0 auto;
   padding: 24px 28px;
   width: 100%;
   display: flex;
