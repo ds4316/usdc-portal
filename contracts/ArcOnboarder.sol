@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+// ⚠️  TESTNET ONLY — 메인넷 배포 전 아래 항목 반드시 수정할 것:
+//   1. Reentrancy: bridgeUSDCToArc / bridgeETHToArc에 ReentrancyGuard 추가
+//   2. arcRecipient zero-address 체크 추가
+//   3. Swap deadline 파라미터 추가 (front-running 방지)
+//   4. 주소 하드코딩 → 생성자 파라미터로 변경 (멀티체인 지원)
+//   5. rescue() 함수에 timelock 또는 multisig 적용 고려
+
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
 interface ISwapRouter {
