@@ -49,7 +49,7 @@ interface ITokenMessenger {
 // 목적지:    Arc Testnet (CCTP Domain 26)
 //
 // 생성자 파라미터 (Sepolia):
-//   _router    = 0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48  (Uniswap V3 SwapRouter02)
+//   _router    = 0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E  (Uniswap V3 SwapRouter02)
 //   _messenger = 0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA  (CCTP V2 TokenMessenger)
 //   _usdc      = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238  (Sepolia USDC)
 //   _weth      = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14  (Sepolia WETH)
