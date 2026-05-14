@@ -21,6 +21,19 @@ const ERC20_ABI = [
     inputs: [{ name: 'account', type: 'address' }], outputs: [{ name: '', type: 'uint256' }] },
 ] as const
 
+// ─── USDCPaymentHub 컨트랙트 ──────────────────────────────────────────────
+const PAYMENT_HUB_ADDRESS = '0x5292C3d44e374a794d4b3477e2C81417BE5Db211' as `0x${string}`
+const PAYMENT_HUB_ABI = [
+  { name: 'pay',        type: 'function', stateMutability: 'payable',
+    inputs: [{ name: 'note', type: 'string' }], outputs: [] },
+  { name: 'withdraw',   type: 'function', stateMutability: 'nonpayable',
+    inputs: [], outputs: [] },
+  { name: 'getBalance', type: 'function', stateMutability: 'view',
+    inputs: [], outputs: [{ name: '', type: 'uint256' }] },
+  { name: 'owner',      type: 'function', stateMutability: 'view',
+    inputs: [], outputs: [{ name: '', type: 'address' }] },
+] as const
+
 // ─── 체인 메타 ────────────────────────────────────────────────────────────
 export const CHAINS = [mainnet, base, polygon, arbitrum, optimism, avalanche, arcTestnet, sepolia, baseSepolia] as const
 
@@ -166,7 +179,7 @@ interface LiFiQuote {
 }
 
 type NetworkMode = 'mainnet' | 'testnet'
-type ActionTab = 'swap' | 'bridge' | 'send' | 'cross'
+type ActionTab = 'swap' | 'bridge' | 'send' | 'cross' | 'pay'
 type MainTab = 'assets' | 'history' | 'faucet'
 type Theme = 'dark' | 'light'
 
@@ -325,6 +338,13 @@ export default function App() {
   const [lifiLoading, setLifiLoading] = useState(false)
   const [lifiError, setLifiError] = useState('')
   const [lifiExecuting, setLifiExecuting] = useState(false)
+
+  // ── Payment Hub 상태 ──
+  const [payNote, setPayNote] = useState('')
+  const [payAmount, setPayAmount] = useState('')
+  const [contractBalance, setContractBalance] = useState<string>('')
+  const [contractOwner, setContractOwner] = useState<string>('')
+  const [withdrawLoading, setWithdrawLoading] = useState(false)
 
   const allAddresses = [...new Set(connections.flatMap((c) => c.accounts))]
   const isConnected = connections.length > 0
@@ -486,6 +506,57 @@ export default function App() {
   function getLifiTokenDecimals(chainId: number, symbol: string): number {
     if (symbol === 'ETH' || symbol === 'POL' || symbol === 'AVAX') return 18
     return TOKENS[chainId]?.find((t) => t.symbol === symbol)?.decimals ?? 18
+  }
+
+  // ── Payment Hub 함수 ──────────────────────────────────────────────────────
+  async function loadContractInfo() {
+    try {
+      const client = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
+      const [bal, owner] = await Promise.all([
+        client.readContract({ address: PAYMENT_HUB_ADDRESS, abi: PAYMENT_HUB_ABI, functionName: 'getBalance' }),
+        client.readContract({ address: PAYMENT_HUB_ADDRESS, abi: PAYMENT_HUB_ABI, functionName: 'owner' }),
+      ])
+      setContractBalance(formatUnits(bal as bigint, 6))
+      setContractOwner((owner as string).toLowerCase())
+    } catch { /* ignore */ }
+  }
+
+  async function payToContract() {
+    if (!payAmount || parseFloat(payAmount) <= 0) return setTxError('금액을 입력해주세요')
+    const allAddresses = connections.flatMap((c) => [...c.accounts] as string[])
+    if (!allAddresses.length) return setTxError('지갑을 연결하세요')
+    setTxError(''); setTxStatus('Processing...')
+    try {
+      const amountWei = BigInt(Math.round(parseFloat(payAmount) * 1e6))
+      // Arc Testnet: USDC is native, use sendTransaction with encoded pay() calldata
+      const { encodeFunctionData } = await import('viem')
+      const data = encodeFunctionData({ abi: PAYMENT_HUB_ABI, functionName: 'pay', args: [payNote || ''] })
+      const hash = await sendTransactionAsync({
+        to: PAYMENT_HUB_ADDRESS,
+        data,
+        value: amountWei,
+      })
+      setTxHash(hash)
+      setTxStatus('success')
+      setPayAmount(''); setPayNote('')
+      setTimeout(loadContractInfo, 3000)
+    } catch (e: unknown) {
+      setTxError(e instanceof Error ? e.message : 'Transaction failed')
+      setTxStatus('')
+    }
+  }
+
+  async function withdrawFromContract() {
+    setWithdrawLoading(true); setTxError('')
+    try {
+      const { encodeFunctionData } = await import('viem')
+      const data = encodeFunctionData({ abi: PAYMENT_HUB_ABI, functionName: 'withdraw', args: [] })
+      const hash = await sendTransactionAsync({ to: PAYMENT_HUB_ADDRESS, data })
+      setTxHash(hash); setTxStatus('success')
+      setTimeout(loadContractInfo, 3000)
+    } catch (e: unknown) {
+      setTxError(e instanceof Error ? e.message : 'Withdraw failed')
+    } finally { setWithdrawLoading(false) }
   }
 
   async function fetchLiFiQuote() {
@@ -1060,9 +1131,10 @@ export default function App() {
                 { key: 'bridge', label: 'Bridge', icon: <Layers size={13} /> },
                 { key: 'send',   label: 'Send',   icon: <ArrowUpRight size={13} /> },
                 { key: 'cross',  label: 'Cross',  icon: <Zap size={13} /> },
+                { key: 'pay',    label: 'Pay',    icon: <Wallet size={13} /> },
               ] as { key: ActionTab; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
                 <button key={key} className={`action-tab ${actionTab === key ? 'active' : ''}`}
-                  onClick={() => { setActionTab(key); setTxStatus(''); setTxError(''); setTxHash(''); setLifiError(''); setLifiQuote(null) }}>
+                  onClick={() => { setActionTab(key); setTxStatus(''); setTxError(''); setTxHash(''); setLifiError(''); setLifiQuote(null); if (key === 'pay') loadContractInfo() }}>
                   {icon}{label}
                 </button>
               ))}
@@ -1179,6 +1251,61 @@ export default function App() {
                     target="_blank" rel="noopener noreferrer">View on explorer <ExternalLink size={11} /></a>
                 </div>
               )}
+
+              {/* ── PAY (USDCPaymentHub) ── */}
+              {actionTab === 'pay' && (() => {
+                const allAddresses = connections.flatMap((c) => [...c.accounts] as string[])
+                const isOwner = allAddresses.some((a) => a.toLowerCase() === contractOwner)
+                return <>
+                  <p className="action-desc">Arc Testnet 결제 컨트랙트로 USDC 전송</p>
+
+                  {/* 컨트랙트 잔액 카드 */}
+                  <div className="lifi-quote" style={{ marginBottom: 8 }}>
+                    <div className="lifi-quote-row">
+                      <span className="lifi-quote-label">컨트랙트 주소</span>
+                      <a href={`https://testnet.arcscan.app/address/${PAYMENT_HUB_ADDRESS}`}
+                        target="_blank" rel="noopener noreferrer" className="chain-link">
+                        {PAYMENT_HUB_ADDRESS.slice(0, 8)}...{PAYMENT_HUB_ADDRESS.slice(-6)} <ExternalLink size={10} />
+                      </a>
+                    </div>
+                    <div className="lifi-quote-row">
+                      <span className="lifi-quote-label">컨트랙트 잔액</span>
+                      <span className="lifi-quote-value">
+                        {contractBalance ? `${parseFloat(contractBalance).toFixed(4)} USDC` : '—'}
+                      </span>
+                    </div>
+                    {isOwner && (
+                      <div className="lifi-quote-row">
+                        <span className="lifi-quote-label" style={{ color: 'var(--success)' }}>✓ Owner 지갑 연결됨</span>
+                        <button className="btn-secondary" style={{ padding: '3px 10px', fontSize: '0.72rem' }}
+                          onClick={withdrawFromContract} disabled={withdrawLoading || !contractBalance || parseFloat(contractBalance) === 0}>
+                          {withdrawLoading ? 'Processing...' : 'Withdraw'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <label className="input-label">금액 (USDC)</label>
+                  <input className="action-input" type="number" placeholder="0.0"
+                    value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
+
+                  <label className="input-label">메모 (선택)</label>
+                  <input className="action-input" type="text" placeholder="주문번호, 용도 등"
+                    value={payNote} onChange={(e) => setPayNote(e.target.value)} />
+
+                  <button className="btn-primary" onClick={payToContract} disabled={txLoading}>
+                    {txLoading ? 'Processing...' : 'Pay to Contract'}
+                  </button>
+
+                  {txHash && (
+                    <div className="tx-status success">
+                      <span>결제 완료!</span>
+                      <a href={`https://testnet.arcscan.app/tx/${txHash}`}
+                        target="_blank" rel="noopener noreferrer">ArcScan에서 보기 <ExternalLink size={11} /></a>
+                    </div>
+                  )}
+                </>
+              })()}
 
               <div className="security-note">
                 <ArrowDownLeft size={12} style={{ opacity: 0.5 }} />
