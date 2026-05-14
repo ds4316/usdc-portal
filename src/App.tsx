@@ -527,6 +527,8 @@ export default function App() {
     if (!allAddresses.length) return setTxError('지갑을 연결하세요')
     setTxError(''); setTxStatus('Processing...')
     try {
+      // Arc Testnet으로 자동 전환
+      await switchChain({ chainId: arcTestnet.id })
       const amountWei = BigInt(Math.round(parseFloat(payAmount) * 1e6))
       // Arc Testnet: USDC is native, use sendTransaction with encoded pay() calldata
       const { encodeFunctionData } = await import('viem')
@@ -549,6 +551,7 @@ export default function App() {
   async function withdrawFromContract() {
     setWithdrawLoading(true); setTxError('')
     try {
+      await switchChain({ chainId: arcTestnet.id })
       const { encodeFunctionData } = await import('viem')
       const data = encodeFunctionData({ abi: PAYMENT_HUB_ABI, functionName: 'withdraw', args: [] })
       const hash = await sendTransactionAsync({ to: PAYMENT_HUB_ADDRESS, data })
