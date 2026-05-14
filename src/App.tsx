@@ -7,8 +7,8 @@ import { createViemAdapterFromProvider } from '@circle-fin/adapter-viem-v2'
 import {
   Sun, Moon, Plus, X, RefreshCw, ArrowRight, Copy, Check,
   Wallet, ExternalLink, AlertTriangle, QrCode, ChevronDown,
-  ArrowUpRight, ArrowDownLeft, Repeat2, Layers, BookUser,
-  Fuel, Trash2, Download, Zap
+  ArrowUpRight, Repeat2, Layers, BookUser,
+  Fuel, Trash2, Download, Zap, ShieldCheck, CircleDollarSign,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { arcTestnet } from './wagmi.config'
@@ -98,7 +98,7 @@ const TOKENS: Record<number, TokenInfo[]> = {
   [baseSepolia.id]: [{ symbol: 'USDC', address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', decimals: 6, coingeckoId: 'usd-coin' }],
 }
 
-// LI.FI에서 사용할 EVM 체인 목록 (테스트넷 제외)
+// LI.FI EVM 체인 목록
 const LIFI_CHAINS = [
   { id: mainnet.id,   label: 'Ethereum',  nativeSymbol: 'ETH' },
   { id: base.id,      label: 'Base',      nativeSymbol: 'ETH' },
@@ -150,7 +150,20 @@ interface ConfirmState {
   title: string; lines: string[]; warnings: string[]; onConfirm: () => void
 }
 
+type Toast = {
+  id: string
+  type: 'success' | 'error' | 'loading'
+  message: string
+  txHash?: string
+  explorerBase?: string
+}
+
+type TransferSeg = 'send' | 'pay'
+type DefiSeg     = 'cross' | 'swap' | 'bridge'
 type FaucetPollState = 'idle' | 'polling' | 'received'
+type NetworkMode = 'mainnet' | 'testnet'
+type MainTab     = 'assets' | 'history' | 'faucet'
+type Theme       = 'dark' | 'light'
 
 // 주소록
 interface Contact { id: string; name: string; address: string }
@@ -178,11 +191,6 @@ interface LiFiQuote {
   }
 }
 
-type NetworkMode = 'mainnet' | 'testnet'
-type ActionTab = 'swap' | 'bridge' | 'send' | 'cross' | 'pay'
-type MainTab = 'assets' | 'history' | 'faucet'
-type Theme = 'dark' | 'light'
-
 const MAINNET_IDS = new Set<number>([mainnet.id, base.id, polygon.id, arbitrum.id, optimism.id, avalanche.id])
 const TESTNET_IDS = new Set<number>([arcTestnet.id, sepolia.id, baseSepolia.id])
 
@@ -206,7 +214,7 @@ const FAUCETS: FaucetInfo[] = [
     tokens: ['ETH'], desc: 'Coinbase official Base faucet', cooldownHours: 24, pollToken: 'native' },
 ]
 
-// ─── Public clients ────────────────────────────────────────────────────────
+// ─── Public clients ───────────────────────────────────────────────────────
 const publicClients = Object.fromEntries(
   CHAINS.map((chain) => {
     const rpcs: Record<number, string[]> = {
@@ -223,7 +231,7 @@ const publicClients = Object.fromEntries(
   })
 )
 
-// ─── TX 히스토리 ────────────────────────────────────────────────────────────
+// ─── TX 히스토리 ───────────────────────────────────────────────────────────
 const TX_KEY = 'usdc_portal_history'
 function loadHistory(): TxRecord[] {
   try { return JSON.parse(localStorage.getItem(TX_KEY) ?? '[]') } catch { return [] }
@@ -233,10 +241,18 @@ function addHistory(records: TxRecord[], entry: TxRecord): TxRecord[] {
   const next = [entry, ...records].slice(0, 50); saveHistory(next); return next
 }
 
-// ─── 작은 컴포넌트들 ──────────────────────────────────────────────────────
-function TokenIcon({ symbol }: { symbol: string }) {
+// ─── 유틸 컴포넌트 ────────────────────────────────────────────────────────
+function TokenIconWithChain({ symbol, chainId }: { symbol: string; chainId: number }) {
   const color = TOKEN_COLORS[symbol] ?? '#555'
-  return <span className="token-icon" style={{ background: color + '18', color }}>{symbol.replace(' (gas)', '').charAt(0)}</span>
+  const chainColor = CHAIN_META[chainId]?.color ?? '#555'
+  return (
+    <div className="token-icon-wrap">
+      <div className="token-icon" style={{ background: color + '22', color }}>
+        {symbol.replace(' (gas)', '').charAt(0)}
+      </div>
+      <span className="chain-badge-dot" style={{ background: chainColor }} />
+    </div>
+  )
 }
 
 function Change24h({ value }: { value: number }) {
@@ -280,6 +296,36 @@ function ConfirmModal({ state, onCancel }: { state: ConfirmState; onCancel: () =
   )
 }
 
+function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: string) => void }) {
+  if (!toasts.length) return null
+  return (
+    <div className="toast-container">
+      {toasts.map((t) => (
+        <div key={t.id} className={`toast ${t.type}`}>
+          <div className="toast-icon">
+            {t.type === 'loading' && <div className="toast-spinner" />}
+            {t.type === 'success' && <Check size={14} style={{ color: 'var(--success)' }} />}
+            {t.type === 'error'   && <AlertTriangle size={14} style={{ color: 'var(--error)' }} />}
+          </div>
+          <div className="toast-body">
+            <span className="toast-message">{t.message}</span>
+            {t.txHash && (
+              <a className="toast-link"
+                href={`${t.explorerBase ?? 'https://testnet.arcscan.app'}/tx/${t.txHash}`}
+                target="_blank" rel="noopener noreferrer">
+                View on explorer <ExternalLink size={10} />
+              </a>
+            )}
+          </div>
+          {t.type !== 'loading' && (
+            <button className="toast-close" onClick={() => onRemove(t.id)}><X size={13} /></button>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── 메인 앱 ──────────────────────────────────────────────────────────────
 export default function App() {
   const connections = useConnections()
@@ -288,27 +334,31 @@ export default function App() {
   const { switchChain } = useSwitchChain()
   const { sendTransactionAsync } = useSendTransaction()
 
-  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) ?? 'dark')
+  const [theme, setTheme]           = useState<Theme>(() => (localStorage.getItem('theme') as Theme) ?? 'dark')
   const [networkMode, setNetworkMode] = useState<NetworkMode>(() => (localStorage.getItem('networkMode') as NetworkMode) ?? 'mainnet')
-  const [mainTab, setMainTab] = useState<MainTab>('assets')
-  const [actionTab, setActionTab] = useState<ActionTab>('swap')
-  const [sortBy, setSortBy] = useState<'value' | 'symbol' | 'chain'>('value')
+  const [mainTab, setMainTab]       = useState<MainTab>('assets')
+  const [transferSeg, setTransferSeg] = useState<TransferSeg>('send')
+  const [defiSeg, setDefiSeg]       = useState<DefiSeg>('cross')
+  const [sortBy, setSortBy]         = useState<'value' | 'symbol' | 'chain'>('value')
 
-  const [assets, setAssets] = useState<AssetRow[]>([])
-  const [prices, setPrices] = useState<Record<string, PriceData>>({})
-  const [totalUsdc, setTotalUsdc] = useState('0.00')
+  const [assets, setAssets]         = useState<AssetRow[]>([])
+  const [prices, setPrices]         = useState<Record<string, PriceData>>({})
+  const [totalUsdc, setTotalUsdc]   = useState('0.00')
   const [loadingAssets, setLoadingAssets] = useState(false)
-  const [history, setHistory] = useState<TxRecord[]>(loadHistory)
+  const [history, setHistory]       = useState<TxRecord[]>(loadHistory)
 
   const [showConnectors, setShowConnectors] = useState(false)
-  const [connectingId, setConnectingId] = useState<string | null>(null)
-  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null)
-  const [copiedAddr, setCopiedAddr] = useState(false)
-  const [showQR, setShowQR] = useState(false)
+  const [connectingId, setConnectingId]     = useState<string | null>(null)
+  const [confirmState, setConfirmState]     = useState<ConfirmState | null>(null)
+  const [copiedAddr, setCopiedAddr]         = useState(false)
+  const [showQR, setShowQR]                 = useState(false)
+
+  // Toast
+  const [toasts, setToasts] = useState<Toast[]>([])
 
   // 주소록
-  const [contacts, setContacts] = useState<Contact[]>(loadContacts)
-  const [showContacts, setShowContacts] = useState(false)
+  const [contacts, setContacts]           = useState<Contact[]>(loadContacts)
+  const [showContacts, setShowContacts]   = useState(false)
   const [newContactName, setNewContactName] = useState('')
   const [newContactAddr, setNewContactAddr] = useState('')
 
@@ -319,42 +369,50 @@ export default function App() {
   const [faucetPoll, setFaucetPoll] = useState<Record<number, FaucetPollState>>({})
   const pollTimers = useRef<Record<number, ReturnType<typeof setInterval>>>({})
 
-  // 거래 폼 (Arc App Kit)
+  // 폼 상태
   const [recipient, setRecipient] = useState('')
-  const [amount, setAmount] = useState('')
+  const [amount, setAmount]       = useState('')
   const [fromChain, setFromChain] = useState<'Ethereum_Sepolia' | 'Base_Sepolia'>('Base_Sepolia')
   const [txLoading, setTxLoading] = useState(false)
-  const [txStatus, setTxStatus] = useState('')
-  const [txHash, setTxHash] = useState('')
-  const [txError, setTxError] = useState('')
 
-  // LI.FI 크로스체인 스왑
+  // LI.FI
   const [lifiFromChainId, setLifiFromChainId] = useState<number>(mainnet.id)
-  const [lifiToChainId, setLifiToChainId] = useState<number>(base.id)
-  const [lifiFromToken, setLifiFromToken] = useState('ETH')
-  const [lifiToToken, setLifiToToken] = useState('USDC')
-  const [lifiAmount, setLifiAmount] = useState('')
-  const [lifiQuote, setLifiQuote] = useState<LiFiQuote | null>(null)
-  const [lifiLoading, setLifiLoading] = useState(false)
-  const [lifiError, setLifiError] = useState('')
-  const [lifiExecuting, setLifiExecuting] = useState(false)
+  const [lifiToChainId, setLifiToChainId]     = useState<number>(base.id)
+  const [lifiFromToken, setLifiFromToken]     = useState('ETH')
+  const [lifiToToken, setLifiToToken]         = useState('USDC')
+  const [lifiAmount, setLifiAmount]           = useState('')
+  const [lifiQuote, setLifiQuote]             = useState<LiFiQuote | null>(null)
+  const [lifiLoading, setLifiLoading]         = useState(false)
+  const [lifiError, setLifiError]             = useState('')
+  const [lifiExecuting, setLifiExecuting]     = useState(false)
 
-  // ── Payment Hub 상태 ──
-  const [payNote, setPayNote] = useState('')
-  const [payAmount, setPayAmount] = useState('')
+  // Payment Hub
+  const [payNote, setPayNote]                 = useState('')
+  const [payAmount, setPayAmount]             = useState('')
   const [contractBalance, setContractBalance] = useState<string>('')
-  const [contractOwner, setContractOwner] = useState<string>('')
+  const [contractOwner, setContractOwner]     = useState<string>('')
   const [withdrawLoading, setWithdrawLoading] = useState(false)
 
   const allAddresses = [...new Set(connections.flatMap((c) => c.accounts))]
-  const isConnected = connections.length > 0
+  const isConnected  = connections.length > 0
   const activeChainId = connections[0]?.chainId
+
+  // ─── Toast 헬퍼 ──────────────────────────────────────────────────────────
+  function addToast(t: Omit<Toast, 'id'>): string {
+    const id = Date.now().toString() + Math.random().toString(36).slice(2)
+    setToasts((prev) => [...prev, { ...t, id }])
+    if (t.type !== 'loading') setTimeout(() => removeToast(id), 5000)
+    return id
+  }
+  function removeToast(id: string) { setToasts((prev) => prev.filter((x) => x.id !== id)) }
+  // updateToast available for future use
+  // function updateToast(id: string, t: Partial<Toast>) { ... }
 
   useEffect(() => { localStorage.setItem('theme', theme) }, [theme])
   useEffect(() => { localStorage.setItem('networkMode', networkMode) }, [networkMode])
   useEffect(() => { if (allAddresses.length) loadAssets() }, [connections.length, allAddresses.join(',')])
 
-  // 60초마다 자동 새로고침
+  // 60초 자동 새로고침
   useEffect(() => {
     if (!isConnected) return
     const t = setInterval(() => loadAssets(), 60000)
@@ -364,7 +422,7 @@ export default function App() {
   // 폴링 클린업
   useEffect(() => () => { Object.values(pollTimers.current).forEach(clearInterval) }, [])
 
-  // ─── 가스비 조회 ────────────────────────────────────────────────────────
+  // ─── 가스비 조회 ─────────────────────────────────────────────────────────
   useEffect(() => {
     async function fetchGas() {
       const results: Record<number, string> = {}
@@ -385,7 +443,7 @@ export default function App() {
     return () => clearInterval(t)
   }, [networkMode])
 
-  // ─── 자산 조회 ──────────────────────────────────────────────────────────
+  // ─── 자산 조회 ───────────────────────────────────────────────────────────
   const loadAssets = useCallback(async () => {
     if (!allAddresses.length) return
     setLoadingAssets(true)
@@ -435,7 +493,7 @@ export default function App() {
     } finally { setLoadingAssets(false) }
   }, [allAddresses.join(',')])
 
-  // ─── 주소록 ─────────────────────────────────────────────────────────────
+  // ─── 주소록 ──────────────────────────────────────────────────────────────
   function addContact() {
     if (!newContactName.trim() || !isAddress(newContactAddr)) return
     const next = [...contacts, { id: Date.now().toString(), name: newContactName.trim(), address: newContactAddr }]
@@ -447,7 +505,7 @@ export default function App() {
     setContacts(next); saveContacts(next)
   }
 
-  // ─── 파우셋 폴링 ────────────────────────────────────────────────────────
+  // ─── 파우셋 폴링 ─────────────────────────────────────────────────────────
   async function getTokenBalance(address: `0x${string}`, faucet: FaucetInfo): Promise<bigint> {
     const client = publicClients[faucet.chainId]
     if (!client) return 0n
@@ -484,7 +542,7 @@ export default function App() {
     }, 180000)
   }
 
-  // ─── CSV 내보내기 ────────────────────────────────────────────────────────
+  // ─── CSV 내보내기 ─────────────────────────────────────────────────────────
   function exportCSV() {
     const rows = ['Token,Chain,Wallet,Balance,Value (USD),24h Change']
     displayed.forEach((a) => {
@@ -493,22 +551,11 @@ export default function App() {
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const el = document.createElement('a')
-    el.href = url; el.download = `portfolio_${new Date().toISOString().slice(0,10)}.csv`; el.click()
+    el.href = url; el.download = `portfolio_${new Date().toISOString().slice(0, 10)}.csv`; el.click()
     URL.revokeObjectURL(url)
   }
 
-  // ─── LI.FI 크로스체인 스왑 ──────────────────────────────────────────────
-  function getLifiTokenAddress(chainId: number, symbol: string): string {
-    if (symbol === 'ETH' || symbol === 'POL' || symbol === 'AVAX') return '0x0000000000000000000000000000000000000000'
-    return TOKENS[chainId]?.find((t) => t.symbol === symbol)?.address ?? '0x0000000000000000000000000000000000000000'
-  }
-
-  function getLifiTokenDecimals(chainId: number, symbol: string): number {
-    if (symbol === 'ETH' || symbol === 'POL' || symbol === 'AVAX') return 18
-    return TOKENS[chainId]?.find((t) => t.symbol === symbol)?.decimals ?? 18
-  }
-
-  // ── Payment Hub 함수 ──────────────────────────────────────────────────────
+  // ─── Payment Hub ──────────────────────────────────────────────────────────
   async function loadContractInfo() {
     try {
       const client = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
@@ -522,44 +569,57 @@ export default function App() {
   }
 
   async function payToContract() {
-    if (!payAmount || parseFloat(payAmount) <= 0) return setTxError('금액을 입력해주세요')
-    const allAddresses = connections.flatMap((c) => [...c.accounts] as string[])
-    if (!allAddresses.length) return setTxError('지갑을 연결하세요')
-    setTxError(''); setTxStatus('Processing...')
+    if (!payAmount || parseFloat(payAmount) <= 0) return addToast({ type: 'error', message: 'Enter an amount' })
+    const addrs = connections.flatMap((c) => [...c.accounts] as string[])
+    if (!addrs.length) return addToast({ type: 'error', message: 'Connect a wallet first' })
+    const loadId = addToast({ type: 'loading', message: 'Processing payment...' })
+    setTxLoading(true)
     try {
-      // Arc Testnet으로 자동 전환
       await switchChain({ chainId: arcTestnet.id })
       const amountWei = BigInt(Math.round(parseFloat(payAmount) * 1e6))
-      // Arc Testnet: USDC is native, use sendTransaction with encoded pay() calldata
       const { encodeFunctionData } = await import('viem')
       const data = encodeFunctionData({ abi: PAYMENT_HUB_ABI, functionName: 'pay', args: [payNote || ''] })
-      const hash = await sendTransactionAsync({
-        to: PAYMENT_HUB_ADDRESS,
-        data,
-        value: amountWei,
-      })
-      setTxHash(hash)
-      setTxStatus('success')
+      const hash = await sendTransactionAsync({ to: PAYMENT_HUB_ADDRESS, data, value: amountWei })
+      removeToast(loadId)
+      addToast({ type: 'success', message: `Paid ${payAmount} USDC to contract`, txHash: hash, explorerBase: 'https://testnet.arcscan.app' })
       setPayAmount(''); setPayNote('')
       setTimeout(loadContractInfo, 3000)
     } catch (e: unknown) {
-      setTxError(e instanceof Error ? e.message : 'Transaction failed')
-      setTxStatus('')
-    }
+      removeToast(loadId)
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Payment failed' })
+    } finally { setTxLoading(false) }
   }
 
   async function withdrawFromContract() {
-    setWithdrawLoading(true); setTxError('')
+    setWithdrawLoading(true)
+    const loadId = addToast({ type: 'loading', message: 'Withdrawing...' })
     try {
       await switchChain({ chainId: arcTestnet.id })
       const { encodeFunctionData } = await import('viem')
       const data = encodeFunctionData({ abi: PAYMENT_HUB_ABI, functionName: 'withdraw', args: [] })
       const hash = await sendTransactionAsync({ to: PAYMENT_HUB_ADDRESS, data })
-      setTxHash(hash); setTxStatus('success')
+      removeToast(loadId)
+      addToast({ type: 'success', message: 'Withdrawal successful', txHash: hash, explorerBase: 'https://testnet.arcscan.app' })
       setTimeout(loadContractInfo, 3000)
     } catch (e: unknown) {
-      setTxError(e instanceof Error ? e.message : 'Withdraw failed')
+      removeToast(loadId)
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Withdrawal failed' })
     } finally { setWithdrawLoading(false) }
+  }
+
+  // ─── LI.FI ───────────────────────────────────────────────────────────────
+  function getLifiTokenAddress(chainId: number, symbol: string): string {
+    if (symbol === 'ETH' || symbol === 'POL' || symbol === 'AVAX') return '0x0000000000000000000000000000000000000000'
+    return TOKENS[chainId]?.find((t) => t.symbol === symbol)?.address ?? '0x0000000000000000000000000000000000000000'
+  }
+  function getLifiTokenDecimals(chainId: number, symbol: string): number {
+    if (symbol === 'ETH' || symbol === 'POL' || symbol === 'AVAX') return 18
+    return TOKENS[chainId]?.find((t) => t.symbol === symbol)?.decimals ?? 18
+  }
+  function getLifiFromTokens(chainId: number) {
+    const chain = LIFI_CHAINS.find((c) => c.id === chainId)
+    const native = chain?.nativeSymbol ?? 'ETH'
+    return [native, ...(TOKENS[chainId]?.map((t) => t.symbol) ?? [])]
   }
 
   async function fetchLiFiQuote() {
@@ -570,12 +630,10 @@ export default function App() {
       const decimals = getLifiTokenDecimals(lifiFromChainId, lifiFromToken)
       const fromAmountRaw = BigInt(Math.floor(parseFloat(lifiAmount) * 10 ** decimals)).toString()
       const params = new URLSearchParams({
-        fromChain: lifiFromChainId.toString(),
-        toChain: lifiToChainId.toString(),
+        fromChain: lifiFromChainId.toString(), toChain: lifiToChainId.toString(),
         fromToken: getLifiTokenAddress(lifiFromChainId, lifiFromToken),
-        toToken: getLifiTokenAddress(lifiToChainId, lifiToToken),
-        fromAmount: fromAmountRaw,
-        fromAddress: allAddresses[0],
+        toToken:   getLifiTokenAddress(lifiToChainId, lifiToToken),
+        fromAmount: fromAmountRaw, fromAddress: allAddresses[0],
       })
       const res = await fetch(`https://li.quest/v1/quote?${params}`)
       const data = await res.json()
@@ -588,10 +646,10 @@ export default function App() {
 
   async function executeLiFiSwap() {
     if (!lifiQuote) return
-    setLifiExecuting(true); setTxError(''); setTxHash('')
+    setLifiExecuting(true)
+    const loadId = addToast({ type: 'loading', message: 'Executing cross-chain swap...' })
     try {
       const req = lifiQuote.transactionRequest
-      // 체인 전환 필요 시
       if (activeChainId !== req.chainId) await switchChain({ chainId: req.chainId })
       const hash = await sendTransactionAsync({
         to: req.to as `0x${string}`,
@@ -599,36 +657,33 @@ export default function App() {
         value: BigInt(req.value || '0'),
         gas: req.gasLimit ? BigInt(req.gasLimit) : undefined,
       })
-      setTxHash(hash)
       const fromSym = lifiQuote.action.fromToken.symbol
-      const toSym = lifiQuote.action.toToken.symbol
-      const toAmt = parseFloat(formatUnits(BigInt(lifiQuote.estimate.toAmount), lifiQuote.action.toToken.decimals)).toFixed(4)
-      setHistory((prev) => addHistory(prev, {
-        type: 'cross', summary: `${lifiAmount} ${fromSym} → ${toAmt} ${toSym}`,
-        txHash: hash, timestamp: Date.now(), status: 'success',
-      }))
-      setLifiQuote(null); setLifiAmount('')
-      loadAssets()
+      const toSym   = lifiQuote.action.toToken.symbol
+      const toAmt   = parseFloat(formatUnits(BigInt(lifiQuote.estimate.toAmount), lifiQuote.action.toToken.decimals)).toFixed(4)
+      removeToast(loadId)
+      addToast({ type: 'success', message: `${lifiAmount} ${fromSym} → ${toAmt} ${toSym}`, txHash: hash,
+        explorerBase: CHAIN_META[lifiQuote.action.fromChainId]?.explorer })
+      setHistory((prev) => addHistory(prev, { type: 'cross', summary: `${lifiAmount} ${fromSym} → ${toAmt} ${toSym}`,
+        txHash: hash, timestamp: Date.now(), status: 'success' }))
+      setLifiQuote(null); setLifiAmount(''); loadAssets()
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setTxError(msg)
-      setHistory((prev) => addHistory(prev, {
-        type: 'cross', summary: `${lifiAmount} ${lifiFromToken} → ${lifiToToken}`,
-        txHash: '', timestamp: Date.now(), status: 'fail',
-      }))
+      removeToast(loadId)
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Swap failed' })
+      setHistory((prev) => addHistory(prev, { type: 'cross', summary: `${lifiAmount} ${lifiFromToken} → ${lifiToToken}`,
+        txHash: '', timestamp: Date.now(), status: 'fail' }))
     } finally { setLifiExecuting(false) }
   }
 
-  // ─── 요약 수치 ──────────────────────────────────────────────────────────
-  const ethValue   = assets.filter((a) => a.symbol === 'ETH').reduce((s, a) => s + parseFloat(a.usdcValue), 0)
-  const usdcTotalVal = assets.filter((a) => a.symbol.includes('USDC')).reduce((s, a) => s + parseFloat(a.usdcValue), 0)
-  const otherValue = parseFloat(totalUsdc) - ethValue - usdcTotalVal
+  // ─── 요약 수치 ────────────────────────────────────────────────────────────
+  const ethValue      = assets.filter((a) => a.symbol === 'ETH').reduce((s, a) => s + parseFloat(a.usdcValue), 0)
+  const usdcTotalVal  = assets.filter((a) => a.symbol.includes('USDC')).reduce((s, a) => s + parseFloat(a.usdcValue), 0)
+  const otherValue    = parseFloat(totalUsdc) - ethValue - usdcTotalVal
 
   const chainBreakdown = CHAINS
     .map((c) => ({ id: c.id, val: assets.filter((a) => a.chain === c.id).reduce((s, a) => s + parseFloat(a.usdcValue), 0) }))
     .filter((c) => c.val > 0)
 
-  // ─── 보안 검증 ──────────────────────────────────────────────────────────
+  // ─── 보안 & 어댑터 ───────────────────────────────────────────────────────
   function validateSend(to: string, amt: string): string[] {
     const warnings: string[] = []
     if (allAddresses.some((a) => a.toLowerCase() === to.toLowerCase())) warnings.push('Sending to your own wallet address')
@@ -643,22 +698,25 @@ export default function App() {
   }
 
   async function execTx(type: 'swap' | 'bridge' | 'send', summary: string, fn: () => Promise<string>) {
-    setTxLoading(true); setTxError(''); setTxHash('')
-    setTxStatus(`${type === 'swap' ? 'Swapping' : type === 'bridge' ? 'Bridging' : 'Sending'}...`)
+    setTxLoading(true)
+    const label = type === 'swap' ? 'Swapping' : type === 'bridge' ? 'Bridging' : 'Sending'
+    const loadId = addToast({ type: 'loading', message: `${label}...` })
     try {
       const hash = await fn()
-      setTxHash(hash); setTxStatus('Done!')
+      removeToast(loadId)
+      addToast({ type: 'success', message: summary, txHash: hash, explorerBase: 'https://testnet.arcscan.app' })
       setHistory((prev) => addHistory(prev, { type, summary, txHash: hash, timestamp: Date.now(), status: 'success' }))
       setAmount(''); setRecipient(''); loadAssets()
     } catch (e) {
+      removeToast(loadId)
       const msg = e instanceof Error ? e.message : String(e)
-      setTxError(msg); setTxStatus('')
+      addToast({ type: 'error', message: msg })
       setHistory((prev) => addHistory(prev, { type, summary, txHash: '', timestamp: Date.now(), status: 'fail' }))
     } finally { setTxLoading(false) }
   }
 
   function openSwapConfirm() {
-    if (!amount) return setTxError('Enter an amount')
+    if (!amount) return addToast({ type: 'error', message: 'Enter an amount' })
     setConfirmState({
       title: 'Confirm Swap',
       lines: [`${amount} ETH → USDC`, 'Network: Arc Testnet', 'Fee: calculated by Arc App Kit'],
@@ -673,7 +731,7 @@ export default function App() {
   }
 
   function openBridgeConfirm() {
-    if (!amount) return setTxError('Enter an amount')
+    if (!amount) return addToast({ type: 'error', message: 'Enter an amount' })
     setConfirmState({
       title: 'Confirm Bridge',
       lines: [`${amount} USDC`, `From: ${fromChain === 'Ethereum_Sepolia' ? 'Ethereum Sepolia' : 'Base Sepolia'}`, 'To: Arc Unified Balance'],
@@ -687,9 +745,9 @@ export default function App() {
   }
 
   function openSendConfirm() {
-    if (!recipient || !amount) return setTxError('Enter address and amount')
-    if (!isAddress(recipient)) return setTxError('Invalid Ethereum address')
-    if (parseFloat(amount) <= 0) return setTxError('Amount must be greater than 0')
+    if (!recipient || !amount) return addToast({ type: 'error', message: 'Enter address and amount' })
+    if (!isAddress(recipient)) return addToast({ type: 'error', message: 'Invalid Ethereum address' })
+    if (parseFloat(amount) <= 0) return addToast({ type: 'error', message: 'Amount must be greater than 0' })
     const warnings = validateSend(recipient, amount)
     setConfirmState({
       title: 'Confirm Send',
@@ -709,20 +767,13 @@ export default function App() {
     navigator.clipboard.writeText(addr).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 2000) })
   }
 
-  // ─── 필터 & 정렬 ────────────────────────────────────────────────────────
+  // ─── 필터 & 정렬 ──────────────────────────────────────────────────────────
   const displayed = assets
     .filter((a) => networkMode === 'mainnet' ? MAINNET_IDS.has(a.chain) : TESTNET_IDS.has(a.chain))
     .sort((a, b) => sortBy === 'value' ? parseFloat(b.usdcValue) - parseFloat(a.usdcValue)
       : sortBy === 'symbol' ? a.symbol.localeCompare(b.symbol) : a.chain - b.chain)
 
-  // ─── LI.FI 토큰 옵션 ─────────────────────────────────────────────────────
-  function getLifiFromTokens(chainId: number) {
-    const chain = LIFI_CHAINS.find((c) => c.id === chainId)
-    const native = chain?.nativeSymbol ?? 'ETH'
-    return [native, ...( TOKENS[chainId]?.map((t) => t.symbol) ?? [])]
-  }
-
-  // ─── 커넥터 목록 ────────────────────────────────────────────────────────
+  // ─── 커넥터 목록 ──────────────────────────────────────────────────────────
   function ConnectorList() {
     return (
       <div className="connector-list">
@@ -730,7 +781,7 @@ export default function App() {
           const isThis = isConnecting && connectingId === connector.uid
           const hasErr = connectError && connectVariables?.connector === connector
           const errMsg = hasErr ? friendlyConnectError(connectError, connector.name) : null
-          const info = INSTALL_LINKS[connector.name]
+          const info   = INSTALL_LINKS[connector.name]
           return (
             <div key={connector.uid} className="connector-item">
               <button className={`btn-connector ${errMsg ? 'has-error' : ''}`} disabled={isConnecting}
@@ -746,14 +797,14 @@ export default function App() {
     )
   }
 
-  // ─── LI.FI 견적 카드 ─────────────────────────────────────────────────────
+  // ─── LI.FI 견적 카드 ──────────────────────────────────────────────────────
   function LiFiQuoteCard() {
     if (!lifiQuote) return null
-    const toAmt = parseFloat(formatUnits(BigInt(lifiQuote.estimate.toAmount), lifiQuote.action.toToken.decimals))
+    const toAmt    = parseFloat(formatUnits(BigInt(lifiQuote.estimate.toAmount), lifiQuote.action.toToken.decimals))
     const toAmtMin = parseFloat(formatUnits(BigInt(lifiQuote.estimate.toAmountMin), lifiQuote.action.toToken.decimals))
     const duration = lifiQuote.estimate.executionDuration
     const fromLabel = CHAIN_META[lifiQuote.action.fromChainId]?.label ?? lifiQuote.action.fromChainId
-    const toLabel = CHAIN_META[lifiQuote.action.toChainId]?.label ?? lifiQuote.action.toChainId
+    const toLabel   = CHAIN_META[lifiQuote.action.toChainId]?.label   ?? lifiQuote.action.toChainId
     return (
       <div className="lifi-quote">
         <div className="lifi-quote-row">
@@ -772,12 +823,6 @@ export default function App() {
           <span className="lifi-quote-label">Est. time</span>
           <span className="lifi-quote-value">{duration < 60 ? `${duration}s` : `${Math.round(duration / 60)}m`}</span>
         </div>
-        {lifiQuote.estimate.feeCosts.length > 0 && (
-          <div className="lifi-quote-row">
-            <span className="lifi-quote-label">Fees</span>
-            <span className="lifi-quote-value muted">{lifiQuote.estimate.feeCosts.map((f) => f.name).join(', ')}</span>
-          </div>
-        )}
       </div>
     )
   }
@@ -785,6 +830,7 @@ export default function App() {
   // ─── 렌더 ─────────────────────────────────────────────────────────────────
   return (
     <div className="root" data-theme={theme}>
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
       {confirmState && <ConfirmModal state={confirmState} onCancel={() => setConfirmState(null)} />}
 
       {/* QR 모달 */}
@@ -833,7 +879,8 @@ export default function App() {
                       <span className="contact-addr">{c.address.slice(0, 10)}...{c.address.slice(-8)}</span>
                     </div>
                     <div className="contact-actions">
-                      <button className="btn-icon" title="Use address" onClick={() => { setRecipient(c.address); setActionTab('send'); setShowContacts(false) }}>
+                      <button className="btn-icon" title="Use address"
+                        onClick={() => { setRecipient(c.address); setTransferSeg('send'); setShowContacts(false) }}>
                         <ArrowUpRight size={13} />
                       </button>
                       <button className="btn-icon danger" title="Delete" onClick={() => removeContact(c.id)}>
@@ -848,9 +895,12 @@ export default function App() {
         </div>
       )}
 
-      {/* ─── 내비바 ─────────────────────────────────────────────────────── */}
+      {/* ─── 내비바 ────────────────────────────────────────────────────── */}
       <nav className="navbar">
-        <span className="nav-logo">USDC Portal</span>
+        <span className="nav-logo">
+          <CircleDollarSign size={16} style={{ verticalAlign: 'middle', marginRight: 6, color: 'var(--accent)' }} />
+          USDC Portal
+        </span>
         <div className="nav-right">
           <div className="network-toggle">
             <button className={`net-btn ${networkMode === 'mainnet' ? 'active' : ''}`} onClick={() => setNetworkMode('mainnet')}>Mainnet</button>
@@ -865,23 +915,6 @@ export default function App() {
                   .map((c) => <option key={c.id} value={c.id}>{CHAIN_META[c.id].label}</option>)}
               </select>
               <ChevronDown size={12} className="chain-select-icon" />
-            </div>
-          )}
-
-          {/* 가스비 */}
-          {Object.keys(gasPrices).length > 0 && (
-            <div className="gas-bar">
-              <Fuel size={12} />
-              {CHAINS
-                .filter((c) => gasPrices[c.id] && (networkMode === 'mainnet' ? MAINNET_IDS.has(c.id) : TESTNET_IDS.has(c.id)))
-                .slice(0, 3)
-                .map((c) => (
-                  <span key={c.id} className="gas-item" title={CHAIN_META[c.id].label}>
-                    <span className="gas-dot" style={{ background: CHAIN_META[c.id].color }} />
-                    {gasPrices[c.id]}
-                  </span>
-                ))}
-              <span className="gas-unit">Gwei</span>
             </div>
           )}
 
@@ -912,29 +945,46 @@ export default function App() {
         </div>
       </nav>
 
-      <main className="dashboard">
-        {/* ─── 요약 카드 ─────────────────────────────────────────────────── */}
-        <div className="summary-grid">
-          <div className="summary-card summary-main">
-            <span className="summary-label">Total Balance</span>
-            <span className="summary-value">${totalUsdc}</span>
-            <span className="summary-unit">USD</span>
+      {/* ─── 포트폴리오 히어로 ────────────────────────────────────────── */}
+      <div className="portfolio-hero">
+        <div className="hero-main">
+          <span className="hero-label">Total Balance</span>
+          <div className="hero-value-row">
+            <span className="hero-value">
+              ${parseFloat(totalUsdc).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+            {loadingAssets && <span className="hero-loading-dot" />}
           </div>
-          <div className="summary-card">
-            <span className="summary-label">ETH Value</span>
-            <span className="summary-value" style={{ color: '#627eea' }}>${ethValue.toFixed(2)}</span>
-          </div>
-          <div className="summary-card">
-            <span className="summary-label">USDC Balance</span>
-            <span className="summary-value" style={{ color: '#2775ca' }}>${usdcTotalVal.toFixed(2)}</span>
-          </div>
-          <div className="summary-card">
-            <span className="summary-label">Other Assets</span>
-            <span className="summary-value">${otherValue.toFixed(2)}</span>
-          </div>
+          {parseFloat(totalUsdc) > 0 && (
+            <div className="hero-breakdown">
+              <span className="hero-breakdown-item">
+                <span style={{ color: '#627eea' }}>●</span> ETH ${ethValue.toFixed(2)}
+              </span>
+              <span className="hero-breakdown-item">
+                <span style={{ color: '#2775ca' }}>●</span> USDC ${usdcTotalVal.toFixed(2)}
+              </span>
+              {otherValue > 0.01 && (
+                <span className="hero-breakdown-item">
+                  <span style={{ color: 'var(--text-muted)' }}>●</span> Other ${otherValue.toFixed(2)}
+                </span>
+              )}
+            </div>
+          )}
         </div>
+        <div className="hero-actions">
+          <button className="btn-ghost" onClick={loadAssets} disabled={loadingAssets}>
+            <RefreshCw size={13} /> Refresh
+          </button>
+          {displayed.length > 0 && (
+            <button className="btn-ghost" onClick={exportCSV}>
+              <Download size={13} /> CSV
+            </button>
+          )}
+        </div>
+      </div>
 
-        {/* ─── 포트폴리오 바 ─────────────────────────────────────────────── */}
+      <main className="dashboard">
+        {/* ─── 포트폴리오 바 ─────────────────────────────────────────── */}
         {chainBreakdown.length > 0 && parseFloat(totalUsdc) > 0 && (
           <div className="portfolio-bar-wrap">
             <div className="portfolio-bar">
@@ -955,13 +1005,13 @@ export default function App() {
         )}
 
         <div className="content-grid">
-          {/* ─── 왼쪽 패널 ──────────────────────────────────────────────── */}
+          {/* ─── 왼쪽 패널 ─────────────────────────────────────────── */}
           <div className="panel">
             <div className="panel-header">
               <div className="main-tabs">
                 <button className={`main-tab ${mainTab === 'assets' ? 'active' : ''}`} onClick={() => setMainTab('assets')}>Assets</button>
                 <button className={`main-tab ${mainTab === 'history' ? 'active' : ''}`} onClick={() => setMainTab('history')}>
-                  History {history.length > 0 && <span className="history-badge">{history.length}</span>}
+                  Activity {history.length > 0 && <span className="history-badge">{history.length}</span>}
                 </button>
                 {networkMode === 'testnet' && (
                   <button className={`main-tab ${mainTab === 'faucet' ? 'active' : ''}`} onClick={() => setMainTab('faucet')}>Faucet</button>
@@ -971,7 +1021,7 @@ export default function App() {
                 <div className="table-controls">
                   <div className="network-label">
                     <span className={`net-indicator ${networkMode}`} />
-                    {networkMode === 'mainnet' ? 'Mainnet assets' : 'Testnet assets'}
+                    {networkMode === 'mainnet' ? 'Mainnet' : 'Testnet'}
                     {loadingAssets && <span className="loading-dot" />}
                   </div>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -980,10 +1030,7 @@ export default function App() {
                       <option value="symbol">By token</option>
                       <option value="chain">By chain</option>
                     </select>
-                    {displayed.length > 0 && (
-                      <button className="btn-icon" onClick={exportCSV} title="Export CSV"><Download size={13} /></button>
-                    )}
-                    <button className="btn-icon" onClick={loadAssets} disabled={loadingAssets}><RefreshCw size={14} /></button>
+                    <button className="btn-icon" onClick={loadAssets} disabled={loadingAssets}><RefreshCw size={13} /></button>
                   </div>
                 </div>
               )}
@@ -992,7 +1039,7 @@ export default function App() {
             {mainTab === 'assets' ? (
               !isConnected ? (
                 <div className="connect-prompt">
-                  <div className="connect-prompt-icon"><Wallet size={36} strokeWidth={1.5} /></div>
+                  <div className="connect-prompt-icon"><Wallet size={40} strokeWidth={1.2} /></div>
                   <p className="connect-prompt-title">Connect your wallet</p>
                   <p className="connect-prompt-sub">Your assets will appear here once connected</p>
                   <button className="btn-primary" style={{ maxWidth: 200 }} onClick={() => setShowConnectors(true)}>Connect wallet</button>
@@ -1002,26 +1049,34 @@ export default function App() {
                   <table className="asset-table">
                     <thead>
                       <tr>
-                        <th>Token</th><th>Chain</th><th>Wallet</th>
-                        <th className="text-right">Balance</th><th className="text-right">Value</th><th className="text-right">24h</th>
+                        <th>Token</th><th>Wallet</th>
+                        <th className="text-right">Balance</th>
+                        <th className="text-right">Value</th>
+                        <th className="text-right">24h</th>
                       </tr>
                     </thead>
                     <tbody>
                       {loadingAssets && assets.length === 0 ? <SkeletonRows /> : displayed.length === 0 ? (
-                        <tr><td colSpan={6} className="empty-cell">No assets found</td></tr>
+                        <tr><td colSpan={5} className="empty-cell">No assets found on {networkMode}</td></tr>
                       ) : displayed.map((a, i) => {
                         const explorer = CHAIN_META[a.chain]?.explorer
                         return (
                           <tr key={i} className="asset-tr">
-                            <td><div className="token-cell"><TokenIcon symbol={a.symbol} /><span className="token-name">{a.symbol}</span></div></td>
                             <td>
-                              <span className="chain-dot" style={{ background: CHAIN_META[a.chain]?.color }} />
-                              {explorer
-                                ? <a className="chain-link" href={explorer} target="_blank" rel="noopener noreferrer">{CHAIN_META[a.chain]?.label}</a>
-                                : <span className="chain-label">{CHAIN_META[a.chain]?.label}</span>}
+                              <div className="token-cell">
+                                <TokenIconWithChain symbol={a.symbol} chainId={a.chain} />
+                                <div>
+                                  <span className="token-name">{a.symbol}</span>
+                                  <span className="token-subname">
+                                    {explorer
+                                      ? <a className="chain-link" href={explorer} target="_blank" rel="noopener noreferrer">{CHAIN_META[a.chain]?.label}</a>
+                                      : CHAIN_META[a.chain]?.label}
+                                  </span>
+                                </div>
+                              </div>
                             </td>
                             <td className="wallet-cell">{a.wallet}</td>
-                            <td className="text-right mono">{a.balance}</td>
+                            <td className="text-right mono">{parseFloat(a.balance).toFixed(4)}</td>
                             <td className="text-right usdc-val">${a.usdcValue}</td>
                             <td className="text-right"><Change24h value={a.change24h} /></td>
                           </tr>
@@ -1075,7 +1130,7 @@ export default function App() {
                     ) : (
                       <div className="faucet-no-wallet">
                         <span>Connect a wallet first</span>
-                        <button className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.82rem' }} onClick={() => setShowConnectors(true)}>Connect</button>
+                        <button className="btn-primary" style={{ padding: '6px 14px', fontSize: '12px', width: 'auto' }} onClick={() => setShowConnectors(true)}>Connect</button>
                       </div>
                     )}
                   </div>
@@ -1084,7 +1139,7 @@ export default function App() {
                   <div className="faucet-step-num">2</div>
                   <div className="faucet-step-body">
                     <p className="faucet-step-title">Request tokens from a faucet</p>
-                    <p className="faucet-step-sub">Click a faucet — it opens in a new tab. Paste your address and submit. We'll detect when tokens arrive.</p>
+                    <p className="faucet-step-sub">Click a faucet — it opens in a new tab. Paste your address and submit.</p>
                     <div className="faucet-cards">
                       {FAUCETS.map((f, i) => {
                         const state = faucetPoll[i] ?? 'idle'
@@ -1095,7 +1150,7 @@ export default function App() {
                             <div className="faucet-card-top">
                               <span className="chain-dot" style={{ background: CHAIN_META[f.chainId]?.color }} />
                               <span className="faucet-card-name">{f.name}</span>
-                              {state === 'idle' && <ExternalLink size={12} className="faucet-card-arrow" />}
+                              {state === 'idle'    && <ExternalLink size={12} className="faucet-card-arrow" />}
                               {state === 'polling' && <span className="faucet-spinner" />}
                               {state === 'received' && <Check size={13} className="faucet-check" />}
                             </div>
@@ -1103,9 +1158,9 @@ export default function App() {
                             <div className="faucet-card-tokens">
                               {f.tokens.map((t) => <span key={t} className="faucet-token">{t}</span>)}
                             </div>
-                            {state === 'polling' && <span className="faucet-status-text">Waiting for deposit...</span>}
+                            {state === 'polling'  && <span className="faucet-status-text">Waiting for deposit...</span>}
                             {state === 'received' && <span className="faucet-status-text received">Tokens received!</span>}
-                            {state === 'idle' && <span className="faucet-card-desc">{f.desc}</span>}
+                            {state === 'idle'     && <span className="faucet-card-desc">{f.desc}</span>}
                           </a>
                         )
                       })}
@@ -1116,8 +1171,8 @@ export default function App() {
                   <div className="faucet-step-num">3</div>
                   <div className="faucet-step-body">
                     <p className="faucet-step-title">Check your balance</p>
-                    <p className="faucet-step-sub">Balance updates automatically when tokens arrive. Or refresh manually.</p>
-                    <button className="btn-outline" onClick={() => { setMainTab('assets'); loadAssets() }}>
+                    <p className="faucet-step-sub">Balance updates automatically when tokens arrive.</p>
+                    <button className="btn-outline" style={{ width: 'auto' }} onClick={() => { setMainTab('assets'); loadAssets() }}>
                       <RefreshCw size={13} /> Refresh assets
                     </button>
                   </div>
@@ -1126,212 +1181,246 @@ export default function App() {
             )}
           </div>
 
-          {/* ─── 오른쪽: 액션 패널 ──────────────────────────────────────── */}
-          <div className="panel action-panel">
-            <div className="action-tabs">
-              {([
-                { key: 'swap',   label: 'Swap',   icon: <Repeat2 size={13} /> },
-                { key: 'bridge', label: 'Bridge', icon: <Layers size={13} /> },
-                { key: 'send',   label: 'Send',   icon: <ArrowUpRight size={13} /> },
-                { key: 'cross',  label: 'Cross',  icon: <Zap size={13} /> },
-                { key: 'pay',    label: 'Pay',    icon: <Wallet size={13} /> },
-              ] as { key: ActionTab; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
-                <button key={key} className={`action-tab ${actionTab === key ? 'active' : ''}`}
-                  onClick={() => { setActionTab(key); setTxStatus(''); setTxError(''); setTxHash(''); setLifiError(''); setLifiQuote(null); if (key === 'pay') loadContractInfo() }}>
-                  {icon}{label}
+          {/* ─── 오른쪽 패널 ─────────────────────────────────────────── */}
+          <div className="right-panel">
+
+            {/* ── Transfer 카드 (Send / Pay Hub) ── */}
+            <div className="action-card">
+              <div className="action-card-seg">
+                <button className={`seg ${transferSeg === 'send' ? 'active' : ''}`}
+                  onClick={() => setTransferSeg('send')}>
+                  <ArrowUpRight size={12} /> Send
                 </button>
-              ))}
-            </div>
+                <button className={`seg ${transferSeg === 'pay' ? 'active' : ''}`}
+                  onClick={() => { setTransferSeg('pay'); loadContractInfo() }}>
+                  <Wallet size={12} /> Pay Hub
+                </button>
+              </div>
 
-            <div className="action-body">
-              {/* ── SWAP (Arc App Kit) ── */}
-              {actionTab === 'swap' && <>
-                <p className="action-desc">Swap ETH → USDC on Arc Testnet</p>
-                <div className="swap-row">
-                  <div className="swap-badge">ETH</div>
-                  <ArrowRight size={16} className="swap-arrow-icon" />
-                  <div className="swap-badge usdc">USDC</div>
-                </div>
-                <label className="input-label">Amount (ETH)</label>
-                <input className="action-input" type="number" placeholder="0.0" value={amount} onChange={(e) => setAmount(e.target.value)} />
-                <button className="btn-primary" onClick={openSwapConfirm} disabled={txLoading}>{txLoading ? 'Processing...' : 'Swap to USDC'}</button>
-              </>}
-
-              {/* ── BRIDGE (Arc App Kit) ── */}
-              {actionTab === 'bridge' && <>
-                <p className="action-desc">Bridge USDC to Arc Unified Balance</p>
-                <label className="input-label">From chain</label>
-                <select className="action-input" value={fromChain} onChange={(e) => setFromChain(e.target.value as typeof fromChain)}>
-                  <option value="Ethereum_Sepolia">Ethereum Sepolia</option>
-                  <option value="Base_Sepolia">Base Sepolia</option>
-                </select>
-                <label className="input-label">Amount (USDC)</label>
-                <input className="action-input" type="number" placeholder="0.0" value={amount} onChange={(e) => setAmount(e.target.value)} />
-                <button className="btn-primary" onClick={openBridgeConfirm} disabled={txLoading}>{txLoading ? 'Processing...' : 'Bridge to Arc'}</button>
-              </>}
-
-              {/* ── SEND ── */}
-              {actionTab === 'send' && <>
-                <p className="action-desc">Send USDC on Arc Testnet</p>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: -4 }}>
-                  <label className="input-label">Recipient address</label>
-                  <button className="btn-book" onClick={() => setShowContacts(true)}>
-                    <BookUser size={12} /> Address book
+              <div className="action-card-body">
+                {/* ── SEND ── */}
+                {transferSeg === 'send' && <>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label className="input-label">Recipient</label>
+                    <button className="btn-book" onClick={() => setShowContacts(true)}>
+                      <BookUser size={12} /> Address book
+                    </button>
+                  </div>
+                  <input className="action-input" type="text" placeholder="0x..." value={recipient}
+                    onChange={(e) => setRecipient(e.target.value)} />
+                  <label className="input-label">Amount (USDC)</label>
+                  <input className="action-input" type="number" placeholder="0.0" value={amount}
+                    onChange={(e) => setAmount(e.target.value)} />
+                  <button className="btn-primary" onClick={openSendConfirm} disabled={txLoading}>
+                    {txLoading ? 'Processing...' : 'Send USDC'}
                   </button>
-                </div>
-                <input className="action-input" type="text" placeholder="0x..." value={recipient} onChange={(e) => setRecipient(e.target.value)} />
-                <label className="input-label">Amount (USDC)</label>
-                <input className="action-input" type="number" placeholder="0.0" value={amount} onChange={(e) => setAmount(e.target.value)} />
-                <button className="btn-primary" onClick={openSendConfirm} disabled={txLoading}>{txLoading ? 'Processing...' : 'Send USDC'}</button>
-              </>}
+                </>}
 
-              {/* ── CROSS-CHAIN (LI.FI) ── */}
-              {actionTab === 'cross' && <>
-                <p className="action-desc">Cross-chain swap via LI.FI — any token, any chain</p>
-                <div className="lifi-row">
-                  <div className="lifi-col">
-                    <label className="input-label">From chain</label>
-                    <select className="action-input" value={lifiFromChainId}
-                      onChange={(e) => { setLifiFromChainId(Number(e.target.value)); setLifiFromToken('ETH'); setLifiQuote(null) }}>
-                      {LIFI_CHAINS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-                    </select>
-                  </div>
-                  <div className="lifi-col">
-                    <label className="input-label">Token</label>
-                    <select className="action-input" value={lifiFromToken}
-                      onChange={(e) => { setLifiFromToken(e.target.value); setLifiQuote(null) }}>
-                      {getLifiFromTokens(lifiFromChainId).map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="lifi-row">
-                  <div className="lifi-col">
-                    <label className="input-label">To chain</label>
-                    <select className="action-input" value={lifiToChainId}
-                      onChange={(e) => { setLifiToChainId(Number(e.target.value)); setLifiToToken('USDC'); setLifiQuote(null) }}>
-                      {LIFI_CHAINS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-                    </select>
-                  </div>
-                  <div className="lifi-col">
-                    <label className="input-label">Receive</label>
-                    <select className="action-input" value={lifiToToken}
-                      onChange={(e) => { setLifiToToken(e.target.value); setLifiQuote(null) }}>
-                      {getLifiFromTokens(lifiToChainId).map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <label className="input-label">Amount ({lifiFromToken})</label>
-                <input className="action-input" type="number" placeholder="0.0" value={lifiAmount}
-                  onChange={(e) => { setLifiAmount(e.target.value); setLifiQuote(null) }} />
-                {lifiError && <div className="tx-status error"><span>{lifiError}</span></div>}
-                {!lifiQuote
-                  ? <button className="btn-primary" onClick={fetchLiFiQuote} disabled={lifiLoading || !lifiAmount}>
-                      {lifiLoading ? 'Getting quote...' : 'Get Quote'}
-                    </button>
-                  : <>
-                    <LiFiQuoteCard />
-                    <button className="btn-primary" onClick={executeLiFiSwap} disabled={lifiExecuting}>
-                      {lifiExecuting ? 'Executing...' : `Swap via LI.FI`}
-                    </button>
-                    <button className="btn-outline" style={{ alignSelf: 'center' }} onClick={() => setLifiQuote(null)}>
-                      <RefreshCw size={12} /> New quote
-                    </button>
-                  </>
-                }
-              </>}
+                {/* ── PAY HUB ── */}
+                {transferSeg === 'pay' && (() => {
+                  const addrs = connections.flatMap((c) => [...c.accounts] as string[])
+                  const isOwner = addrs.some((a) => a.toLowerCase() === contractOwner)
+                  return <>
+                    <div className="arc-badge"><span className="arc-dot" /> Arc Testnet</div>
 
-              {/* TX 상태 (swap/bridge/send/cross 공통) */}
-              {(txStatus || txError) && (
-                <div className={`tx-status ${txError ? 'error' : 'success'}`}>
-                  <span>{txError || txStatus}</span>
-                  {txHash && <a href={`https://testnet.arcscan.app/tx/${txHash}`} target="_blank" rel="noopener noreferrer">View on ArcScan <ExternalLink size={11} /></a>}
-                </div>
-              )}
-              {txHash && actionTab === 'cross' && (
-                <div className="tx-status success">
-                  <span>Transaction submitted!</span>
-                  <a href={`${CHAIN_META[lifiQuote?.action?.fromChainId ?? mainnet.id]?.explorer ?? 'https://etherscan.io'}/tx/${txHash}`}
-                    target="_blank" rel="noopener noreferrer">View on explorer <ExternalLink size={11} /></a>
-                </div>
-              )}
-
-              {/* ── PAY (USDCPaymentHub) ── */}
-              {actionTab === 'pay' && (() => {
-                const allAddresses = connections.flatMap((c) => [...c.accounts] as string[])
-                const isOwner = allAddresses.some((a) => a.toLowerCase() === contractOwner)
-                return <>
-                  <p className="action-desc">Arc Testnet 결제 컨트랙트로 USDC 전송</p>
-
-                  {/* 컨트랙트 잔액 카드 */}
-                  <div className="lifi-quote" style={{ marginBottom: 8 }}>
-                    <div className="lifi-quote-row">
-                      <span className="lifi-quote-label">컨트랙트 주소</span>
+                    <div className="pay-hub-contract-row">
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Contract</span>
                       <a href={`https://testnet.arcscan.app/address/${PAYMENT_HUB_ADDRESS}`}
-                        target="_blank" rel="noopener noreferrer" className="chain-link">
+                        target="_blank" rel="noopener noreferrer" className="pay-hub-contract-addr">
                         {PAYMENT_HUB_ADDRESS.slice(0, 8)}...{PAYMENT_HUB_ADDRESS.slice(-6)} <ExternalLink size={10} />
                       </a>
                     </div>
-                    <div className="lifi-quote-row">
-                      <span className="lifi-quote-label">컨트랙트 잔액</span>
-                      <span className="lifi-quote-value">
-                        {contractBalance ? `${parseFloat(contractBalance).toFixed(4)} USDC` : '—'}
+
+                    <div className="pay-hub-balance">
+                      <div>
+                        <div className="pay-hub-balance-label">Contract Balance</div>
+                        {isOwner && <div className="pay-hub-owner-badge"><Check size={11} /> Owner</div>}
+                      </div>
+                      <span className="pay-hub-balance-value">
+                        {contractBalance ? parseFloat(contractBalance).toFixed(4) : '—'}
+                        <span style={{ fontSize: 'var(--text-xs)', marginLeft: 4, color: 'var(--arc)', opacity: 0.7 }}>USDC</span>
                       </span>
                     </div>
-                    {isOwner && (
-                      <div className="lifi-quote-row">
-                        <span className="lifi-quote-label" style={{ color: 'var(--success)' }}>✓ Owner 지갑 연결됨</span>
-                        <button className="btn-secondary" style={{ padding: '3px 10px', fontSize: '0.72rem' }}
-                          onClick={withdrawFromContract} disabled={withdrawLoading || !contractBalance || parseFloat(contractBalance) === 0}>
-                          {withdrawLoading ? 'Processing...' : 'Withdraw'}
-                        </button>
-                      </div>
+
+                    <label className="input-label">Amount (USDC)</label>
+                    <input className="action-input" type="number" placeholder="0.0"
+                      value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
+
+                    <label className="input-label">Memo (optional)</label>
+                    <input className="action-input" type="text" placeholder="Order ID, note..."
+                      value={payNote} onChange={(e) => setPayNote(e.target.value)} />
+
+                    <button className="btn-primary" onClick={payToContract} disabled={txLoading}>
+                      {txLoading ? 'Processing...' : 'Pay to Contract'}
+                    </button>
+
+                    {isOwner && contractBalance && parseFloat(contractBalance) > 0 && (
+                      <button className="btn-outline" onClick={withdrawFromContract} disabled={withdrawLoading}>
+                        {withdrawLoading ? 'Withdrawing...' : `Withdraw ${parseFloat(contractBalance).toFixed(4)} USDC`}
+                      </button>
                     )}
-                  </div>
+                  </>
+                })()}
+              </div>
+            </div>
 
-                  <label className="input-label">금액 (USDC)</label>
-                  <input className="action-input" type="number" placeholder="0.0"
-                    value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
-
-                  <label className="input-label">메모 (선택)</label>
-                  <input className="action-input" type="text" placeholder="주문번호, 용도 등"
-                    value={payNote} onChange={(e) => setPayNote(e.target.value)} />
-
-                  <button className="btn-primary" onClick={payToContract} disabled={txLoading}>
-                    {txLoading ? 'Processing...' : 'Pay to Contract'}
-                  </button>
-
-                  {txHash && (
-                    <div className="tx-status success">
-                      <span>결제 완료!</span>
-                      <a href={`https://testnet.arcscan.app/tx/${txHash}`}
-                        target="_blank" rel="noopener noreferrer">ArcScan에서 보기 <ExternalLink size={11} /></a>
-                    </div>
-                  )}
-                </>
-              })()}
-
-              <div className="security-note">
-                <ArrowDownLeft size={12} style={{ opacity: 0.5 }} />
-                USDC Portal never stores your private keys. Always verify before signing.
+            {/* ── DeFi 카드 (Cross / Swap / Bridge) ── */}
+            <div className="action-card">
+              <div className="action-card-label">DeFi</div>
+              <div className="action-card-seg" style={{ margin: '8px 4px 0' }}>
+                <button className={`seg ${defiSeg === 'cross' ? 'active' : ''}`} onClick={() => setDefiSeg('cross')}>
+                  <Zap size={11} /> Cross-chain
+                </button>
+                <button className={`seg ${defiSeg === 'swap' ? 'active' : ''}`} onClick={() => setDefiSeg('swap')}>
+                  <Repeat2 size={11} /> Swap
+                </button>
+                <button className={`seg ${defiSeg === 'bridge' ? 'active' : ''}`} onClick={() => setDefiSeg('bridge')}>
+                  <Layers size={11} /> Bridge
+                </button>
               </div>
 
-              {/* 가격 조회 */}
-              {Object.keys(prices).length > 0 && (
-                <div className="price-ticker">
+              <div className="action-card-body">
+                {/* ── CROSS-CHAIN (LI.FI) ── */}
+                {defiSeg === 'cross' && <>
+                  <div className="lifi-row">
+                    <div className="lifi-col">
+                      <label className="input-label">From</label>
+                      <select className="action-input" value={lifiFromChainId}
+                        onChange={(e) => { setLifiFromChainId(Number(e.target.value)); setLifiFromToken('ETH'); setLifiQuote(null) }}>
+                        {LIFI_CHAINS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                      </select>
+                    </div>
+                    <div className="lifi-col">
+                      <label className="input-label">Token</label>
+                      <select className="action-input" value={lifiFromToken}
+                        onChange={(e) => { setLifiFromToken(e.target.value); setLifiQuote(null) }}>
+                        {getLifiFromTokens(lifiFromChainId).map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="lifi-row">
+                    <div className="lifi-col">
+                      <label className="input-label">To</label>
+                      <select className="action-input" value={lifiToChainId}
+                        onChange={(e) => { setLifiToChainId(Number(e.target.value)); setLifiToToken('USDC'); setLifiQuote(null) }}>
+                        {LIFI_CHAINS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                      </select>
+                    </div>
+                    <div className="lifi-col">
+                      <label className="input-label">Receive</label>
+                      <select className="action-input" value={lifiToToken}
+                        onChange={(e) => { setLifiToToken(e.target.value); setLifiQuote(null) }}>
+                        {getLifiFromTokens(lifiToChainId).map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <label className="input-label">Amount ({lifiFromToken})</label>
+                  <input className="action-input" type="number" placeholder="0.0" value={lifiAmount}
+                    onChange={(e) => { setLifiAmount(e.target.value); setLifiQuote(null) }} />
+                  {lifiError && <div style={{ color: 'var(--error)', fontSize: 'var(--text-xs)', padding: '2px 0' }}>{lifiError}</div>}
+                  {!lifiQuote
+                    ? <button className="btn-primary" onClick={fetchLiFiQuote} disabled={lifiLoading || !lifiAmount}>
+                        {lifiLoading ? 'Getting quote...' : 'Get Quote'}
+                      </button>
+                    : <>
+                      <LiFiQuoteCard />
+                      <button className="btn-primary" onClick={executeLiFiSwap} disabled={lifiExecuting}>
+                        {lifiExecuting ? 'Executing...' : 'Swap via LI.FI'}
+                      </button>
+                      <button className="btn-outline" onClick={() => setLifiQuote(null)}>
+                        <RefreshCw size={12} /> New quote
+                      </button>
+                    </>
+                  }
+                </>}
+
+                {/* ── SWAP (Coming Soon / Arc App Kit) ── */}
+                {defiSeg === 'swap' && <>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 0 8px' }}>
+                    <div className="swap-row">
+                      <div className="swap-badge">ETH</div>
+                      <ArrowRight size={14} className="swap-arrow-icon" />
+                      <div className="swap-badge usdc">USDC</div>
+                    </div>
+                  </div>
+                  <label className="input-label">Amount (ETH)</label>
+                  <input className="action-input" type="number" placeholder="0.0" value={amount}
+                    onChange={(e) => setAmount(e.target.value)} />
+                  <button className="btn-primary" onClick={openSwapConfirm} disabled={txLoading}>
+                    {txLoading ? 'Processing...' : 'Swap to USDC'}
+                  </button>
+                  <div className="coming-soon">
+                    <span className="coming-soon-label">Arc Testnet only</span>
+                    Powered by Circle App Kit
+                  </div>
+                </>}
+
+                {/* ── BRIDGE (Arc App Kit) ── */}
+                {defiSeg === 'bridge' && <>
+                  <label className="input-label">From chain</label>
+                  <select className="action-input" value={fromChain}
+                    onChange={(e) => setFromChain(e.target.value as typeof fromChain)}>
+                    <option value="Ethereum_Sepolia">Ethereum Sepolia</option>
+                    <option value="Base_Sepolia">Base Sepolia</option>
+                  </select>
+                  <label className="input-label">Amount (USDC)</label>
+                  <input className="action-input" type="number" placeholder="0.0" value={amount}
+                    onChange={(e) => setAmount(e.target.value)} />
+                  <button className="btn-primary" onClick={openBridgeConfirm} disabled={txLoading}>
+                    {txLoading ? 'Processing...' : 'Bridge to Arc'}
+                  </button>
+                  <div className="coming-soon">
+                    <span className="coming-soon-label">Testnet only</span>
+                    Powered by Circle App Kit
+                  </div>
+                </>}
+              </div>
+            </div>
+
+            {/* ── 가스 카드 ── */}
+            {Object.keys(gasPrices).length > 0 && (
+              <div className="gas-card">
+                <div className="gas-card-label"><Fuel size={11} /> Gas</div>
+                {CHAINS
+                  .filter((c) => gasPrices[c.id] && (networkMode === 'mainnet' ? MAINNET_IDS.has(c.id) : TESTNET_IDS.has(c.id)))
+                  .slice(0, 4)
+                  .map((c) => (
+                    <div key={c.id} className="gas-item" title={CHAIN_META[c.id].label}>
+                      <span className="gas-dot" style={{ background: CHAIN_META[c.id].color }} />
+                      {gasPrices[c.id]}
+                    </div>
+                  ))}
+                <span className="gas-unit">Gwei</span>
+              </div>
+            )}
+
+            {/* ── 가격 카드 ── */}
+            {Object.keys(prices).length > 0 && (
+              <div className="action-card prices-card">
+                <div className="action-card-label">Live Prices</div>
+                <div className="action-card-body">
                   {[
-                    { id: 'ethereum', label: 'ETH' },
-                    { id: 'usd-coin', label: 'USDC' },
-                    { id: 'matic-network', label: 'POL' },
-                    { id: 'avalanche-2', label: 'AVAX' },
+                    { id: 'ethereum',     label: 'ETH'  },
+                    { id: 'usd-coin',     label: 'USDC' },
+                    { id: 'matic-network', label: 'POL'  },
+                    { id: 'avalanche-2',  label: 'AVAX' },
                   ].filter((p) => prices[p.id]).map((p) => (
                     <div key={p.id} className="price-item">
                       <span className="price-symbol">{p.label}</span>
-                      <span className="price-value">${prices[p.id].usd.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                      <span className="price-value">
+                        ${prices[p.id].usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
                       <Change24h value={prices[p.id].change24h} />
                     </div>
                   ))}
                 </div>
-              )}
+              </div>
+            )}
+
+            {/* ── 보안 안내 ── */}
+            <div className="security-note">
+              <ShieldCheck size={12} style={{ opacity: 0.4, flexShrink: 0, marginTop: 1 }} />
+              Never stores your private keys. Always verify transactions before signing.
             </div>
           </div>
         </div>
