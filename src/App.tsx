@@ -8,7 +8,7 @@ import {
   Sun, Moon, Plus, X, RefreshCw, ArrowRight, Copy, Check,
   Wallet, ExternalLink, AlertTriangle, QrCode, ChevronDown,
   ArrowUpRight, Repeat2, Layers, BookUser,
-  Fuel, Trash2, Download, Zap, ShieldCheck, CircleDollarSign,
+  Fuel, Trash2, Download, Zap, ShieldCheck, CircleDollarSign, Bot,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { arcTestnet } from './wagmi.config'
@@ -35,10 +35,47 @@ const PAYMENT_HUB_ABI = [
 ] as const
 
 // ─── CCTP V2 (Testnet) ────────────────────────────────────────────────────
-const SEPOLIA_USDC            = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`
-const SEPOLIA_TOKEN_MESSENGER = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA' as `0x${string}`
-const ARC_MSG_TRANSMITTER     = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x${string}`
-const ARC_CCTP_DOMAIN         = 26
+const SEPOLIA_USDC        = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`
+const ARC_MSG_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x${string}`
+
+// ─── ArcOnboarder ─────────────────────────────────────────────────────────
+// TODO: Remix로 Sepolia 배포 후 이 주소를 실제 컨트랙트 주소로 교체
+const ARC_ONBOARDER = '0x0000000000000000000000000000000000000000' as `0x${string}`
+
+// ─── ArcEscrow ────────────────────────────────────────────────────────────
+// TODO: Remix로 Arc Testnet 배포 후 이 주소를 실제 컨트랙트 주소로 교체
+const ARC_ESCROW = '0x0000000000000000000000000000000000000000' as `0x${string}`
+const ARC_TESTNET_USDC = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}` // TODO: Arc Testnet USDC로 교체
+
+const ARC_ESCROW_ABI = [
+  { name: 'createJob', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'agent',       type: 'address' },
+      { name: 'amount',      type: 'uint256' },
+      { name: 'deadline',    type: 'uint256' },
+      { name: 'description', type: 'string'  },
+    ], outputs: [{ name: 'jobId', type: 'uint256' }] },
+  { name: 'submitWork', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'jobId',     type: 'uint256' },
+      { name: 'resultUri', type: 'string'  },
+    ], outputs: [] },
+  { name: 'approveWork', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'jobId', type: 'uint256' }], outputs: [] },
+  { name: 'claimRefund', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'jobId', type: 'uint256' }], outputs: [] },
+  { name: 'getJob', type: 'function', stateMutability: 'view',
+    inputs: [{ name: 'jobId', type: 'uint256' }],
+    outputs: [
+      { name: 'client',      type: 'address' },
+      { name: 'agent',       type: 'address' },
+      { name: 'amount',      type: 'uint256' },
+      { name: 'deadline',    type: 'uint256' },
+      { name: 'description', type: 'string'  },
+      { name: 'resultUri',   type: 'string'  },
+      { name: 'status',      type: 'uint8'   },
+    ] },
+] as const
 
 const APPROVE_ABI = [
   { name: 'approve', type: 'function', stateMutability: 'nonpayable',
@@ -46,15 +83,14 @@ const APPROVE_ABI = [
     outputs: [{ name: '', type: 'bool' }] },
 ] as const
 
-const DEPOSIT_BURN_ABI = [
-  { name: 'depositForBurn', type: 'function', stateMutability: 'nonpayable',
+
+const ARC_ONBOARDER_ABI = [
+  { name: 'bridgeUSDCToArc', type: 'function', stateMutability: 'nonpayable',
     inputs: [
-      { name: 'amount',            type: 'uint256' },
-      { name: 'destinationDomain', type: 'uint32'  },
-      { name: 'mintRecipient',     type: 'bytes32' },
-      { name: 'burnToken',         type: 'address' },
+      { name: 'amount',       type: 'uint256' },
+      { name: 'arcRecipient', type: 'bytes32' },
     ],
-    outputs: [{ name: 'nonce', type: 'uint64' }] },
+    outputs: [] },
 ] as const
 
 const RECEIVE_MSG_ABI = [
@@ -193,7 +229,7 @@ type Toast = {
 }
 
 type TransferSeg = 'send' | 'pay'
-type DefiSeg     = 'cross' | 'swap' | 'bridge'
+type DefiSeg     = 'cross' | 'swap' | 'bridge' | 'agent'
 type FaucetPollState = 'idle' | 'polling' | 'received'
 type NetworkMode = 'mainnet' | 'testnet'
 type MainTab     = 'assets' | 'history' | 'faucet'
@@ -373,6 +409,20 @@ export default function App() {
   const [mainTab, setMainTab]       = useState<MainTab>('assets')
   const [transferSeg, setTransferSeg] = useState<TransferSeg>('send')
   const [defiSeg, setDefiSeg]       = useState<DefiSeg>('cross')
+
+  // ── ArcEscrow 상태 ────────────────────────────────────────────────────────
+  const [escrowTab,    setEscrowTab]    = useState<'create' | 'lookup'>('create')
+  const [escrowAgent,  setEscrowAgent]  = useState('')
+  const [escrowAmount, setEscrowAmount] = useState('')
+  const [escrowDays,   setEscrowDays]   = useState('3')
+  const [escrowDesc,   setEscrowDesc]   = useState('')
+  const [escrowJobId,  setEscrowJobId]  = useState('')
+  const [escrowJob,    setEscrowJob]    = useState<{
+    client: string; agent: string; amount: bigint; deadline: bigint;
+    description: string; resultUri: string; status: number
+  } | null>(null)
+  const [escrowWorkUri,  setEscrowWorkUri]  = useState('')
+  const [escrowLoading,  setEscrowLoading]  = useState(false)
   const [sortBy, setSortBy]         = useState<'value' | 'symbol' | 'chain'>('value')
 
   const [assets, setAssets]         = useState<AssetRow[]>([])
@@ -788,22 +838,22 @@ export default function App() {
       // ── Step 1: Sepolia로 체인 전환 ─────────────────────────────────
       await switchChain({ chainId: sepolia.id })
 
-      // ── Step 2: USDC approve ─────────────────────────────────────────
+      // ── Step 2: USDC approve → ArcOnboarder ─────────────────────────
       setCctpStep('approving')
       addToast({ type: 'loading', message: '1/4 Approving USDC on Sepolia...' })
       await sendTransactionAsync({
         to: SEPOLIA_USDC,
         data: encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve',
-          args: [SEPOLIA_TOKEN_MESSENGER, usdcAmount] }),
+          args: [ARC_ONBOARDER, usdcAmount] }),
       })
 
-      // ── Step 3: depositForBurn ────────────────────────────────────────
+      // ── Step 3: ArcOnboarder.bridgeUSDCToArc ─────────────────────────
       setCctpStep('burning')
-      addToast({ type: 'loading', message: '2/4 Burning USDC → Arc (CCTP)...' })
+      addToast({ type: 'loading', message: '2/4 Bridging USDC → Arc via ArcOnboarder...' })
       const burnHash = await sendTransactionAsync({
-        to: SEPOLIA_TOKEN_MESSENGER,
-        data: encodeFunctionData({ abi: DEPOSIT_BURN_ABI, functionName: 'depositForBurn',
-          args: [usdcAmount, ARC_CCTP_DOMAIN, mintRecipient, SEPOLIA_USDC] }),
+        to: ARC_ONBOARDER,
+        data: encodeFunctionData({ abi: ARC_ONBOARDER_ABI, functionName: 'bridgeUSDCToArc',
+          args: [usdcAmount, mintRecipient] }),
       })
       setCctpBurnHash(burnHash)
 
@@ -855,6 +905,130 @@ export default function App() {
     } catch (e: unknown) {
       setCctpStep('error')
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Bridge failed' })
+    }
+  }
+
+  // ─── ArcEscrow 함수들 ────────────────────────────────────────────────────
+
+  async function escrowCreateJob() {
+    const { encodeFunctionData } = await import('viem')
+    const amt = parseFloat(escrowAmount)
+    if (!isAddress(escrowAgent)) return addToast({ type: 'error', message: 'Invalid agent address' })
+    if (!amt || amt <= 0)        return addToast({ type: 'error', message: 'Enter USDC amount' })
+    if (!escrowDesc.trim())      return addToast({ type: 'error', message: 'Enter job description' })
+
+    const usdcAmt  = BigInt(Math.round(amt * 1e6))
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + parseInt(escrowDays) * 86400)
+
+    setEscrowLoading(true)
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+
+      // approve USDC to ArcEscrow
+      await sendTransactionAsync({
+        to: ARC_TESTNET_USDC,
+        data: encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve',
+          args: [ARC_ESCROW, usdcAmt] }),
+      })
+
+      // createJob
+      await sendTransactionAsync({
+        to: ARC_ESCROW,
+        data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'createJob',
+          args: [escrowAgent as `0x${string}`, usdcAmt, deadline, escrowDesc] }),
+      })
+
+      addToast({ type: 'success', message: `Job created! ${amt} USDC locked in escrow.` })
+      setEscrowAgent(''); setEscrowAmount(''); setEscrowDesc('')
+    } catch (e: unknown) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Transaction failed' })
+    } finally {
+      setEscrowLoading(false)
+    }
+  }
+
+  async function escrowLookupJob() {
+    const id = parseInt(escrowJobId)
+    if (isNaN(id) || id < 0) return addToast({ type: 'error', message: 'Enter valid Job ID' })
+
+    setEscrowLoading(true)
+    try {
+      const { encodeFunctionData, decodeFunctionResult } = await import('viem')
+      const arcClient = createPublicClient({
+        chain: arcTestnet,
+        transport: http('https://rpc.testnet.arc.network'),
+      })
+      const data = encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'getJob', args: [BigInt(id)] })
+      const raw  = await arcClient.call({ to: ARC_ESCROW, data })
+      if (!raw.data) throw new Error('No data returned')
+      const [client, agent, amount, deadline, description, resultUri, status] =
+        decodeFunctionResult({ abi: ARC_ESCROW_ABI, functionName: 'getJob', data: raw.data }) as
+        [string, string, bigint, bigint, string, string, number]
+      setEscrowJob({ client, agent, amount, deadline, description, resultUri, status })
+    } catch (e: unknown) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Lookup failed' })
+      setEscrowJob(null)
+    } finally {
+      setEscrowLoading(false)
+    }
+  }
+
+  async function escrowSubmitWork() {
+    const { encodeFunctionData } = await import('viem')
+    if (!escrowWorkUri.trim()) return addToast({ type: 'error', message: 'Enter result URI' })
+    setEscrowLoading(true)
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+      await sendTransactionAsync({
+        to: ARC_ESCROW,
+        data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'submitWork',
+          args: [BigInt(parseInt(escrowJobId)), escrowWorkUri] }),
+      })
+      addToast({ type: 'success', message: 'Work submitted!' })
+      setEscrowWorkUri('')
+      await escrowLookupJob()
+    } catch (e: unknown) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Transaction failed' })
+    } finally {
+      setEscrowLoading(false)
+    }
+  }
+
+  async function escrowApproveWork() {
+    const { encodeFunctionData } = await import('viem')
+    setEscrowLoading(true)
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+      await sendTransactionAsync({
+        to: ARC_ESCROW,
+        data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'approveWork',
+          args: [BigInt(parseInt(escrowJobId))] }),
+      })
+      addToast({ type: 'success', message: 'Work approved — USDC sent to agent!' })
+      await escrowLookupJob()
+    } catch (e: unknown) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Transaction failed' })
+    } finally {
+      setEscrowLoading(false)
+    }
+  }
+
+  async function escrowClaimRefund() {
+    const { encodeFunctionData } = await import('viem')
+    setEscrowLoading(true)
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+      await sendTransactionAsync({
+        to: ARC_ESCROW,
+        data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'claimRefund',
+          args: [BigInt(parseInt(escrowJobId))] }),
+      })
+      addToast({ type: 'success', message: 'Refund claimed!' })
+      await escrowLookupJob()
+    } catch (e: unknown) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Transaction failed' })
+    } finally {
+      setEscrowLoading(false)
     }
   }
 
@@ -1391,6 +1565,9 @@ export default function App() {
                 <button className={`seg ${defiSeg === 'bridge' ? 'active' : ''}`} onClick={() => setDefiSeg('bridge')}>
                   <Layers size={11} /> Bridge
                 </button>
+                <button className={`seg ${defiSeg === 'agent' ? 'active' : ''}`} onClick={() => setDefiSeg('agent')}>
+                  <Bot size={11} /> Agent
+                </button>
               </div>
 
               <div className="action-card-body">
@@ -1539,6 +1716,105 @@ export default function App() {
                         Burn tx ↗
                       </a>
                     )}
+                  </>}
+                </>}
+
+                {/* ── AGENT ESCROW ── */}
+                {defiSeg === 'agent' && <>
+                  <div className="action-card-seg" style={{ margin: '4px 0 8px' }}>
+                    <button className={`seg ${escrowTab === 'create' ? 'active' : ''}`} onClick={() => setEscrowTab('create')}>
+                      Post Job
+                    </button>
+                    <button className={`seg ${escrowTab === 'lookup' ? 'active' : ''}`} onClick={() => setEscrowTab('lookup')}>
+                      Lookup Job
+                    </button>
+                  </div>
+
+                  {escrowTab === 'create' ? <>
+                    <label className="input-label">Agent Address</label>
+                    <input className="action-input" placeholder="0x..." value={escrowAgent}
+                      onChange={(e) => setEscrowAgent(e.target.value)} />
+
+                    <label className="input-label">USDC Amount</label>
+                    <input className="action-input" type="number" placeholder="10.00" value={escrowAmount}
+                      onChange={(e) => setEscrowAmount(e.target.value)} />
+
+                    <label className="input-label">Deadline (days)</label>
+                    <input className="action-input" type="number" min="1" max="30" value={escrowDays}
+                      onChange={(e) => setEscrowDays(e.target.value)} />
+
+                    <label className="input-label">Job Description</label>
+                    <input className="action-input" placeholder="Describe the task..." value={escrowDesc}
+                      onChange={(e) => setEscrowDesc(e.target.value)} />
+
+                    <button className="btn-primary" style={{ marginTop: 4 }}
+                      onClick={escrowCreateJob} disabled={escrowLoading}>
+                      {escrowLoading ? 'Processing...' : 'Lock USDC & Post Job'}
+                    </button>
+                    <div className="coming-soon" style={{ marginTop: 6 }}>
+                      <span className="coming-soon-label">Arc Testnet</span>
+                      USDC 에스크로 · 자동 정산 · ArcEscrow.sol
+                    </div>
+                  </> : <>
+                    <label className="input-label">Job ID</label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input className="action-input" type="number" placeholder="0" value={escrowJobId}
+                        style={{ flex: 1 }} onChange={(e) => { setEscrowJobId(e.target.value); setEscrowJob(null) }} />
+                      <button className="btn-outline" onClick={escrowLookupJob} disabled={escrowLoading}
+                        style={{ whiteSpace: 'nowrap' }}>
+                        {escrowLoading ? '...' : 'Look up'}
+                      </button>
+                    </div>
+
+                    {escrowJob && (() => {
+                      const statusLabel = ['Open', 'Submitted', 'Approved', 'Refunded'][escrowJob.status] ?? '?'
+                      const statusColor = ['#f5a623', '#2775ca', '#27ae60', '#e74c3c'][escrowJob.status] ?? '#888'
+                      const expired     = Date.now() / 1000 > Number(escrowJob.deadline)
+                      const myAddr      = (allAddresses[0] ?? '').toLowerCase()
+                      const isClient    = escrowJob.client.toLowerCase() === myAddr
+                      const isAgent     = escrowJob.agent.toLowerCase()  === myAddr
+                      const usdcAmt     = (Number(escrowJob.amount) / 1e6).toFixed(2)
+                      const dl          = new Date(Number(escrowJob.deadline) * 1000).toLocaleDateString()
+                      return (
+                        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: 'var(--text-xs)', opacity: 0.6 }}>Job #{escrowJobId}</span>
+                            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: statusColor }}>{statusLabel}</span>
+                          </div>
+                          <div style={{ fontSize: 'var(--text-xs)', opacity: 0.8 }}>{escrowJob.description}</div>
+                          <div style={{ fontSize: 'var(--text-xs)', opacity: 0.5 }}>
+                            {usdcAmt} USDC · Deadline {dl}
+                          </div>
+                          {escrowJob.resultUri && (
+                            <a href={escrowJob.resultUri} target="_blank" rel="noreferrer"
+                              style={{ fontSize: 'var(--text-xs)', color: 'var(--accent)' }}>
+                              Result ↗
+                            </a>
+                          )}
+
+                          {/* 에이전트 액션: 결과 제출 */}
+                          {isAgent && escrowJob.status === 0 && !expired && <>
+                            <input className="action-input" placeholder="Result URL or IPFS hash"
+                              value={escrowWorkUri} onChange={(e) => setEscrowWorkUri(e.target.value)} />
+                            <button className="btn-primary" onClick={escrowSubmitWork} disabled={escrowLoading}>
+                              {escrowLoading ? 'Submitting...' : 'Submit Work'}
+                            </button>
+                          </>}
+
+                          {/* 의뢰인 액션: 승인 or 환불 */}
+                          {isClient && escrowJob.status === 1 && (
+                            <button className="btn-primary" onClick={escrowApproveWork} disabled={escrowLoading}>
+                              {escrowLoading ? 'Approving...' : 'Approve & Release USDC'}
+                            </button>
+                          )}
+                          {isClient && (escrowJob.status === 0 || escrowJob.status === 1) && expired && (
+                            <button className="btn-outline" onClick={escrowClaimRefund} disabled={escrowLoading}>
+                              {escrowLoading ? 'Refunding...' : 'Claim Refund'}
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </>}
                 </>}
               </div>
