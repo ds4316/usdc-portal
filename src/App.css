@@ -983,3 +983,50 @@ body {
   background: var(--accent); animation: shimmer 1s infinite;
   display: inline-block; vertical-align: middle;
 }
+
+/* ─── CCTP Bridge ─────────────────────────────────────────────────────── */
+.cctp-steps {
+  display: flex; align-items: center; gap: 0; margin-bottom: 10px;
+}
+.cctp-step {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  flex: 1; font-size: 9px; color: var(--text-muted);
+  position: relative;
+}
+.cctp-step:not(:last-child)::after {
+  content: ''; position: absolute; top: 8px; left: 60%;
+  width: 80%; height: 1px; background: var(--border2);
+}
+.cctp-step.done::after  { background: var(--success); }
+.cctp-step.active::after { background: var(--border2); }
+.cctp-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700;
+  background: var(--surface3); border: 1px solid var(--border2);
+  color: var(--text-muted); z-index: 1;
+}
+.cctp-step.done  .cctp-dot { background: var(--success); border-color: var(--success); color: #000; }
+.cctp-step.active .cctp-dot {
+  background: var(--arc-dim); border-color: var(--arc); color: var(--arc);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.cctp-step.done  { color: var(--success); }
+.cctp-step.active { color: var(--arc); }
+
+.cctp-chain-badge {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface3); border: 1px solid var(--border2);
+  border-radius: 8px; padding: 7px 10px;
+  font-size: var(--text-xs); color: var(--text-sub);
+  margin-bottom: 6px;
+}
+.cctp-done {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 16px 0 8px; text-align: center;
+}
+.cctp-tx-link {
+  display: block; text-align: center; margin-top: 6px;
+  font-size: var(--text-xs); color: var(--arc); text-decoration: none;
+}
+.cctp-tx-link:hover { text-decoration: underline; }

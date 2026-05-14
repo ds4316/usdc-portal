@@ -34,6 +34,40 @@ const PAYMENT_HUB_ABI = [
     inputs: [], outputs: [{ name: '', type: 'address' }] },
 ] as const
 
+// ─── CCTP V2 (Testnet) ────────────────────────────────────────────────────
+const SEPOLIA_USDC            = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`
+const SEPOLIA_TOKEN_MESSENGER = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA' as `0x${string}`
+const ARC_MSG_TRANSMITTER     = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x${string}`
+const ARC_CCTP_DOMAIN         = 26
+
+const APPROVE_ABI = [
+  { name: 'approve', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }],
+    outputs: [{ name: '', type: 'bool' }] },
+] as const
+
+const DEPOSIT_BURN_ABI = [
+  { name: 'depositForBurn', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'amount',            type: 'uint256' },
+      { name: 'destinationDomain', type: 'uint32'  },
+      { name: 'mintRecipient',     type: 'bytes32' },
+      { name: 'burnToken',         type: 'address' },
+    ],
+    outputs: [{ name: 'nonce', type: 'uint64' }] },
+] as const
+
+const RECEIVE_MSG_ABI = [
+  { name: 'receiveMessage', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'message', type: 'bytes' }, { name: 'attestation', type: 'bytes' }],
+    outputs: [{ name: 'success', type: 'bool' }] },
+] as const
+
+const MESSAGE_SENT_EVENT = [
+  { name: 'MessageSent', type: 'event',
+    inputs: [{ name: 'message', type: 'bytes', indexed: false }] },
+] as const
+
 // ─── 체인 메타 ────────────────────────────────────────────────────────────
 export const CHAINS = [mainnet, base, polygon, arbitrum, optimism, avalanche, arcTestnet, sepolia, baseSepolia] as const
 
@@ -372,8 +406,16 @@ export default function App() {
   // 폼 상태
   const [recipient, setRecipient] = useState('')
   const [amount, setAmount]       = useState('')
-  const [fromChain, setFromChain] = useState<'Ethereum_Sepolia' | 'Base_Sepolia'>('Base_Sepolia')
+  // fromChain kept for Circle AppKit compatibility (kit.unifiedBalance)
+  const _fromChain = 'Base_Sepolia' as const; void _fromChain
   const [txLoading, setTxLoading] = useState(false)
+
+  // CCTP Bridge 상태
+  type CCTPStep = 'idle' | 'approving' | 'burning' | 'attesting' | 'minting' | 'done' | 'error'
+  const [cctpAmount,    setCctpAmount]    = useState('')
+  const [cctpRecipient, setCctpRecipient] = useState('')
+  const [cctpStep,      setCctpStep]      = useState<CCTPStep>('idle')
+  const [cctpBurnHash,  setCctpBurnHash]  = useState('')
 
   // LI.FI
   const [lifiFromChainId, setLifiFromChainId] = useState<number>(mainnet.id)
@@ -730,18 +772,90 @@ export default function App() {
     })
   }
 
-  function openBridgeConfirm() {
-    if (!amount) return addToast({ type: 'error', message: 'Enter an amount' })
-    setConfirmState({
-      title: 'Confirm Bridge',
-      lines: [`${amount} USDC`, `From: ${fromChain === 'Ethereum_Sepolia' ? 'Ethereum Sepolia' : 'Base Sepolia'}`, 'To: Arc Unified Balance'],
-      warnings: [],
-      onConfirm: () => execTx('bridge', `${amount} USDC → Arc`, async () => {
-        const adapter = await getAdapter()
-        const r = await kit.unifiedBalance.deposit({ from: { adapter, chain: fromChain }, amount, token: 'USDC' })
-        return (r as { txHash?: string }).txHash ?? ''
-      }),
-    })
+  // ─── CCTP Bridge: Sepolia USDC → Arc Testnet USDC ───────────────────────
+  async function executeCCTPBridge() {
+    const amt = parseFloat(cctpAmount)
+    if (!amt || amt <= 0) return addToast({ type: 'error', message: 'Enter an amount' })
+    const recipientAddr = (cctpRecipient || allAddresses[0]) as `0x${string}`
+    if (!recipientAddr) return addToast({ type: 'error', message: 'Connect wallet or enter Arc address' })
+
+    const { encodeFunctionData, decodeEventLog, keccak256 } = await import('viem')
+    const usdcAmount = BigInt(Math.round(amt * 1e6)) // USDC 6 decimals
+    // Arc recipient: EVM address → bytes32 (right-aligned, left-zero-padded)
+    const mintRecipient = `0x${'0'.repeat(24)}${recipientAddr.replace('0x', '')}` as `0x${string}`
+
+    try {
+      // ── Step 1: Sepolia로 체인 전환 ─────────────────────────────────
+      await switchChain({ chainId: sepolia.id })
+
+      // ── Step 2: USDC approve ─────────────────────────────────────────
+      setCctpStep('approving')
+      addToast({ type: 'loading', message: '1/4 Approving USDC on Sepolia...' })
+      await sendTransactionAsync({
+        to: SEPOLIA_USDC,
+        data: encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve',
+          args: [SEPOLIA_TOKEN_MESSENGER, usdcAmount] }),
+      })
+
+      // ── Step 3: depositForBurn ────────────────────────────────────────
+      setCctpStep('burning')
+      addToast({ type: 'loading', message: '2/4 Burning USDC → Arc (CCTP)...' })
+      const burnHash = await sendTransactionAsync({
+        to: SEPOLIA_TOKEN_MESSENGER,
+        data: encodeFunctionData({ abi: DEPOSIT_BURN_ABI, functionName: 'depositForBurn',
+          args: [usdcAmount, ARC_CCTP_DOMAIN, mintRecipient, SEPOLIA_USDC] }),
+      })
+      setCctpBurnHash(burnHash)
+
+      // ── Step 4: MessageSent 이벤트에서 message 추출 ─────────────────
+      const sepoliaClient = createPublicClient({
+        chain: sepolia,
+        transport: http('https://rpc.sepolia.org'),
+      })
+      const receipt = await sepoliaClient.waitForTransactionReceipt({ hash: burnHash })
+      const msgLog = receipt.logs.find(
+        (l) => l.address.toLowerCase() === '0xe737e5cebeeba77efe34d4aa090756590b1ce275'
+      )
+      if (!msgLog) throw new Error('MessageSent event not found in receipt')
+
+      const { args } = decodeEventLog({
+        abi: MESSAGE_SENT_EVENT,
+        data: msgLog.data,
+        topics: msgLog.topics,
+      })
+      const messageBytes = args.message as `0x${string}`
+      const messageHash  = keccak256(messageBytes)
+
+      // ── Step 5: Circle Attestation API 폴링 ─────────────────────────
+      setCctpStep('attesting')
+      addToast({ type: 'loading', message: '3/4 Waiting Circle attestation...' })
+      let attestation = ''
+      for (let i = 0; i < 60; i++) {
+        await new Promise((r) => setTimeout(r, 5000))
+        const res  = await fetch(`https://iris-api-sandbox.circle.com/v1/attestations/${messageHash}`)
+        const json = await res.json()
+        if (json.status === 'complete') { attestation = json.attestation; break }
+      }
+      if (!attestation) throw new Error('Attestation timeout — retry later')
+
+      // ── Step 6: Arc Testnet에서 receiveMessage ───────────────────────
+      setCctpStep('minting')
+      addToast({ type: 'loading', message: '4/4 Minting USDC on Arc Testnet...' })
+      await switchChain({ chainId: arcTestnet.id })
+      await sendTransactionAsync({
+        to: ARC_MSG_TRANSMITTER,
+        data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
+          args: [messageBytes, attestation as `0x${string}`] }),
+      })
+
+      setCctpStep('done')
+      addToast({ type: 'success', message: `${cctpAmount} USDC arrived on Arc!`, txHash: burnHash })
+      setCctpAmount('')
+
+    } catch (e: unknown) {
+      setCctpStep('error')
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Bridge failed' })
+    }
   }
 
   function openSendConfirm() {
@@ -1355,24 +1469,77 @@ export default function App() {
                   </div>
                 </>}
 
-                {/* ── BRIDGE (Arc App Kit) ── */}
+                {/* ── BRIDGE (CCTP V2 Native) ── */}
                 {defiSeg === 'bridge' && <>
-                  <label className="input-label">From chain</label>
-                  <select className="action-input" value={fromChain}
-                    onChange={(e) => setFromChain(e.target.value as typeof fromChain)}>
-                    <option value="Ethereum_Sepolia">Ethereum Sepolia</option>
-                    <option value="Base_Sepolia">Base Sepolia</option>
-                  </select>
-                  <label className="input-label">Amount (USDC)</label>
-                  <input className="action-input" type="number" placeholder="0.0" value={amount}
-                    onChange={(e) => setAmount(e.target.value)} />
-                  <button className="btn-primary" onClick={openBridgeConfirm} disabled={txLoading}>
-                    {txLoading ? 'Processing...' : 'Bridge to Arc'}
-                  </button>
-                  <div className="coming-soon">
-                    <span className="coming-soon-label">Testnet only</span>
-                    Powered by Circle App Kit
-                  </div>
+                  {/* 진행 스텝 표시 */}
+                  {cctpStep !== 'idle' && (
+                    <div className="cctp-steps">
+                      {(['approving','burning','attesting','minting'] as const).map((s, i) => {
+                        const labels = ['Approve','Burn','Attest','Mint']
+                        const idx    = ['approving','burning','attesting','minting'].indexOf(cctpStep)
+                        const status = i < idx ? 'done' : i === idx ? 'active' : 'pending'
+                        return (
+                          <div key={s} className={`cctp-step ${status}`}>
+                            <div className="cctp-dot">
+                              {status === 'done' ? '✓' : i + 1}
+                            </div>
+                            <span>{labels[i]}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {cctpStep === 'done' ? (
+                    <div className="cctp-done">
+                      <div style={{ fontSize: 24, marginBottom: 6 }}>✅</div>
+                      <div style={{ fontWeight: 600, marginBottom: 2 }}>Bridged to Arc!</div>
+                      <div style={{ opacity: 0.5, fontSize: 'var(--text-xs)' }}>{cctpAmount} USDC → Arc Testnet</div>
+                      <button className="btn-ghost" style={{ marginTop: 10 }} onClick={() => { setCctpStep('idle'); setCctpBurnHash('') }}>
+                        Bridge again
+                      </button>
+                    </div>
+                  ) : <>
+                    <label className="input-label">From chain</label>
+                    <div className="cctp-chain-badge">
+                      <span className="arc-dot" style={{ background: '#627eea' }} />
+                      Ethereum Sepolia → Arc Testnet
+                    </div>
+
+                    <label className="input-label">Amount (USDC)</label>
+                    <input className="action-input" type="number" placeholder="0.0"
+                      value={cctpAmount} onChange={(e) => setCctpAmount(e.target.value)}
+                      disabled={cctpStep !== 'idle'} />
+
+                    <label className="input-label">Arc recipient (optional)</label>
+                    <input className="action-input" placeholder="0x… (default: your wallet)"
+                      value={cctpRecipient} onChange={(e) => setCctpRecipient(e.target.value)}
+                      disabled={cctpStep !== 'idle'} />
+
+                    <button className="btn-primary" style={{ marginTop: 4 }}
+                      onClick={executeCCTPBridge}
+                      disabled={cctpStep !== 'idle' && cctpStep !== 'error'}>
+                      {cctpStep === 'idle'      ? 'Bridge to Arc'          :
+                       cctpStep === 'approving' ? 'Approving USDC...'      :
+                       cctpStep === 'burning'   ? 'Burning on Sepolia...'  :
+                       cctpStep === 'attesting' ? 'Waiting attestation...' :
+                       cctpStep === 'minting'   ? 'Minting on Arc...'      :
+                       cctpStep === 'error'     ? 'Retry Bridge'           : '...'}
+                    </button>
+
+                    <div className="coming-soon" style={{ marginTop: 6 }}>
+                      <span className="coming-soon-label">CCTP V2</span>
+                      Circle 공식 브릿지 · 슬리피지 0 · 1:1 발행
+                    </div>
+
+                    {cctpBurnHash && (
+                      <a className="cctp-tx-link"
+                        href={`https://sepolia.etherscan.io/tx/${cctpBurnHash}`}
+                        target="_blank" rel="noreferrer">
+                        Burn tx ↗
+                      </a>
+                    )}
+                  </>}
                 </>}
               </div>
             </div>
