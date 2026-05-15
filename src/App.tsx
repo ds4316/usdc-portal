@@ -467,6 +467,7 @@ export default function App() {
   const [prices, setPrices]         = useState<Record<string, PriceData>>({})
   const [totalUsdc, setTotalUsdc]   = useState('0.00')
   const [loadingAssets, setLoadingAssets] = useState(false)
+  const [cctpBalances, setCctpBalances] = useState<{ sepolia: string; arc: string; loading: boolean }>({ sepolia: '—', arc: '—', loading: false })
   const [history, setHistory]       = useState<TxRecord[]>(loadHistory)
 
   const [showConnectors, setShowConnectors] = useState(false)
@@ -620,6 +621,33 @@ export default function App() {
       setTotalUsdc(total.toFixed(2))
     } finally { setLoadingAssets(false) }
   }, [allAddresses.join(',')])
+
+  const loadCctpBalances = useCallback(async () => {
+    const addr = allAddresses[0] as `0x${string}` | undefined
+    if (!addr) return
+    setCctpBalances(b => ({ ...b, loading: true }))
+    try {
+      const [sepoliaBal, arcBal] = await Promise.all([
+        publicClients[11155111].readContract({
+          address: SEPOLIA_USDC as `0x${string}`,
+          abi: ERC20_ABI, functionName: `balanceOf`, args: [addr],
+        }).catch(() => 0n),
+        publicClients[5042002].readContract({
+          address: ARC_TESTNET_USDC,
+          abi: ERC20_ABI, functionName: `balanceOf`, args: [addr],
+        }).catch(() => 0n),
+      ])
+      setCctpBalances({
+        sepolia: parseFloat(formatUnits(sepoliaBal as bigint, 6)).toFixed(2),
+        arc:     parseFloat(formatUnits(arcBal as bigint, 6)).toFixed(2),
+        loading: false,
+      })
+    } catch {
+      setCctpBalances(b => ({ ...b, loading: false }))
+    }
+  }, [allAddresses.join(',')])
+
+  useEffect(() => { if (isConnected && allAddresses[0]) loadCctpBalances() }, [isConnected, allAddresses.join(',')])
 
   // ??? 二쇱냼濡???????????????????????????????????????????????????????????????
   function addContact() {
@@ -1842,10 +1870,7 @@ export default function App() {
                             <span className="arc-dot" style={{ background: '#627eea' }} /> Sepolia
                           </span>
                           <span className="cctp-bal-val">
-                            {(() => {
-                              const a = assets.find(x => x.chain === 11155111 && x.symbol === 'USDC')
-                              return a ? `${parseFloat(a.balance).toFixed(2)} USDC` : '—'
-                            })()}
+                            {cctpBalances.sepolia !== '—' ? `${cctpBalances.sepolia} USDC` : '—'}
                           </span>
                         </div>
                         <div className="cctp-bal-arrow">→</div>
@@ -1854,13 +1879,13 @@ export default function App() {
                             <span className="arc-dot" style={{ background: '#00c2ff' }} /> Arc Testnet
                           </span>
                           <span className="cctp-bal-val">
-                            {(() => {
-                              const a = assets.find(x => x.chain === 5042002 && x.symbol === 'USDC')
-                              return a ? `${parseFloat(a.balance).toFixed(2)} USDC` : '—'
-                            })()}
+                            {cctpBalances.arc !== '—' ? `${cctpBalances.arc} USDC` : '—'}
                           </span>
                         </div>
-                        {loadingAssets && <span className="cctp-bal-loading"><RefreshCw size={10} /></span>}
+                        {cctpBalances.loading
+                          ? <span className="cctp-bal-loading"><RefreshCw size={10} /></span>
+                          : <button className="btn-ghost cctp-bal-refresh" onClick={loadCctpBalances} title="Refresh balances"><RefreshCw size={10} /></button>
+                        }
                       </div>
                       <label className="input-label">Amount (USDC)</label>
                       <input className="action-input" type="number" placeholder="0.0"

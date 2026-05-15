@@ -1034,6 +1034,8 @@ body {
 .cctp-bal-val { font-size: var(--text-sm); font-weight: 600; font-family: var(--font-mono); }
 .cctp-bal-arrow { color: var(--text-muted); font-size: 14px; flex-shrink: 0; }
 .cctp-bal-loading { color: var(--text-muted); animation: spin 1s linear infinite; display: flex; }
+.cctp-bal-refresh { padding: 2px 4px; min-width: 0; color: var(--text-muted); opacity: 0.6; background: none; border: none; cursor: pointer; display: flex; }
+.cctp-bal-refresh:hover { opacity: 1; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .cctp-attest-note {
   display: flex; align-items: flex-start; gap: 7px;
