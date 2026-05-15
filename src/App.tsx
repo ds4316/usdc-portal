@@ -1836,10 +1836,31 @@ export default function App() {
                         </button>
                       </div>
                     ) : <>
-                      <label className="input-label">From chain</label>
-                      <div className="cctp-chain-badge">
-                        <span className="arc-dot" style={{ background: '#627eea' }} />
-                        Ethereum Sepolia → Arc Testnet
+                      <div className="cctp-balance-row">
+                        <div className="cctp-bal-item">
+                          <span className="cctp-bal-chain">
+                            <span className="arc-dot" style={{ background: '#627eea' }} /> Sepolia
+                          </span>
+                          <span className="cctp-bal-val">
+                            {(() => {
+                              const a = assets.find(x => x.chain === 11155111 && x.symbol === 'USDC')
+                              return a ? `${parseFloat(a.balance).toFixed(2)} USDC` : '—'
+                            })()}
+                          </span>
+                        </div>
+                        <div className="cctp-bal-arrow">→</div>
+                        <div className="cctp-bal-item">
+                          <span className="cctp-bal-chain">
+                            <span className="arc-dot" style={{ background: '#00c2ff' }} /> Arc Testnet
+                          </span>
+                          <span className="cctp-bal-val">
+                            {(() => {
+                              const a = assets.find(x => x.chain === 5042002 && x.symbol === 'USDC')
+                              return a ? `${parseFloat(a.balance).toFixed(2)} USDC` : '—'
+                            })()}
+                          </span>
+                        </div>
+                        {loadingAssets && <span className="cctp-bal-loading"><RefreshCw size={10} /></span>}
                       </div>
                       <label className="input-label">Amount (USDC)</label>
                       <input className="action-input" type="number" placeholder="0.0"
@@ -1855,10 +1876,16 @@ export default function App() {
                         {cctpStep === 'idle'      ? 'Bridge to Arc'          :
                          cctpStep === 'approving' ? 'Approving USDC...'      :
                          cctpStep === 'burning'   ? 'Burning on Sepolia...'  :
-                         cctpStep === 'attesting' ? 'Waiting attestation...' :
+                         cctpStep === 'attesting' ? 'Waiting Circle attestation...' :
                          cctpStep === 'minting'   ? 'Minting on Arc...'      :
                          cctpStep === 'error'     ? 'Retry Bridge'           : '...'}
                       </button>
+                      {cctpStep === 'attesting' && (
+                        <div className="cctp-attest-note">
+                          <AlertTriangle size={12} style={{ flexShrink: 0 }} />
+                          Circle attestation takes 15–20 min on testnet. Keep this tab open — it polls automatically.
+                        </div>
+                      )}
                       <div className="coming-soon" style={{ marginTop: 6 }}>
                         <span className="coming-soon-label">CCTP V2</span>
                         Official Circle bridge · 0 slippage · 1:1 mint
