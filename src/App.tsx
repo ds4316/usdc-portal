@@ -1799,7 +1799,7 @@ export default function App() {
                 <Layers size={13} /> CCTP Bridge
               </button>
               <button className={`move-tab ${moveFundsTab === 'cross' ? 'active' : ''}`} onClick={() => setMoveFundsTab('cross')}>
-                <Zap size={13} /> Cross-chain Route
+                <Zap size={13} /> LI.FI Swap
               </button>
               <button className={`move-tab ${moveFundsTab === 'send' ? 'active' : ''}`} onClick={() => setMoveFundsTab('send')}>
                 <ArrowUpRight size={13} /> Send USDC
@@ -1875,7 +1875,7 @@ export default function App() {
 
               {moveFundsTab === 'cross' && (
                 <div className="action-card move-funds-card">
-                  <div className="action-card-label">Cross-chain swap across 6 mainnet chains via LI.FI</div>
+                  <div className="action-card-label">LI.FI swap across ETH · Base · Polygon · Arbitrum · Optimism · Avalanche</div>
                   <div className="action-card-body">
                     <div className="lifi-row">
                       <div className="lifi-col">
