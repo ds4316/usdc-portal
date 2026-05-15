@@ -1030,3 +1030,137 @@ body {
   font-size: var(--text-xs); color: var(--arc); text-decoration: none;
 }
 .cctp-tx-link:hover { text-decoration: underline; }
+
+/* ─── Escrow Board ───────────────────────────────────────────────────────── */
+.escrow-board { display: flex; flex-direction: column; gap: 0; margin: -4px -4px 0; }
+
+.escrow-board-tabs {
+  display: flex; gap: 2px;
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: 8px; padding: 3px; margin-bottom: 12px;
+}
+.escrow-board-tabs button {
+  flex: 1; background: none; border: none; border-radius: 6px;
+  color: var(--text-muted); cursor: pointer; font-size: var(--text-sm);
+  font-weight: 500; padding: 6px 10px; width: auto;
+  transition: background 0.15s, color 0.15s;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.escrow-board-tabs button.active { background: var(--surface); color: var(--text); }
+
+.escrow-badge-count {
+  background: var(--accent); color: #fff;
+  border-radius: 10px; font-size: 10px; font-weight: 700;
+  padding: 1px 6px; line-height: 1.4;
+}
+
+/* New Job Form */
+.escrow-form { display: flex; flex-direction: column; gap: 10px; }
+.escrow-form-group { display: flex; flex-direction: column; gap: 4px; }
+.escrow-form-group label { font-size: var(--text-xs); color: var(--text-sub); font-weight: 500; }
+.escrow-form-row { display: flex; gap: 8px; }
+.escrow-form-row .escrow-form-group { flex: 1; }
+.escrow-input-suffix { position: relative; display: flex; align-items: center; }
+.escrow-input-suffix input { flex: 1; padding-right: 44px !important; }
+.escrow-input-suffix span {
+  position: absolute; right: 10px;
+  font-size: var(--text-xs); color: var(--text-muted); font-weight: 600; pointer-events: none;
+}
+.escrow-submit-btn { margin-top: 4px; }
+.escrow-hint {
+  font-size: var(--text-xs); color: var(--text-muted);
+  text-align: center; padding: 4px 0;
+}
+
+/* Jobs Panel */
+.escrow-jobs-panel { display: flex; flex-direction: column; gap: 8px; }
+
+.escrow-job-list { display: flex; flex-direction: column; gap: 2px; }
+.escrow-job-row {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 7px; padding: 8px 10px; cursor: pointer; width: 100%;
+  transition: border-color 0.15s, background 0.15s; text-align: left;
+}
+.escrow-job-row:hover { border-color: var(--border3); background: var(--surface3); }
+.escrow-job-row.selected { border-color: var(--accent); background: var(--accent-dim); }
+.escrow-job-row-id {
+  font-size: var(--text-xs); font-family: var(--font-mono);
+  color: var(--accent); font-weight: 700; min-width: 32px;
+}
+.escrow-job-row-label { flex: 1; font-size: var(--text-sm); color: var(--text-sub); }
+.escrow-job-row-arrow { color: var(--text-muted); font-size: var(--text-xs); }
+
+.escrow-lookup-row { display: flex; gap: 6px; }
+.escrow-lookup-row input { flex: 1; }
+.escrow-lookup-row button { white-space: nowrap; }
+
+/* Job Detail Card */
+.escrow-detail-card {
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;
+}
+.escrow-detail-header {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+}
+.escrow-detail-id { font-size: var(--text-xs); color: var(--text-muted); margin-bottom: 2px; font-family: var(--font-mono); }
+.escrow-detail-desc { font-size: var(--text-sm); color: var(--text); font-weight: 500; line-height: 1.4; }
+.escrow-status-badge {
+  font-size: var(--text-xs); font-weight: 700; padding: 3px 8px;
+  border-radius: 20px; white-space: nowrap; flex-shrink: 0;
+}
+
+.escrow-detail-meta {
+  display: flex; gap: 0;
+  background: var(--surface3); border-radius: 7px; overflow: hidden;
+  border: 1px solid var(--border);
+}
+.escrow-meta-item {
+  flex: 1; display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 10px; border-right: 1px solid var(--border);
+}
+.escrow-meta-item:last-child { border-right: none; }
+.escrow-meta-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.escrow-meta-value { font-size: var(--text-sm); font-weight: 600; color: var(--text); }
+
+.escrow-detail-addrs {
+  display: flex; flex-direction: column; gap: 4px;
+  background: var(--surface3); border-radius: 7px; padding: 8px 10px;
+  border: 1px solid var(--border);
+}
+.escrow-detail-addrs > div { display: flex; justify-content: space-between; align-items: center; }
+.escrow-detail-addrs span { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+.escrow-detail-addrs code { font-size: var(--text-xs); font-family: var(--font-mono); color: var(--text-sub); }
+
+.escrow-result-link {
+  font-size: var(--text-xs); color: var(--accent); text-decoration: none;
+  padding: 6px 10px; border: 1px solid var(--accent-dim); border-radius: 6px;
+  text-align: center; transition: background 0.15s;
+}
+.escrow-result-link:hover { background: var(--accent-dim); }
+
+.escrow-actions { display: flex; flex-direction: column; gap: 6px; }
+.escrow-action-group { display: flex; flex-direction: column; gap: 6px; }
+
+.escrow-ai-btn {
+  width: 100%; padding: 9px; border-radius: 8px; cursor: pointer;
+  background: linear-gradient(135deg, rgba(108,68,255,0.12), rgba(0,194,255,0.12));
+  border: 1px solid rgba(108,68,255,0.3); color: #a78bfa;
+  font-size: var(--text-sm); font-weight: 600;
+  transition: background 0.15s, border-color 0.15s;
+}
+.escrow-ai-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(108,68,255,0.2), rgba(0,194,255,0.2));
+  border-color: rgba(108,68,255,0.5);
+}
+.escrow-ai-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.escrow-verdict {
+  padding: 10px 12px; border-radius: 8px; display: flex; flex-direction: column; gap: 3px;
+}
+.escrow-verdict.approve { background: rgba(39,174,96,0.1); border: 1px solid rgba(39,174,96,0.3); }
+.escrow-verdict.reject  { background: rgba(231,76,60,0.1);  border: 1px solid rgba(231,76,60,0.3); }
+.escrow-verdict-title { font-size: var(--text-xs); font-weight: 700; }
+.escrow-verdict.approve .escrow-verdict-title { color: #27ae60; }
+.escrow-verdict.reject  .escrow-verdict-title { color: #e74c3c; }
+.escrow-verdict-reason { font-size: var(--text-xs); color: var(--text-sub); line-height: 1.5; }

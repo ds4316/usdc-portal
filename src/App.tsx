@@ -76,6 +76,10 @@ const ARC_ESCROW_ABI = [
     ] },
 ] as const
 
+const NEXT_JOB_ID_ABI = [
+  { name: 'nextJobId', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint256' }] },
+] as const
+
 const APPROVE_ABI = [
   { name: 'approve', type: 'function', stateMutability: 'nonpayable',
     inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }],
@@ -410,7 +414,6 @@ export default function App() {
   const [defiSeg, setDefiSeg]       = useState<DefiSeg>('cross')
 
   // ── ArcEscrow 상태 ────────────────────────────────────────────────────────
-  const [escrowTab,    setEscrowTab]    = useState<'create' | 'lookup'>('create')
   const [escrowAgent,  setEscrowAgent]  = useState('')
   const [escrowAmount, setEscrowAmount] = useState('')
   const [escrowDays,   setEscrowDays]   = useState('3')
@@ -424,6 +427,10 @@ export default function App() {
   const [escrowLoading,  setEscrowLoading]  = useState(false)
   const [aiVerdict,      setAiVerdict]      = useState<{ verdict: 'approve' | 'reject'; reasoning: string } | null>(null)
   const [aiLoading,      setAiLoading]      = useState(false)
+  const [escrowMyTab,    setEscrowMyTab]    = useState<'new' | 'jobs'>('new')
+  const [recentJobIds,   setRecentJobIds]   = useState<number[]>(() => {
+    try { return JSON.parse(localStorage.getItem('arc_escrow_jobs') ?? '[]') } catch { return [] }
+  })
   const [sortBy, setSortBy]         = useState<'value' | 'symbol' | 'chain'>('value')
 
   const [assets, setAssets]         = useState<AssetRow[]>([])
@@ -939,7 +946,18 @@ export default function App() {
           args: [escrowAgent as `0x${string}`, usdcAmt, deadline, escrowDesc] }),
       })
 
-      addToast({ type: 'success', message: `Job created! ${amt} USDC locked in escrow.` })
+      // read nextJobId to get the new job's ID
+      const arcClient = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
+      const nextId = await arcClient.readContract({ address: ARC_ESCROW, abi: NEXT_JOB_ID_ABI, functionName: 'nextJobId' })
+      const newJobId = Number(nextId) - 1
+      setRecentJobIds(prev => {
+        const updated = [newJobId, ...prev.filter(id => id !== newJobId)]
+        localStorage.setItem('arc_escrow_jobs', JSON.stringify(updated))
+        return updated
+      })
+      setEscrowJobId(String(newJobId))
+      setEscrowMyTab('jobs')
+      addToast({ type: 'success', message: `Job #${newJobId} created! ${amt} USDC locked in escrow.` })
       setEscrowAgent(''); setEscrowAmount(''); setEscrowDesc('')
     } catch (e: unknown) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Transaction failed' })
@@ -968,9 +986,17 @@ export default function App() {
     }
   }
 
-  async function escrowLookupJob() {
-    const id = parseInt(escrowJobId)
+  async function escrowLookupJob(overrideId?: number) {
+    const id = overrideId ?? parseInt(escrowJobId)
     if (isNaN(id) || id < 0) return addToast({ type: 'error', message: 'Enter valid Job ID' })
+    if (overrideId !== undefined) {
+      setEscrowJobId(String(overrideId))
+      setRecentJobIds(prev => {
+        const updated = [overrideId, ...prev.filter(j => j !== overrideId)]
+        localStorage.setItem('arc_escrow_jobs', JSON.stringify(updated))
+        return updated
+      })
+    }
 
     setAiVerdict(null)
     setEscrowLoading(true)
@@ -1742,125 +1768,191 @@ export default function App() {
                 </>}
 
                 {/* ── AGENT ESCROW ── */}
-                {defiSeg === 'agent' && <>
-                  <div className="action-card-seg" style={{ margin: '4px 0 8px' }}>
-                    <button className={`seg ${escrowTab === 'create' ? 'active' : ''}`} onClick={() => setEscrowTab('create')}>
-                      Post Job
-                    </button>
-                    <button className={`seg ${escrowTab === 'lookup' ? 'active' : ''}`} onClick={() => setEscrowTab('lookup')}>
-                      Lookup Job
-                    </button>
-                  </div>
-
-                  {escrowTab === 'create' ? <>
-                    <label className="input-label">Agent Address</label>
-                    <input className="action-input" placeholder="0x..." value={escrowAgent}
-                      onChange={(e) => setEscrowAgent(e.target.value)} />
-
-                    <label className="input-label">USDC Amount</label>
-                    <input className="action-input" type="number" placeholder="10.00" value={escrowAmount}
-                      onChange={(e) => setEscrowAmount(e.target.value)} />
-
-                    <label className="input-label">Deadline (days)</label>
-                    <input className="action-input" type="number" min="1" max="30" value={escrowDays}
-                      onChange={(e) => setEscrowDays(e.target.value)} />
-
-                    <label className="input-label">Job Description</label>
-                    <input className="action-input" placeholder="Describe the task..." value={escrowDesc}
-                      onChange={(e) => setEscrowDesc(e.target.value)} />
-
-                    <button className="btn-primary" style={{ marginTop: 4 }}
-                      onClick={escrowCreateJob} disabled={escrowLoading}>
-                      {escrowLoading ? 'Processing...' : 'Lock USDC & Post Job'}
-                    </button>
-                    <div className="coming-soon" style={{ marginTop: 6 }}>
-                      <span className="coming-soon-label">Arc Testnet</span>
-                      USDC 에스크로 · 자동 정산 · ArcEscrow.sol
-                    </div>
-                  </> : <>
-                    <label className="input-label">Job ID</label>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <input className="action-input" type="number" placeholder="0" value={escrowJobId}
-                        style={{ flex: 1 }} onChange={(e) => { setEscrowJobId(e.target.value); setEscrowJob(null) }} />
-                      <button className="btn-outline" onClick={escrowLookupJob} disabled={escrowLoading}
-                        style={{ whiteSpace: 'nowrap' }}>
-                        {escrowLoading ? '...' : 'Look up'}
+                {defiSeg === 'agent' && (
+                  <div className="escrow-board">
+                    {/* 탭 헤더 */}
+                    <div className="escrow-board-tabs">
+                      <button className={escrowMyTab === 'new' ? 'active' : ''} onClick={() => setEscrowMyTab('new')}>
+                        + New Job
+                      </button>
+                      <button className={escrowMyTab === 'jobs' ? 'active' : ''} onClick={() => setEscrowMyTab('jobs')}>
+                        My Jobs {recentJobIds.length > 0 && <span className="escrow-badge-count">{recentJobIds.length}</span>}
                       </button>
                     </div>
 
-                    {escrowJob && (() => {
-                      const statusLabel = ['Open', 'Submitted', 'Approved', 'Refunded'][escrowJob.status] ?? '?'
-                      const statusColor = ['#f5a623', '#2775ca', '#27ae60', '#e74c3c'][escrowJob.status] ?? '#888'
-                      const expired     = Date.now() / 1000 > Number(escrowJob.deadline)
-                      const myAddr      = (allAddresses[0] ?? '').toLowerCase()
-                      const isClient    = escrowJob.client.toLowerCase() === myAddr
-                      const isAgent     = escrowJob.agent.toLowerCase()  === myAddr
-                      const usdcAmt     = (Number(escrowJob.amount) / 1e6).toFixed(2)
-                      const dl          = new Date(Number(escrowJob.deadline) * 1000).toLocaleDateString()
-                      return (
-                        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: 'var(--text-xs)', opacity: 0.6 }}>Job #{escrowJobId}</span>
-                            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: statusColor }}>{statusLabel}</span>
-                          </div>
-                          <div style={{ fontSize: 'var(--text-xs)', opacity: 0.8 }}>{escrowJob.description}</div>
-                          <div style={{ fontSize: 'var(--text-xs)', opacity: 0.5 }}>
-                            {usdcAmt} USDC · Deadline {dl}
-                          </div>
-                          {escrowJob.resultUri && (
-                            <a href={escrowJob.resultUri} target="_blank" rel="noreferrer"
-                              style={{ fontSize: 'var(--text-xs)', color: 'var(--accent)' }}>
-                              Result ↗
-                            </a>
-                          )}
-
-                          {/* 에이전트 액션: 결과 제출 */}
-                          {isAgent && escrowJob.status === 0 && !expired && <>
-                            <input className="action-input" placeholder="Result URL or IPFS hash"
-                              value={escrowWorkUri} onChange={(e) => setEscrowWorkUri(e.target.value)} />
-                            <button className="btn-primary" onClick={escrowSubmitWork} disabled={escrowLoading}>
-                              {escrowLoading ? 'Submitting...' : 'Submit Work'}
-                            </button>
-                          </>}
-
-                          {/* 의뢰인 액션: AI 평가 + 승인 */}
-                          {isClient && escrowJob.status === 1 && (<>
-                            <button className="btn-outline" onClick={evaluateWithAI}
-                              disabled={aiLoading || escrowLoading}
-                              style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
-                              {aiLoading ? 'Evaluating...' : '✦ Ask Claude to Evaluate'}
-                            </button>
-
-                            {aiVerdict && (
-                              <div style={{
-                                padding: '10px 12px',
-                                borderRadius: 8,
-                                background: aiVerdict.verdict === 'approve' ? 'rgba(39,174,96,0.1)' : 'rgba(231,76,60,0.1)',
-                                border: `1px solid ${aiVerdict.verdict === 'approve' ? 'rgba(39,174,96,0.3)' : 'rgba(231,76,60,0.3)'}`,
-                                fontSize: 'var(--text-xs)',
-                                lineHeight: 1.5,
-                              }}>
-                                <div style={{ fontWeight: 700, marginBottom: 3, color: aiVerdict.verdict === 'approve' ? '#27ae60' : '#e74c3c' }}>
-                                  Claude: {aiVerdict.verdict === 'approve' ? '✓ Approve' : '✗ Reject'}
-                                </div>
-                                <div style={{ opacity: 0.8 }}>{aiVerdict.reasoning}</div>
-                              </div>
-                            )}
-
-                            <button className="btn-primary" onClick={escrowApproveWork} disabled={escrowLoading}>
-                              {escrowLoading ? 'Approving...' : 'Approve & Release USDC'}
-                            </button>
-                          </>)}
-                          {isClient && (escrowJob.status === 0 || escrowJob.status === 1) && expired && (
-                            <button className="btn-outline" onClick={escrowClaimRefund} disabled={escrowLoading}>
-                              {escrowLoading ? 'Refunding...' : 'Claim Refund'}
-                            </button>
-                          )}
+                    {escrowMyTab === 'new' ? (
+                      <div className="escrow-form">
+                        <div className="escrow-form-group">
+                          <label>Agent Wallet Address</label>
+                          <input className="action-input" placeholder="0x..." value={escrowAgent}
+                            onChange={(e) => setEscrowAgent(e.target.value)} />
                         </div>
-                      )
-                    })()}
-                  </>}
-                </>}
+                        <div className="escrow-form-row">
+                          <div className="escrow-form-group">
+                            <label>Amount</label>
+                            <div className="escrow-input-suffix">
+                              <input className="action-input" inputMode="decimal" placeholder="0.00" value={escrowAmount}
+                                onChange={(e) => setEscrowAmount(e.target.value)} />
+                              <span>USDC</span>
+                            </div>
+                          </div>
+                          <div className="escrow-form-group">
+                            <label>Deadline</label>
+                            <div className="escrow-input-suffix">
+                              <input className="action-input" inputMode="numeric" placeholder="7" value={escrowDays}
+                                onChange={(e) => setEscrowDays(e.target.value)} />
+                              <span>days</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="escrow-form-group">
+                          <label>Job Description</label>
+                          <input className="action-input" placeholder="Describe the task clearly..." value={escrowDesc}
+                            onChange={(e) => setEscrowDesc(e.target.value)} />
+                        </div>
+                        <button className="btn-primary escrow-submit-btn" onClick={escrowCreateJob} disabled={escrowLoading}>
+                          {escrowLoading ? 'Processing...' : '🔒 Lock USDC & Post Job'}
+                        </button>
+                        <div className="escrow-hint">USDC is held in the ArcEscrow contract until you approve the result.</div>
+                      </div>
+                    ) : (
+                      <div className="escrow-jobs-panel">
+                        {/* 최근 잡 목록 */}
+                        {recentJobIds.length > 0 && (
+                          <div className="escrow-job-list">
+                            {recentJobIds.map(id => (
+                              <button key={id}
+                                className={`escrow-job-row ${escrowJobId === String(id) ? 'selected' : ''}`}
+                                onClick={() => escrowLookupJob(id)}>
+                                <span className="escrow-job-row-id">#{id}</span>
+                                <span className="escrow-job-row-label">Job #{id}</span>
+                                <span className="escrow-job-row-arrow">→</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* 수동 Job ID 조회 */}
+                        <div className="escrow-lookup-row">
+                          <input className="action-input" inputMode="numeric" placeholder="Look up by Job ID..."
+                            value={escrowJobId}
+                            onChange={(e) => { setEscrowJobId(e.target.value); setEscrowJob(null); setAiVerdict(null) }} />
+                          <button className="btn-outline" onClick={() => escrowLookupJob()} disabled={escrowLoading}>
+                            {escrowLoading ? '...' : 'Search'}
+                          </button>
+                        </div>
+
+                        {/* 잡 상세 카드 */}
+                        {escrowJob && (() => {
+                          const STATUS_LABEL = ['Open', 'Submitted', 'Approved', 'Refunded']
+                          const STATUS_COLOR = ['#f5a623', '#2775ca', '#27ae60', '#e74c3c']
+                          const STATUS_BG    = ['rgba(245,166,35,0.1)', 'rgba(39,117,202,0.1)', 'rgba(39,174,96,0.1)', 'rgba(231,76,60,0.1)']
+                          const statusLabel  = STATUS_LABEL[escrowJob.status] ?? '?'
+                          const statusColor  = STATUS_COLOR[escrowJob.status] ?? '#888'
+                          const statusBg     = STATUS_BG[escrowJob.status]    ?? 'transparent'
+                          const expired      = Date.now() / 1000 > Number(escrowJob.deadline)
+                          const myAddr       = (allAddresses[0] ?? '').toLowerCase()
+                          const isClient     = escrowJob.client.toLowerCase() === myAddr
+                          const isAgent      = escrowJob.agent.toLowerCase()  === myAddr
+                          const usdcAmt      = (Number(escrowJob.amount) / 1e6).toFixed(2)
+                          const deadlineDate = new Date(Number(escrowJob.deadline) * 1000)
+                          return (
+                            <div className="escrow-detail-card">
+                              {/* 헤더 */}
+                              <div className="escrow-detail-header">
+                                <div>
+                                  <div className="escrow-detail-id">Job #{escrowJobId}</div>
+                                  <div className="escrow-detail-desc">{escrowJob.description}</div>
+                                </div>
+                                <span className="escrow-status-badge" style={{ color: statusColor, background: statusBg }}>
+                                  {statusLabel}
+                                </span>
+                              </div>
+
+                              {/* 메타 */}
+                              <div className="escrow-detail-meta">
+                                <div className="escrow-meta-item">
+                                  <span className="escrow-meta-label">Amount</span>
+                                  <span className="escrow-meta-value" style={{ color: 'var(--arc)', fontFamily: 'var(--font-mono)' }}>
+                                    {usdcAmt} USDC
+                                  </span>
+                                </div>
+                                <div className="escrow-meta-item">
+                                  <span className="escrow-meta-label">Deadline</span>
+                                  <span className="escrow-meta-value" style={{ color: expired ? 'var(--error)' : undefined }}>
+                                    {deadlineDate.toLocaleDateString()} {expired && '(Expired)'}
+                                  </span>
+                                </div>
+                                <div className="escrow-meta-item">
+                                  <span className="escrow-meta-label">Role</span>
+                                  <span className="escrow-meta-value">
+                                    {isClient ? 'Client' : isAgent ? 'Agent' : 'Observer'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* 주소 */}
+                              <div className="escrow-detail-addrs">
+                                <div><span>Client</span><code>{escrowJob.client.slice(0,8)}…{escrowJob.client.slice(-6)}</code></div>
+                                <div><span>Agent</span><code>{escrowJob.agent.slice(0,8)}…{escrowJob.agent.slice(-6)}</code></div>
+                              </div>
+
+                              {/* 결과물 링크 */}
+                              {escrowJob.resultUri && (
+                                <a className="escrow-result-link" href={escrowJob.resultUri} target="_blank" rel="noreferrer">
+                                  📎 View Result ↗
+                                </a>
+                              )}
+
+                              {/* 액션 영역 */}
+                              <div className="escrow-actions">
+                                {/* 에이전트: 결과 제출 */}
+                                {isAgent && escrowJob.status === 0 && !expired && (
+                                  <div className="escrow-action-group">
+                                    <input className="action-input" placeholder="Result URL or IPFS hash"
+                                      value={escrowWorkUri} onChange={(e) => setEscrowWorkUri(e.target.value)} />
+                                    <button className="btn-primary" onClick={escrowSubmitWork} disabled={escrowLoading}>
+                                      {escrowLoading ? 'Submitting...' : 'Submit Work'}
+                                    </button>
+                                  </div>
+                                )}
+
+                                {/* 클라이언트: AI 평가 + 승인 */}
+                                {isClient && escrowJob.status === 1 && (
+                                  <div className="escrow-action-group">
+                                    <button className="escrow-ai-btn" onClick={evaluateWithAI} disabled={aiLoading || escrowLoading}>
+                                      {aiLoading ? '✦ Evaluating...' : '✦ Ask Claude to Evaluate'}
+                                    </button>
+
+                                    {aiVerdict && (
+                                      <div className={`escrow-verdict ${aiVerdict.verdict}`}>
+                                        <div className="escrow-verdict-title">
+                                          {aiVerdict.verdict === 'approve' ? '✓ Claude recommends Approve' : '✗ Claude recommends Reject'}
+                                        </div>
+                                        <div className="escrow-verdict-reason">{aiVerdict.reasoning}</div>
+                                      </div>
+                                    )}
+
+                                    <button className="btn-primary" onClick={escrowApproveWork} disabled={escrowLoading}>
+                                      {escrowLoading ? 'Approving...' : 'Approve & Release USDC'}
+                                    </button>
+                                  </div>
+                                )}
+
+                                {/* 클라이언트: 환불 */}
+                                {isClient && (escrowJob.status === 0 || escrowJob.status === 1) && expired && (
+                                  <button className="btn-outline" onClick={escrowClaimRefund} disabled={escrowLoading}>
+                                    {escrowLoading ? 'Refunding...' : 'Claim Refund'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
