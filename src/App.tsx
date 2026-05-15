@@ -40,7 +40,7 @@ const ARC_MSG_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x$
 
 // ─── ArcOnboarder ─────────────────────────────────────────────────────────
 // TODO: Remix로 Sepolia 배포 후 이 주소를 실제 컨트랙트 주소로 교체
-const ARC_ONBOARDER = '0x0000000000000000000000000000000000000000' as `0x${string}`
+const ARC_ONBOARDER = '0x495825fF81B048B2A6e1FE10571625496f8fF1FD' as `0x${string}`
 
 // ─── ArcEscrow ────────────────────────────────────────────────────────────
 // TODO: Remix로 Arc Testnet 배포 후 이 주소를 실제 컨트랙트 주소로 교체
