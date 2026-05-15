@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useConnect, useDisconnect, useConnections, useSwitchChain, useSendTransaction } from 'wagmi'
 import { createPublicClient, fallback, http, formatUnits, isAddress } from 'viem'
 import { mainnet, base, polygon, arbitrum, optimism, avalanche, sepolia, baseSepolia } from 'wagmi/chains'
@@ -1407,11 +1407,11 @@ export default function App() {
 
             <div className="ov-hero">
               <div className="ov-hero-left">
-                <div className="ov-badge">Circle + Arc Stablecoin Commerce · Agentic Economy Track</div>
+                <div className="ov-badge">ARC TESTNET · CIRCLE CCTP V2 · CLAUDE HAIKU</div>
                 <h1 className="ov-title">Agentic USDC<br />payments on Arc</h1>
                 <p className="ov-sub">
-                  Trustless escrow for AI agent workflows. Lock USDC, submit work on-chain,
-                  get AI-verified payouts — fully on-chain on Arc Testnet.
+                  Create escrow jobs, let agents submit work, and use Claude to verify results 
+                  before automatic settlement in Arc Testnet USDC.
                 </p>
                 <div className="ov-status-row">
                   <span className="status-dot green" /><span>ArcEscrow live</span>
@@ -1423,7 +1423,7 @@ export default function App() {
                 </div>
                 <div className="ov-ctas">
                   <button className="btn-primary ov-cta" onClick={() => setActivePage('escrow')}>
-                    <Lock size={14} /> Try Agent Escrow
+                    <Lock size={14} /> Launch Agent Escrow
                   </button>
                   <button className="btn-outline ov-cta" onClick={() => setActivePage('funds')}>
                     <ArrowRightLeft size={14} /> Move Funds to Arc
@@ -1441,13 +1441,13 @@ export default function App() {
             </div>
 
             <div className="ov-section">
-              <div className="ov-section-label">How It Works</div>
+              <div className="ov-section-label">Workflow</div>
               <div className="workflow-steps">
                 {[
-                  { icon: <Lock size={20} />, step: 'Lock', desc: 'Client locks USDC in ArcEscrow contract on Arc Testnet' },
-                  { icon: <Upload size={20} />, step: 'Submit', desc: 'AI agent completes work and submits result URI on-chain' },
-                  { icon: <Bot size={20} />, step: 'Review', desc: 'Claude Haiku reads the deliverable and returns a verdict' },
-                  { icon: <CircleDollarSign size={20} />, step: 'Payout', desc: 'Client releases — USDC transferred trustlessly to agent' },
+                  { icon: <Lock size={22} />, step: 'Lock', desc: 'Client locks USDC in ArcEscrow contract' },
+                  { icon: <Upload size={22} />, step: 'Submit', desc: 'Agent completes work and submits result URI' },
+                  { icon: <Bot size={22} />, step: 'Review', desc: 'Claude reads deliverable and returns verdict' },
+                  { icon: <CircleDollarSign size={22} />, step: 'Payout', desc: 'USDC transferred trustlessly to agent' },
                 ].map((s, i) => (
                   <div key={i} className="workflow-step-wrap">
                     <div className="workflow-step">
@@ -1455,20 +1455,20 @@ export default function App() {
                       <div className="workflow-step-label">{s.step}</div>
                       <div className="workflow-step-desc">{s.desc}</div>
                     </div>
-                    {i < 3 && <div className="workflow-arrow"><ArrowRight size={18} /></div>}
+                    {i < 3 && <div className="workflow-arrow"><ArrowRight size={16} /></div>}
                   </div>
                 ))}
               </div>
             </div>
 
             <div className="ov-section">
-              <div className="ov-section-label">What Agents Can Do</div>
+              <div className="ov-section-label">Designed for agentic commerce</div>
               <div className="agent-use-cases">
                 {[
-                  { icon: <Bot size={18} />, title: 'Code Generation', desc: 'Agent writes code, submits on-chain. Client reviews output via ArcScan link.' },
-                  { icon: <Upload size={18} />, title: 'Research & Reports', desc: 'Agent delivers PDF/text reports via Vercel Blob. Claude Haiku verifies completeness.' },
-                  { icon: <Lock size={18} />, title: 'Trustless Milestones', desc: 'Multi-step deliverables locked at project start, released on AI-verified completion.' },
-                  { icon: <Network size={18} />, title: 'Cross-chain Payroll', desc: 'Move USDC from any mainnet chain to Arc for agent payouts via CCTP V2 or LI.FI.' },
+                  { icon: <Bot size={20} />, title: 'Code Generation', desc: 'Agents write code, submit on-chain. Clients review output via ArcScan.' },
+                  { icon: <Upload size={20} />, title: 'Research & Reports', desc: 'Deliver PDF or text reports via Vercel Blob. Claude verifies completeness.' },
+                  { icon: <Lock size={20} />, title: 'Trustless Milestones', desc: 'Multi-step deliverables locked at start, released on AI-verified completion.' },
+                  { icon: <Network size={20} />, title: 'Cross-chain Payroll', desc: 'Move USDC from any mainnet chain to Arc via CCTP V2 or LI.FI.' },
                 ].map((uc, i) => (
                   <div key={i} className="agent-use-case">
                     <div className="agent-uc-icon">{uc.icon}</div>
@@ -1483,12 +1483,12 @@ export default function App() {
               <div className="ov-section-label">Built With</div>
               <div className="stack-cards">
                 {[
-                  { name: 'Arc Testnet',    desc: 'EVM-compatible chain for stablecoin commerce', color: '#00c2ff' },
-                  { name: 'Circle CCTP V2', desc: 'Native USDC burn-and-mint bridge, 0 slippage',  color: '#2775ca' },
+                  { name: 'Arc Testnet',    desc: 'EVM-compatible chain for stablecoin commerce', color: '#00bfff' },
+                  { name: 'Circle CCTP V2', desc: 'Native USDC burn-and-mint bridge, zero slippage',  color: '#0077cc' },
                   { name: 'Claude Haiku',   desc: 'AI judge that reads work results and verdicts',  color: '#d4a574' },
-                  { name: 'wagmi + viem',   desc: 'Type-safe Ethereum wallet & contract layer',     color: '#627eea' },
-                  { name: 'LI.FI',          desc: 'Cross-chain routing across 6 mainnet chains',    color: '#bf5af2' },
-                  { name: 'Vercel Blob',    desc: 'Serverless storage for agent work results',      color: '#555'    },
+                  { name: 'wagmi + viem',   desc: 'Type-safe Ethereum wallet and contract layer',     color: '#627eea' },
+                  { name: 'LI.FI',          desc: 'Cross-chain routing across 6 mainnet chains',    color: '#a855f7' },
+                  { name: 'Vercel Blob',    desc: 'Serverless storage for agent work results',      color: '#666'    },
                 ].map((s, i) => (
                   <div key={i} className="stack-card">
                     <div className="stack-card-dot" style={{ background: s.color }} />
@@ -1496,6 +1496,24 @@ export default function App() {
                     <div className="stack-card-desc">{s.desc}</div>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="ov-final-cta">
+              <h2 className="ov-final-cta-title">Ready to test agentic settlement on Arc?</h2>
+              <p className="ov-final-cta-sub">
+                Create an escrow job, submit work, and run Claude-based verification on Arc Testnet.
+              </p>
+              <div className="ov-final-cta-buttons">
+                <button className="btn-primary" style={{ width: 'auto', padding: '13px 28px' }} onClick={() => setActivePage('escrow')}>
+                  <Lock size={14} /> Launch Agent Escrow
+                </button>
+                <button className="btn-outline" style={{ width: 'auto', padding: '13px 28px' }} onClick={() => setActivePage('funds')}>
+                  <ArrowRightLeft size={14} /> Move Funds to Arc
+                </button>
+                <button className="btn-outline" style={{ width: 'auto', padding: '13px 28px' }} onClick={() => setActivePage('docs')}>
+                  <BookOpen size={14} /> View Docs
+                </button>
               </div>
             </div>
 
