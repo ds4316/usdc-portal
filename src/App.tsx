@@ -412,6 +412,7 @@ export default function App() {
   const [mainTab, setMainTab]       = useState<MainTab>('assets')
   const [transferSeg, setTransferSeg] = useState<TransferSeg>('send')
   const [defiSeg, setDefiSeg]       = useState<DefiSeg>('cross')
+  const [moveFundsTab, setMoveFundsTab] = useState<'bridge' | 'cross' | 'send'>('bridge')
 
   // ── ArcEscrow 상태 ────────────────────────────────────────────────────────
   const [escrowAgent,  setEscrowAgent]  = useState('')
@@ -1207,13 +1208,17 @@ export default function App() {
     )
   }
 
+  function scrollTo(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   // ─── 렌더 ─────────────────────────────────────────────────────────────────
   return (
     <div className="root" data-theme={theme}>
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       {confirmState && <ConfirmModal state={confirmState} onCancel={() => setConfirmState(null)} />}
 
-      {/* QR 모달 */}
+      {/* QR Modal */}
       {showQR && isConnected && (
         <div className="modal-overlay" onClick={() => setShowQR(false)}>
           <div className="modal qr-modal" onClick={(e) => e.stopPropagation()}>
@@ -1235,7 +1240,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 주소록 모달 */}
+      {/* Address Book Modal */}
       {showContacts && (
         <div className="modal-overlay" onClick={() => setShowContacts(false)}>
           <div className="modal contacts-modal" onClick={(e) => e.stopPropagation()}>
@@ -1260,7 +1265,7 @@ export default function App() {
                     </div>
                     <div className="contact-actions">
                       <button className="btn-icon" title="Use address"
-                        onClick={() => { setRecipient(c.address); setTransferSeg('send'); setShowContacts(false) }}>
+                        onClick={() => { setRecipient(c.address); setMoveFundsTab('send'); setShowContacts(false) }}>
                         <ArrowUpRight size={13} />
                       </button>
                       <button className="btn-icon danger" title="Delete" onClick={() => removeContact(c.id)}>
@@ -1275,12 +1280,20 @@ export default function App() {
         </div>
       )}
 
-      {/* ─── 내비바 ────────────────────────────────────────────────────── */}
+      {/* ─── NAVBAR ─── */}
       <nav className="navbar">
-        <span className="nav-logo">
-          <CircleDollarSign size={16} style={{ verticalAlign: 'middle', marginRight: 6, color: 'var(--accent)' }} />
-          USDC Portal
-        </span>
+        <div className="nav-left">
+          <span className="nav-logo">
+            <CircleDollarSign size={16} style={{ verticalAlign: 'middle', marginRight: 6, color: 'var(--accent)' }} />
+            USDC Portal
+          </span>
+          <div className="nav-links">
+            <button className="nav-link" onClick={() => scrollTo('hero')}>Overview</button>
+            <button className="nav-link" onClick={() => scrollTo('escrow')}>Agent Escrow</button>
+            <button className="nav-link" onClick={() => scrollTo('move-funds')}>Move Funds</button>
+            <button className="nav-link" onClick={() => scrollTo('portfolio')}>Portfolio</button>
+          </div>
+        </div>
         <div className="nav-right">
           <div className="network-toggle">
             <button className={`net-btn ${networkMode === 'mainnet' ? 'active' : ''}`} onClick={() => setNetworkMode('mainnet')}>Mainnet</button>
@@ -1325,46 +1338,582 @@ export default function App() {
         </div>
       </nav>
 
-      {/* ─── 포트폴리오 히어로 ────────────────────────────────────────── */}
-      <div className="portfolio-hero">
-        <div className="hero-main">
-          <span className="hero-label">Total Balance</span>
-          <div className="hero-value-row">
-            <span className="hero-value">
-              ${parseFloat(totalUsdc).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-            {loadingAssets && <span className="hero-loading-dot" />}
+      {/* ─── HERO ─── */}
+      <section id="hero" className="hero-section">
+        <div className="hero-content">
+          <div className="hero-left">
+            <div className="hero-tag">Circle CCTP V2 · Arc Testnet · Claude Haiku</div>
+            <h1 className="hero-title">Agentic USDC payments<br />on Arc</h1>
+            <p className="hero-sub">
+              Trustless escrow for AI agent workflows. Lock USDC, submit work on-chain,
+              get AI-verified payouts — end to end on Arc Testnet.
+            </p>
+            <div className="hero-ctas">
+              <button className="btn-primary hero-cta" onClick={() => scrollTo('escrow')}>
+                <Bot size={14} /> Try Agent Escrow
+              </button>
+              <button className="btn-outline hero-cta" onClick={() => scrollTo('move-funds')}>
+                <Layers size={14} /> Bridge to Arc
+              </button>
+            </div>
           </div>
-          {parseFloat(totalUsdc) > 0 && (
-            <div className="hero-breakdown">
-              <span className="hero-breakdown-item">
-                <span style={{ color: '#627eea' }}>●</span> ETH ${ethValue.toFixed(2)}
-              </span>
-              <span className="hero-breakdown-item">
-                <span style={{ color: '#2775ca' }}>●</span> USDC ${usdcTotalVal.toFixed(2)}
-              </span>
-              {otherValue > 0.01 && (
-                <span className="hero-breakdown-item">
-                  <span style={{ color: 'var(--text-muted)' }}>●</span> Other ${otherValue.toFixed(2)}
-                </span>
+          <div className="hero-right">
+            <div className="hero-status-card">
+              <div className="hero-status-title">Live System Status</div>
+              <div className="hero-status-row">
+                <span className="status-dot green" />
+                <span>ArcEscrow Contract</span>
+                <a href="https://testnet.arcscan.app/address/0xc73821142DeD9Ab7f0F299389Fd3a186475676d5"
+                  target="_blank" rel="noreferrer" className="status-link">
+                  <ExternalLink size={11} />
+                </a>
+              </div>
+              <div className="hero-status-row">
+                <span className="status-dot green" />
+                <span>Circle CCTP V2 Bridge</span>
+              </div>
+              <div className="hero-status-row">
+                <span className="status-dot green" />
+                <span>Claude Haiku AI Judge</span>
+              </div>
+              <div className="hero-status-row">
+                <span className="status-dot green" />
+                <span>LI.FI Cross-chain Router</span>
+              </div>
+              <div className="hero-status-row">
+                <span className="status-dot green" />
+                <span>Vercel Blob Storage</span>
+              </div>
+              <div className="hero-status-divider" />
+              {isConnected ? (
+                <div className="hero-wallet-mini">
+                  <span className="status-dot green" />
+                  <span className="hero-wallet-addr">{allAddresses[0]?.slice(0, 8)}...{allAddresses[0]?.slice(-6)}</span>
+                  <span className="hero-wallet-label">connected</span>
+                </div>
+              ) : (
+                <div className="hero-wallet-mini">
+                  <span className="status-dot gray" />
+                  <button className="btn-link" onClick={() => setShowConnectors(true)}>Connect wallet to start →</button>
+                </div>
               )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── WORKFLOW ─── */}
+      <section className="workflow-section">
+        <div className="section-center">
+          <div className="workflow-label-top">How It Works</div>
+          <div className="workflow-steps">
+            {[
+              { icon: '🔒', step: 'Lock', desc: 'Client locks USDC in ArcEscrow contract on Arc Testnet' },
+              { icon: '📤', step: 'Submit', desc: 'AI agent completes work and submits result URI on-chain' },
+              { icon: '🤖', step: 'Review', desc: 'Claude Haiku reads the deliverable and returns a verdict' },
+              { icon: '💸', step: 'Payout', desc: 'Client releases — USDC transferred trustlessly to agent' },
+            ].map((s, i) => (
+              <div key={i} className="workflow-step-wrap">
+                <div className="workflow-step">
+                  <div className="workflow-step-icon">{s.icon}</div>
+                  <div className="workflow-step-label">{s.step}</div>
+                  <div className="workflow-step-desc">{s.desc}</div>
+                </div>
+                {i < 3 && <div className="workflow-arrow"><ArrowRight size={18} /></div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── AGENT ESCROW ─── */}
+      <section id="escrow" className="content-section">
+        <div className="section-heading">
+          <Bot size={18} style={{ color: 'var(--accent)' }} />
+          <div>
+            <h2 className="section-title">Agent Escrow</h2>
+            <p className="section-sub">Trustless USDC payment channel for AI agents — deployed on Arc Testnet</p>
+          </div>
+        </div>
+        <div className="section-layout">
+          <div className="section-main">
+            <div className="panel">
+              <div className="escrow-board">
+                <div className="escrow-board-tabs">
+                  <button className={escrowMyTab === 'new' ? 'active' : ''} onClick={() => setEscrowMyTab('new')}>
+                    + New Job
+                  </button>
+                  <button className={escrowMyTab === 'jobs' ? 'active' : ''} onClick={() => setEscrowMyTab('jobs')}>
+                    My Jobs {recentJobIds.length > 0 && <span className="escrow-badge-count">{recentJobIds.length}</span>}
+                  </button>
+                </div>
+
+                {escrowMyTab === 'new' ? (
+                  <div className="escrow-form">
+                    <div className="escrow-form-group">
+                      <label>Agent Wallet Address</label>
+                      <input className="action-input" placeholder="0x..." value={escrowAgent}
+                        onChange={(e) => setEscrowAgent(e.target.value)} />
+                    </div>
+                    <div className="escrow-form-row">
+                      <div className="escrow-form-group">
+                        <label>Amount</label>
+                        <div className="escrow-input-suffix">
+                          <input className="action-input" inputMode="decimal" placeholder="0.00" value={escrowAmount}
+                            onChange={(e) => setEscrowAmount(e.target.value)} />
+                          <span>USDC</span>
+                        </div>
+                      </div>
+                      <div className="escrow-form-group">
+                        <label>Deadline</label>
+                        <div className="escrow-input-suffix">
+                          <input className="action-input" inputMode="numeric" placeholder="7" value={escrowDays}
+                            onChange={(e) => setEscrowDays(e.target.value)} />
+                          <span>days</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="escrow-form-group">
+                      <label>Job Description</label>
+                      <input className="action-input" placeholder="Describe the task clearly..." value={escrowDesc}
+                        onChange={(e) => setEscrowDesc(e.target.value)} />
+                    </div>
+                    <button className="btn-primary escrow-submit-btn" onClick={escrowCreateJob} disabled={escrowLoading}>
+                      {escrowLoading ? 'Processing...' : '🔒 Lock USDC & Post Job'}
+                    </button>
+                    <div className="escrow-hint">USDC is held in the ArcEscrow contract until you approve the result.</div>
+                  </div>
+                ) : (
+                  <div className="escrow-jobs-panel">
+                    {recentJobIds.length > 0 && (
+                      <div className="escrow-job-list">
+                        {recentJobIds.map(id => (
+                          <button key={id}
+                            className={`escrow-job-row ${escrowJobId === String(id) ? 'selected' : ''}`}
+                            onClick={() => escrowLookupJob(id)}>
+                            <span className="escrow-job-row-id">#{id}</span>
+                            <span className="escrow-job-row-label">Job #{id}</span>
+                            <span className="escrow-job-row-arrow">→</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="escrow-search-block">
+                      <label className="escrow-search-label">Search by Job ID</label>
+                      <input
+                        className="escrow-search-input"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="Enter Job ID (e.g. 0)"
+                        value={escrowJobId}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, '')
+                          setEscrowJobId(val)
+                          setEscrowJob(null)
+                          setAiVerdict(null)
+                        }}
+                        onKeyDown={(e) => e.key === 'Enter' && escrowLookupJob()}
+                      />
+                      <button className="btn-primary" onClick={() => escrowLookupJob()} disabled={escrowLoading || escrowJobId === ''}>
+                        {escrowLoading ? 'Loading...' : 'Look up Job'}
+                      </button>
+                    </div>
+
+                    {escrowJob && (() => {
+                      const STATUS_LABEL = ['Open', 'Submitted', 'Approved', 'Refunded']
+                      const STATUS_COLOR = ['#f5a623', '#2775ca', '#27ae60', '#e74c3c']
+                      const STATUS_BG    = ['rgba(245,166,35,0.1)', 'rgba(39,117,202,0.1)', 'rgba(39,174,96,0.1)', 'rgba(231,76,60,0.1)']
+                      const statusLabel  = STATUS_LABEL[escrowJob.status] ?? '?'
+                      const statusColor  = STATUS_COLOR[escrowJob.status] ?? '#888'
+                      const statusBg     = STATUS_BG[escrowJob.status]    ?? 'transparent'
+                      const expired      = Date.now() / 1000 > Number(escrowJob.deadline)
+                      const myAddr       = (allAddresses[0] ?? '').toLowerCase()
+                      const isClient     = escrowJob.client.toLowerCase() === myAddr
+                      const isAgent      = escrowJob.agent.toLowerCase()  === myAddr
+                      const usdcAmt      = (Number(escrowJob.amount) / 1e6).toFixed(2)
+                      const deadlineDate = new Date(Number(escrowJob.deadline) * 1000)
+                      return (
+                        <div className="escrow-detail-card">
+                          <div className="escrow-detail-header">
+                            <div>
+                              <div className="escrow-detail-id">Job #{escrowJobId}</div>
+                              <div className="escrow-detail-desc">{escrowJob.description}</div>
+                            </div>
+                            <span className="escrow-status-badge" style={{ color: statusColor, background: statusBg }}>
+                              {statusLabel}
+                            </span>
+                          </div>
+
+                          <div className="escrow-detail-meta">
+                            <div className="escrow-meta-item">
+                              <span className="escrow-meta-label">Amount</span>
+                              <span className="escrow-meta-value" style={{ color: 'var(--arc)', fontFamily: 'var(--font-mono)' }}>
+                                {usdcAmt} USDC
+                              </span>
+                            </div>
+                            <div className="escrow-meta-item">
+                              <span className="escrow-meta-label">Deadline</span>
+                              <span className="escrow-meta-value" style={{ color: expired ? 'var(--error)' : undefined }}>
+                                {deadlineDate.toLocaleDateString()} {expired && '(Expired)'}
+                              </span>
+                            </div>
+                            <div className="escrow-meta-item">
+                              <span className="escrow-meta-label">Role</span>
+                              <span className="escrow-meta-value">
+                                {isClient ? 'Client' : isAgent ? 'Agent' : 'Observer'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="escrow-detail-addrs">
+                            <div><span>Client</span><code>{escrowJob.client.slice(0,8)}…{escrowJob.client.slice(-6)}</code></div>
+                            <div><span>Agent</span><code>{escrowJob.agent.slice(0,8)}…{escrowJob.agent.slice(-6)}</code></div>
+                          </div>
+
+                          {escrowJob.resultUri && (
+                            <a className="escrow-result-link" href={escrowJob.resultUri} target="_blank" rel="noreferrer">
+                              📎 View Result ↗
+                            </a>
+                          )}
+
+                          <div className="escrow-actions">
+                            {isAgent && escrowJob.status === 0 && !expired && (
+                              <div className="escrow-action-group">
+                                <div className="escrow-submit-label">Submit Work Result</div>
+                                <textarea
+                                  className="escrow-work-textarea"
+                                  placeholder="Describe the completed work in detail. Claude will read and evaluate it."
+                                  value={escrowWorkText}
+                                  onChange={(e) => setEscrowWorkText(e.target.value)}
+                                  rows={4}
+                                />
+                                <div className="escrow-file-upload">
+                                  <label className="escrow-file-label" htmlFor="escrow-file-input">
+                                    {escrowWorkFile ? `📎 ${escrowWorkFile.name}` : '+ Attach file (image · PDF · TXT)'}
+                                  </label>
+                                  <input
+                                    id="escrow-file-input"
+                                    type="file"
+                                    accept="image/*,application/pdf,text/plain"
+                                    style={{ display: 'none' }}
+                                    onChange={(e) => setEscrowWorkFile(e.target.files?.[0] ?? null)}
+                                  />
+                                  {escrowWorkFile && (
+                                    <button className="escrow-file-remove" onClick={() => setEscrowWorkFile(null)}>✕</button>
+                                  )}
+                                </div>
+                                <div className="escrow-submit-hint">
+                                  Claude reads the actual content after upload and evaluates it.
+                                </div>
+                                <button className="btn-primary" onClick={escrowSubmitWork}
+                                  disabled={escrowLoading || escrowWorkUploading || (!escrowWorkText.trim() && !escrowWorkFile)}>
+                                  {escrowWorkUploading ? 'Uploading...' : escrowLoading ? 'Submitting...' : 'Submit Work Result'}
+                                </button>
+                              </div>
+                            )}
+
+                            {isClient && escrowJob.status === 1 && (
+                              <div className="escrow-action-group">
+                                <button className="escrow-ai-btn" onClick={evaluateWithAI} disabled={aiLoading || escrowLoading}>
+                                  {aiLoading ? '✦ Evaluating...' : '✦ Run Claude Review'}
+                                </button>
+
+                                {aiVerdict && (
+                                  <div className={`escrow-verdict ${aiVerdict.verdict}`}>
+                                    <div className="escrow-verdict-title">
+                                      {aiVerdict.verdict === 'approve' ? '✓ Claude recommends Approve' : '✗ Claude recommends Reject'}
+                                    </div>
+                                    <div className="escrow-verdict-reason">{aiVerdict.reasoning}</div>
+                                  </div>
+                                )}
+
+                                <button className="btn-primary" onClick={escrowApproveWork} disabled={escrowLoading}>
+                                  {escrowLoading ? 'Releasing...' : 'Release Payment'}
+                                </button>
+                              </div>
+                            )}
+
+                            {isClient && (escrowJob.status === 0 || escrowJob.status === 1) && expired && (
+                              <button className="btn-outline" onClick={escrowClaimRefund} disabled={escrowLoading}>
+                                {escrowLoading ? 'Refunding...' : 'Claim Refund'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ─── SIDEBAR ─── */}
+          <div className="section-sidebar">
+            <div className="sidebar-card">
+              <div className="sidebar-card-title"><Wallet size={13} /> Wallet Summary</div>
+              {isConnected ? (
+                <>
+                  <div className="sidebar-balance">
+                    ${parseFloat(totalUsdc).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className="sidebar-balance-label">Total Balance (USD)</div>
+                  {parseFloat(totalUsdc) > 0 && (
+                    <div className="sidebar-breakdown">
+                      <div className="sidebar-breakdown-item">
+                        <span style={{ color: '#627eea' }}>●</span> ETH
+                        <span>${ethValue.toFixed(2)}</span>
+                      </div>
+                      <div className="sidebar-breakdown-item">
+                        <span style={{ color: '#2775ca' }}>●</span> USDC
+                        <span>${usdcTotalVal.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
+                  <button className="btn-ghost sidebar-refresh" onClick={loadAssets} disabled={loadingAssets}>
+                    <RefreshCw size={11} /> {loadingAssets ? 'Loading...' : 'Refresh'}
+                  </button>
+                </>
+              ) : (
+                <div className="sidebar-no-wallet">
+                  <p>Connect a wallet to see balances</p>
+                  <button className="btn-primary" style={{ fontSize: 12, padding: '8px 16px' }} onClick={() => setShowConnectors(true)}>
+                    Connect
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="sidebar-card">
+              <div className="sidebar-card-title"><Check size={13} /> Demo Checklist</div>
+              <div className="demo-checklist">
+                {[
+                  { label: 'Connect wallet on Arc Testnet', done: isConnected && activeChainId === arcTestnet.id },
+                  { label: 'Lock USDC in escrow', done: recentJobIds.length > 0 },
+                  { label: 'Submit work as agent', done: escrowJob?.status === 1 || escrowJob?.status === 2 },
+                  { label: 'Run Claude Review', done: aiVerdict !== null },
+                  { label: 'Release payment', done: escrowJob?.status === 2 },
+                ].map((item, i) => (
+                  <div key={i} className={`checklist-item ${item.done ? 'done' : ''}`}>
+                    <span className="checklist-icon">{item.done ? '✓' : '○'}</span>
+                    <span>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="sidebar-card">
+              <div className="sidebar-card-title"><ShieldCheck size={13} /> Deployed Contracts</div>
+              <div className="contract-list">
+                <div className="contract-item">
+                  <div className="contract-name">ArcEscrow</div>
+                  <div className="contract-chain">Arc Testnet</div>
+                  <a className="contract-addr" href={`https://testnet.arcscan.app/address/${ARC_ESCROW}`} target="_blank" rel="noreferrer">
+                    {ARC_ESCROW.slice(0,8)}…{ARC_ESCROW.slice(-6)} <ExternalLink size={10} />
+                  </a>
+                </div>
+                <div className="contract-item">
+                  <div className="contract-name">ArcOnboarder</div>
+                  <div className="contract-chain">Ethereum Sepolia</div>
+                  <a className="contract-addr" href={`https://sepolia.etherscan.io/address/${ARC_ONBOARDER}`} target="_blank" rel="noreferrer">
+                    {ARC_ONBOARDER.slice(0,8)}…{ARC_ONBOARDER.slice(-6)} <ExternalLink size={10} />
+                  </a>
+                </div>
+                <div className="contract-item">
+                  <div className="contract-name">USDCPaymentHub</div>
+                  <div className="contract-chain">Arc Testnet</div>
+                  <a className="contract-addr" href={`https://testnet.arcscan.app/address/${PAYMENT_HUB_ADDRESS}`} target="_blank" rel="noreferrer">
+                    {PAYMENT_HUB_ADDRESS.slice(0,8)}…{PAYMENT_HUB_ADDRESS.slice(-6)} <ExternalLink size={10} />
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── MOVE FUNDS ─── */}
+      <section id="move-funds" className="content-section alt-bg">
+        <div className="section-heading">
+          <Layers size={18} style={{ color: 'var(--accent)' }} />
+          <div>
+            <h2 className="section-title">Move Funds to Arc</h2>
+            <p className="section-sub">Bridge via CCTP V2 · Cross-chain route via LI.FI · Send USDC directly</p>
+          </div>
+        </div>
+
+        <div className="move-funds-tabs">
+          <button className={`move-tab ${moveFundsTab === 'bridge' ? 'active' : ''}`} onClick={() => setMoveFundsTab('bridge')}>
+            <Layers size={13} /> CCTP Bridge
+          </button>
+          <button className={`move-tab ${moveFundsTab === 'cross' ? 'active' : ''}`} onClick={() => setMoveFundsTab('cross')}>
+            <Zap size={13} /> Cross-chain Route
+          </button>
+          <button className={`move-tab ${moveFundsTab === 'send' ? 'active' : ''}`} onClick={() => setMoveFundsTab('send')}>
+            <ArrowUpRight size={13} /> Send USDC
+          </button>
+        </div>
+
+        <div className="move-funds-content">
+          {moveFundsTab === 'bridge' && (
+            <div className="action-card move-funds-card">
+              <div className="action-card-label">Sepolia USDC → Arc Testnet USDC · Circle CCTP V2 · 0 slippage</div>
+              <div className="action-card-body">
+                {cctpStep !== 'idle' && (
+                  <div className="cctp-steps">
+                    {(['approving','burning','attesting','minting'] as const).map((s, i) => {
+                      const labels = ['Approve','Burn','Attest','Mint']
+                      const idx    = ['approving','burning','attesting','minting'].indexOf(cctpStep)
+                      const status = i < idx ? 'done' : i === idx ? 'active' : 'pending'
+                      return (
+                        <div key={s} className={`cctp-step ${status}`}>
+                          <div className="cctp-dot">{status === 'done' ? '✓' : i + 1}</div>
+                          <span>{labels[i]}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                {cctpStep === 'done' ? (
+                  <div className="cctp-done">
+                    <div style={{ fontSize: 24, marginBottom: 6 }}>✅</div>
+                    <div style={{ fontWeight: 600, marginBottom: 2 }}>Bridged to Arc!</div>
+                    <div style={{ opacity: 0.5, fontSize: 'var(--text-xs)' }}>{cctpAmount} USDC → Arc Testnet</div>
+                    <button className="btn-ghost" style={{ marginTop: 10 }} onClick={() => { setCctpStep('idle'); setCctpBurnHash('') }}>
+                      Bridge again
+                    </button>
+                  </div>
+                ) : <>
+                  <label className="input-label">From chain</label>
+                  <div className="cctp-chain-badge">
+                    <span className="arc-dot" style={{ background: '#627eea' }} />
+                    Ethereum Sepolia → Arc Testnet
+                  </div>
+                  <label className="input-label">Amount (USDC)</label>
+                  <input className="action-input" type="number" placeholder="0.0"
+                    value={cctpAmount} onChange={(e) => setCctpAmount(e.target.value)}
+                    disabled={cctpStep !== 'idle'} />
+                  <label className="input-label">Arc recipient (optional)</label>
+                  <input className="action-input" placeholder="0x… (default: your wallet)"
+                    value={cctpRecipient} onChange={(e) => setCctpRecipient(e.target.value)}
+                    disabled={cctpStep !== 'idle'} />
+                  <button className="btn-primary" style={{ marginTop: 4 }}
+                    onClick={executeCCTPBridge}
+                    disabled={cctpStep !== 'idle' && cctpStep !== 'error'}>
+                    {cctpStep === 'idle'      ? 'Bridge to Arc'          :
+                     cctpStep === 'approving' ? 'Approving USDC...'      :
+                     cctpStep === 'burning'   ? 'Burning on Sepolia...'  :
+                     cctpStep === 'attesting' ? 'Waiting attestation...' :
+                     cctpStep === 'minting'   ? 'Minting on Arc...'      :
+                     cctpStep === 'error'     ? 'Retry Bridge'           : '...'}
+                  </button>
+                  <div className="coming-soon" style={{ marginTop: 6 }}>
+                    <span className="coming-soon-label">CCTP V2</span>
+                    Official Circle bridge · 0 slippage · 1:1 mint
+                  </div>
+                  {cctpBurnHash && (
+                    <a className="cctp-tx-link" href={`https://sepolia.etherscan.io/tx/${cctpBurnHash}`} target="_blank" rel="noreferrer">
+                      Burn tx ↗
+                    </a>
+                  )}
+                </>}
+              </div>
+            </div>
+          )}
+
+          {moveFundsTab === 'cross' && (
+            <div className="action-card move-funds-card">
+              <div className="action-card-label">Cross-chain swap across 6 mainnet chains via LI.FI</div>
+              <div className="action-card-body">
+                <div className="lifi-row">
+                  <div className="lifi-col">
+                    <label className="input-label">From</label>
+                    <select className="action-input" value={lifiFromChainId}
+                      onChange={(e) => { setLifiFromChainId(Number(e.target.value)); setLifiFromToken('ETH'); setLifiQuote(null) }}>
+                      {LIFI_CHAINS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="lifi-col">
+                    <label className="input-label">Token</label>
+                    <select className="action-input" value={lifiFromToken}
+                      onChange={(e) => { setLifiFromToken(e.target.value); setLifiQuote(null) }}>
+                      {getLifiFromTokens(lifiFromChainId).map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="lifi-row">
+                  <div className="lifi-col">
+                    <label className="input-label">To</label>
+                    <select className="action-input" value={lifiToChainId}
+                      onChange={(e) => { setLifiToChainId(Number(e.target.value)); setLifiToToken('USDC'); setLifiQuote(null) }}>
+                      {LIFI_CHAINS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="lifi-col">
+                    <label className="input-label">Receive</label>
+                    <select className="action-input" value={lifiToToken}
+                      onChange={(e) => { setLifiToToken(e.target.value); setLifiQuote(null) }}>
+                      {getLifiFromTokens(lifiToChainId).map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <label className="input-label">Amount ({lifiFromToken})</label>
+                <input className="action-input" type="number" placeholder="0.0" value={lifiAmount}
+                  onChange={(e) => { setLifiAmount(e.target.value); setLifiQuote(null) }} />
+                {lifiError && <div style={{ color: 'var(--error)', fontSize: 'var(--text-xs)', padding: '2px 0' }}>{lifiError}</div>}
+                {!lifiQuote
+                  ? <button className="btn-primary" onClick={fetchLiFiQuote} disabled={lifiLoading || !lifiAmount}>
+                      {lifiLoading ? 'Getting quote...' : 'Get Quote'}
+                    </button>
+                  : <>
+                    <LiFiQuoteCard />
+                    <button className="btn-primary" onClick={executeLiFiSwap} disabled={lifiExecuting}>
+                      {lifiExecuting ? 'Executing...' : 'Swap via LI.FI'}
+                    </button>
+                    <button className="btn-outline" onClick={() => setLifiQuote(null)}>
+                      <RefreshCw size={12} /> New quote
+                    </button>
+                  </>
+                }
+              </div>
+            </div>
+          )}
+
+          {moveFundsTab === 'send' && (
+            <div className="action-card move-funds-card">
+              <div className="action-card-label">Send USDC via Circle App Kit · Arc Testnet</div>
+              <div className="action-card-body">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <label className="input-label">Recipient</label>
+                  <button className="btn-book" onClick={() => setShowContacts(true)}>
+                    <BookUser size={12} /> Address book
+                  </button>
+                </div>
+                <input className="action-input" type="text" placeholder="0x..." value={recipient}
+                  onChange={(e) => setRecipient(e.target.value)} />
+                <label className="input-label">Amount (USDC)</label>
+                <input className="action-input" type="number" placeholder="0.0" value={amount}
+                  onChange={(e) => setAmount(e.target.value)} />
+                <button className="btn-primary" onClick={openSendConfirm} disabled={txLoading}>
+                  {txLoading ? 'Processing...' : 'Send USDC'}
+                </button>
+              </div>
             </div>
           )}
         </div>
-        <div className="hero-actions">
-          <button className="btn-ghost" onClick={loadAssets} disabled={loadingAssets}>
-            <RefreshCw size={13} /> Refresh
-          </button>
-          {displayed.length > 0 && (
-            <button className="btn-ghost" onClick={exportCSV}>
-              <Download size={13} /> CSV
-            </button>
-          )}
-        </div>
-      </div>
+      </section>
 
-      <main className="dashboard">
-        {/* ─── 포트폴리오 바 ─────────────────────────────────────────── */}
+      {/* ─── PORTFOLIO ─── */}
+      <section id="portfolio" className="content-section">
+        <div className="section-heading">
+          <Wallet size={18} style={{ color: 'var(--accent)' }} />
+          <div>
+            <h2 className="section-title">Portfolio</h2>
+            <p className="section-sub">Assets across {networkMode === 'mainnet' ? '6 mainnet chains' : '3 testnet chains'}</p>
+          </div>
+        </div>
+
         {chainBreakdown.length > 0 && parseFloat(totalUsdc) > 0 && (
           <div className="portfolio-bar-wrap">
             <div className="portfolio-bar">
@@ -1384,660 +1933,187 @@ export default function App() {
           </div>
         )}
 
-        <div className="content-grid">
-          {/* ─── 왼쪽 패널 ─────────────────────────────────────────── */}
-          <div className="panel">
-            <div className="panel-header">
-              <div className="main-tabs">
-                <button className={`main-tab ${mainTab === 'assets' ? 'active' : ''}`} onClick={() => setMainTab('assets')}>Assets</button>
-                <button className={`main-tab ${mainTab === 'history' ? 'active' : ''}`} onClick={() => setMainTab('history')}>
-                  Activity {history.length > 0 && <span className="history-badge">{history.length}</span>}
-                </button>
-                {networkMode === 'testnet' && (
-                  <button className={`main-tab ${mainTab === 'faucet' ? 'active' : ''}`} onClick={() => setMainTab('faucet')}>Faucet</button>
+        <div className="portfolio-layout">
+          <div className="portfolio-main">
+            <div className="panel">
+              <div className="panel-header">
+                <div className="main-tabs">
+                  <button className={`main-tab ${mainTab === 'assets' ? 'active' : ''}`} onClick={() => setMainTab('assets')}>Assets</button>
+                  <button className={`main-tab ${mainTab === 'history' ? 'active' : ''}`} onClick={() => setMainTab('history')}>
+                    Activity {history.length > 0 && <span className="history-badge">{history.length}</span>}
+                  </button>
+                  {networkMode === 'testnet' && (
+                    <button className={`main-tab ${mainTab === 'faucet' ? 'active' : ''}`} onClick={() => setMainTab('faucet')}>Faucet</button>
+                  )}
+                </div>
+                {mainTab === 'assets' && (
+                  <div className="table-controls">
+                    <div className="network-label">
+                      <span className={`net-indicator ${networkMode}`} />
+                      {networkMode === 'mainnet' ? 'Mainnet' : 'Testnet'}
+                      {loadingAssets && <span className="loading-dot" />}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <select className="sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
+                        <option value="value">By value</option>
+                        <option value="symbol">By token</option>
+                        <option value="chain">By chain</option>
+                      </select>
+                      <button className="btn-icon" onClick={loadAssets} disabled={loadingAssets}><RefreshCw size={13} /></button>
+                      {displayed.length > 0 && (
+                        <button className="btn-icon" onClick={exportCSV} title="Export CSV"><Download size={13} /></button>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
-              {mainTab === 'assets' && (
-                <div className="table-controls">
-                  <div className="network-label">
-                    <span className={`net-indicator ${networkMode}`} />
-                    {networkMode === 'mainnet' ? 'Mainnet' : 'Testnet'}
-                    {loadingAssets && <span className="loading-dot" />}
+
+              {mainTab === 'assets' ? (
+                !isConnected ? (
+                  <div className="connect-prompt">
+                    <div className="connect-prompt-icon"><Wallet size={40} strokeWidth={1.2} /></div>
+                    <p className="connect-prompt-title">Connect your wallet</p>
+                    <p className="connect-prompt-sub">Your assets will appear here once connected</p>
+                    <button className="btn-primary" style={{ maxWidth: 200 }} onClick={() => setShowConnectors(true)}>Connect wallet</button>
                   </div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <select className="sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
-                      <option value="value">By value</option>
-                      <option value="symbol">By token</option>
-                      <option value="chain">By chain</option>
-                    </select>
-                    <button className="btn-icon" onClick={loadAssets} disabled={loadingAssets}><RefreshCw size={13} /></button>
+                ) : (
+                  <div className="table-wrap">
+                    <table className="asset-table">
+                      <thead>
+                        <tr>
+                          <th>Token</th><th>Wallet</th>
+                          <th className="text-right">Balance</th>
+                          <th className="text-right">Value</th>
+                          <th className="text-right">24h</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {loadingAssets && assets.length === 0 ? <SkeletonRows /> : displayed.length === 0 ? (
+                          <tr><td colSpan={5} className="empty-cell">No assets found on {networkMode}</td></tr>
+                        ) : displayed.map((a, i) => {
+                          const explorer = CHAIN_META[a.chain]?.explorer
+                          return (
+                            <tr key={i} className="asset-tr">
+                              <td>
+                                <div className="token-cell">
+                                  <TokenIconWithChain symbol={a.symbol} chainId={a.chain} />
+                                  <div>
+                                    <span className="token-name">{a.symbol}</span>
+                                    <span className="token-subname">
+                                      {explorer
+                                        ? <a className="chain-link" href={explorer} target="_blank" rel="noopener noreferrer">{CHAIN_META[a.chain]?.label}</a>
+                                        : CHAIN_META[a.chain]?.label}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="wallet-cell">{a.wallet}</td>
+                              <td className="text-right mono">{parseFloat(a.balance).toFixed(4)}</td>
+                              <td className="text-right usdc-val">${a.usdcValue}</td>
+                              <td className="text-right"><Change24h value={a.change24h} /></td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              ) : mainTab === 'history' ? (
+                <div className="history-list">
+                  {history.length === 0 ? (
+                    <div className="empty-cell">No transactions yet</div>
+                  ) : history.map((h, i) => {
+                    const iconMap = { swap: <Repeat2 size={14} />, bridge: <Layers size={14} />, send: <ArrowUpRight size={14} />, cross: <Zap size={14} /> }
+                    return (
+                      <div key={i} className={`history-row ${h.status}`}>
+                        <div className="history-left">
+                          <span className={`history-icon ${h.type}`}>{iconMap[h.type]}</span>
+                          <div className="history-info">
+                            <span className="history-summary">{h.summary}</span>
+                            <span className="history-time">{new Date(h.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        </div>
+                        <div className="history-right">
+                          {h.txHash && (
+                            <a className="history-link" href={`https://testnet.arcscan.app/tx/${h.txHash}`} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink size={13} />
+                            </a>
+                          )}
+                          <span className={`history-dot ${h.status}`} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="faucet-list">
+                  <div className="faucet-step-card">
+                    <div className="faucet-step-num">1</div>
+                    <div className="faucet-step-body">
+                      <p className="faucet-step-title">Copy your wallet address</p>
+                      {isConnected ? (
+                        <div className="faucet-addr-row">
+                          <span className="faucet-addr-text">{allAddresses[0]}</span>
+                          <button className={`btn-copy ${copiedAddr ? 'copied' : ''}`} onClick={copyAddress}>
+                            {copiedAddr ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="faucet-no-wallet">
+                          <span>Connect a wallet first</span>
+                          <button className="btn-primary" style={{ padding: '6px 14px', fontSize: '12px', width: 'auto' }} onClick={() => setShowConnectors(true)}>Connect</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="faucet-step-card">
+                    <div className="faucet-step-num">2</div>
+                    <div className="faucet-step-body">
+                      <p className="faucet-step-title">Request tokens from a faucet</p>
+                      <p className="faucet-step-sub">Click a faucet — it opens in a new tab. Paste your address and submit.</p>
+                      <div className="faucet-cards">
+                        {FAUCETS.map((f, i) => {
+                          const state = faucetPoll[i] ?? 'idle'
+                          return (
+                            <a key={i} href={f.url} target="_blank" rel="noopener noreferrer"
+                              className={`faucet-card ${state}`}
+                              onClick={() => { if (isConnected && state === 'idle') startFaucetPoll(i) }}>
+                              <div className="faucet-card-top">
+                                <span className="chain-dot" style={{ background: CHAIN_META[f.chainId]?.color }} />
+                                <span className="faucet-card-name">{f.name}</span>
+                                {state === 'idle'     && <ExternalLink size={12} className="faucet-card-arrow" />}
+                                {state === 'polling'  && <span className="faucet-spinner" />}
+                                {state === 'received' && <Check size={13} className="faucet-check" />}
+                              </div>
+                              <span className="faucet-card-chain">{f.chain}</span>
+                              <div className="faucet-card-tokens">
+                                {f.tokens.map((t) => <span key={t} className="faucet-token">{t}</span>)}
+                              </div>
+                              {state === 'polling'  && <span className="faucet-status-text">Waiting for deposit...</span>}
+                              {state === 'received' && <span className="faucet-status-text received">Tokens received!</span>}
+                              {state === 'idle'     && <span className="faucet-card-desc">{f.desc}</span>}
+                            </a>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="faucet-step-card faucet-step-last">
+                    <div className="faucet-step-num">3</div>
+                    <div className="faucet-step-body">
+                      <p className="faucet-step-title">Check your balance</p>
+                      <p className="faucet-step-sub">Balance updates automatically when tokens arrive.</p>
+                      <button className="btn-outline" style={{ width: 'auto' }} onClick={() => { setMainTab('assets'); loadAssets() }}>
+                        <RefreshCw size={13} /> Refresh assets
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
-
-            {mainTab === 'assets' ? (
-              !isConnected ? (
-                <div className="connect-prompt">
-                  <div className="connect-prompt-icon"><Wallet size={40} strokeWidth={1.2} /></div>
-                  <p className="connect-prompt-title">Connect your wallet</p>
-                  <p className="connect-prompt-sub">Your assets will appear here once connected</p>
-                  <button className="btn-primary" style={{ maxWidth: 200 }} onClick={() => setShowConnectors(true)}>Connect wallet</button>
-                </div>
-              ) : (
-                <div className="table-wrap">
-                  <table className="asset-table">
-                    <thead>
-                      <tr>
-                        <th>Token</th><th>Wallet</th>
-                        <th className="text-right">Balance</th>
-                        <th className="text-right">Value</th>
-                        <th className="text-right">24h</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loadingAssets && assets.length === 0 ? <SkeletonRows /> : displayed.length === 0 ? (
-                        <tr><td colSpan={5} className="empty-cell">No assets found on {networkMode}</td></tr>
-                      ) : displayed.map((a, i) => {
-                        const explorer = CHAIN_META[a.chain]?.explorer
-                        return (
-                          <tr key={i} className="asset-tr">
-                            <td>
-                              <div className="token-cell">
-                                <TokenIconWithChain symbol={a.symbol} chainId={a.chain} />
-                                <div>
-                                  <span className="token-name">{a.symbol}</span>
-                                  <span className="token-subname">
-                                    {explorer
-                                      ? <a className="chain-link" href={explorer} target="_blank" rel="noopener noreferrer">{CHAIN_META[a.chain]?.label}</a>
-                                      : CHAIN_META[a.chain]?.label}
-                                  </span>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="wallet-cell">{a.wallet}</td>
-                            <td className="text-right mono">{parseFloat(a.balance).toFixed(4)}</td>
-                            <td className="text-right usdc-val">${a.usdcValue}</td>
-                            <td className="text-right"><Change24h value={a.change24h} /></td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )
-            ) : mainTab === 'history' ? (
-              <div className="history-list">
-                {history.length === 0 ? (
-                  <div className="empty-cell">No transactions yet</div>
-                ) : history.map((h, i) => {
-                  const iconMap = { swap: <Repeat2 size={14} />, bridge: <Layers size={14} />, send: <ArrowUpRight size={14} />, cross: <Zap size={14} /> }
-                  return (
-                    <div key={i} className={`history-row ${h.status}`}>
-                      <div className="history-left">
-                        <span className={`history-icon ${h.type}`}>{iconMap[h.type]}</span>
-                        <div className="history-info">
-                          <span className="history-summary">{h.summary}</span>
-                          <span className="history-time">{new Date(h.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                      </div>
-                      <div className="history-right">
-                        {h.txHash && (
-                          <a className="history-link" href={`https://testnet.arcscan.app/tx/${h.txHash}`} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink size={13} />
-                          </a>
-                        )}
-                        <span className={`history-dot ${h.status}`} />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              /* 파우셋 탭 */
-              <div className="faucet-list">
-                <div className="faucet-step-card">
-                  <div className="faucet-step-num">1</div>
-                  <div className="faucet-step-body">
-                    <p className="faucet-step-title">Copy your wallet address</p>
-                    {isConnected ? (
-                      <div className="faucet-addr-row">
-                        <span className="faucet-addr-text">{allAddresses[0]}</span>
-                        <button className={`btn-copy ${copiedAddr ? 'copied' : ''}`} onClick={copyAddress}>
-                          {copiedAddr ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="faucet-no-wallet">
-                        <span>Connect a wallet first</span>
-                        <button className="btn-primary" style={{ padding: '6px 14px', fontSize: '12px', width: 'auto' }} onClick={() => setShowConnectors(true)}>Connect</button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="faucet-step-card">
-                  <div className="faucet-step-num">2</div>
-                  <div className="faucet-step-body">
-                    <p className="faucet-step-title">Request tokens from a faucet</p>
-                    <p className="faucet-step-sub">Click a faucet — it opens in a new tab. Paste your address and submit.</p>
-                    <div className="faucet-cards">
-                      {FAUCETS.map((f, i) => {
-                        const state = faucetPoll[i] ?? 'idle'
-                        return (
-                          <a key={i} href={f.url} target="_blank" rel="noopener noreferrer"
-                            className={`faucet-card ${state}`}
-                            onClick={() => { if (isConnected && state === 'idle') startFaucetPoll(i) }}>
-                            <div className="faucet-card-top">
-                              <span className="chain-dot" style={{ background: CHAIN_META[f.chainId]?.color }} />
-                              <span className="faucet-card-name">{f.name}</span>
-                              {state === 'idle'    && <ExternalLink size={12} className="faucet-card-arrow" />}
-                              {state === 'polling' && <span className="faucet-spinner" />}
-                              {state === 'received' && <Check size={13} className="faucet-check" />}
-                            </div>
-                            <span className="faucet-card-chain">{f.chain}</span>
-                            <div className="faucet-card-tokens">
-                              {f.tokens.map((t) => <span key={t} className="faucet-token">{t}</span>)}
-                            </div>
-                            {state === 'polling'  && <span className="faucet-status-text">Waiting for deposit...</span>}
-                            {state === 'received' && <span className="faucet-status-text received">Tokens received!</span>}
-                            {state === 'idle'     && <span className="faucet-card-desc">{f.desc}</span>}
-                          </a>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-                <div className="faucet-step-card faucet-step-last">
-                  <div className="faucet-step-num">3</div>
-                  <div className="faucet-step-body">
-                    <p className="faucet-step-title">Check your balance</p>
-                    <p className="faucet-step-sub">Balance updates automatically when tokens arrive.</p>
-                    <button className="btn-outline" style={{ width: 'auto' }} onClick={() => { setMainTab('assets'); loadAssets() }}>
-                      <RefreshCw size={13} /> Refresh assets
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* ─── 오른쪽 패널 ─────────────────────────────────────────── */}
-          <div className="right-panel">
-
-            {/* ── Transfer 카드 (Send / Pay Hub) ── */}
-            <div className="action-card">
-              <div className="action-card-seg">
-                <button className={`seg ${transferSeg === 'send' ? 'active' : ''}`}
-                  onClick={() => setTransferSeg('send')}>
-                  <ArrowUpRight size={12} /> Send
-                </button>
-                <button className={`seg ${transferSeg === 'pay' ? 'active' : ''}`}
-                  onClick={() => { setTransferSeg('pay'); loadContractInfo() }}>
-                  <Wallet size={12} /> Pay Hub
-                </button>
-              </div>
-
-              <div className="action-card-body">
-                {/* ── SEND ── */}
-                {transferSeg === 'send' && <>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <label className="input-label">Recipient</label>
-                    <button className="btn-book" onClick={() => setShowContacts(true)}>
-                      <BookUser size={12} /> Address book
-                    </button>
-                  </div>
-                  <input className="action-input" type="text" placeholder="0x..." value={recipient}
-                    onChange={(e) => setRecipient(e.target.value)} />
-                  <label className="input-label">Amount (USDC)</label>
-                  <input className="action-input" type="number" placeholder="0.0" value={amount}
-                    onChange={(e) => setAmount(e.target.value)} />
-                  <button className="btn-primary" onClick={openSendConfirm} disabled={txLoading}>
-                    {txLoading ? 'Processing...' : 'Send USDC'}
-                  </button>
-                </>}
-
-                {/* ── PAY HUB ── */}
-                {transferSeg === 'pay' && (() => {
-                  const addrs = connections.flatMap((c) => [...c.accounts] as string[])
-                  const isOwner = addrs.some((a) => a.toLowerCase() === contractOwner)
-                  return <>
-                    <div className="arc-badge"><span className="arc-dot" /> Arc Testnet</div>
-
-                    <div className="pay-hub-contract-row">
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Contract</span>
-                      <a href={`https://testnet.arcscan.app/address/${PAYMENT_HUB_ADDRESS}`}
-                        target="_blank" rel="noopener noreferrer" className="pay-hub-contract-addr">
-                        {PAYMENT_HUB_ADDRESS.slice(0, 8)}...{PAYMENT_HUB_ADDRESS.slice(-6)} <ExternalLink size={10} />
-                      </a>
-                    </div>
-
-                    <div className="pay-hub-balance">
-                      <div>
-                        <div className="pay-hub-balance-label">Contract Balance</div>
-                        {isOwner && <div className="pay-hub-owner-badge"><Check size={11} /> Owner</div>}
-                      </div>
-                      <span className="pay-hub-balance-value">
-                        {contractBalance ? parseFloat(contractBalance).toFixed(4) : '—'}
-                        <span style={{ fontSize: 'var(--text-xs)', marginLeft: 4, color: 'var(--arc)', opacity: 0.7 }}>USDC</span>
-                      </span>
-                    </div>
-
-                    <label className="input-label">Amount (USDC)</label>
-                    <input className="action-input" type="number" placeholder="0.0"
-                      value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
-
-                    <label className="input-label">Memo (optional)</label>
-                    <input className="action-input" type="text" placeholder="Order ID, note..."
-                      value={payNote} onChange={(e) => setPayNote(e.target.value)} />
-
-                    <button className="btn-primary" onClick={payToContract} disabled={txLoading}>
-                      {txLoading ? 'Processing...' : 'Pay to Contract'}
-                    </button>
-
-                    {isOwner && contractBalance && parseFloat(contractBalance) > 0 && (
-                      <button className="btn-outline" onClick={withdrawFromContract} disabled={withdrawLoading}>
-                        {withdrawLoading ? 'Withdrawing...' : `Withdraw ${parseFloat(contractBalance).toFixed(4)} USDC`}
-                      </button>
-                    )}
-                  </>
-                })()}
-              </div>
-            </div>
-
-            {/* ── DeFi 카드 (Cross / Swap / Bridge) ── */}
-            <div className="action-card">
-              <div className="action-card-label">DeFi</div>
-              <div className="action-card-seg" style={{ margin: '8px 4px 0' }}>
-                <button className={`seg ${defiSeg === 'cross' ? 'active' : ''}`} onClick={() => setDefiSeg('cross')}>
-                  <Zap size={11} /> Cross-chain
-                </button>
-                <button className={`seg ${defiSeg === 'swap' ? 'active' : ''}`} onClick={() => setDefiSeg('swap')}>
-                  <Repeat2 size={11} /> Swap
-                </button>
-                <button className={`seg ${defiSeg === 'bridge' ? 'active' : ''}`} onClick={() => setDefiSeg('bridge')}>
-                  <Layers size={11} /> Bridge
-                </button>
-                <button className={`seg ${defiSeg === 'agent' ? 'active' : ''}`} onClick={() => setDefiSeg('agent')}>
-                  <Bot size={11} /> Agent
-                </button>
-              </div>
-
-              <div className="action-card-body">
-                {/* ── CROSS-CHAIN (LI.FI) ── */}
-                {defiSeg === 'cross' && <>
-                  <div className="lifi-row">
-                    <div className="lifi-col">
-                      <label className="input-label">From</label>
-                      <select className="action-input" value={lifiFromChainId}
-                        onChange={(e) => { setLifiFromChainId(Number(e.target.value)); setLifiFromToken('ETH'); setLifiQuote(null) }}>
-                        {LIFI_CHAINS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-                      </select>
-                    </div>
-                    <div className="lifi-col">
-                      <label className="input-label">Token</label>
-                      <select className="action-input" value={lifiFromToken}
-                        onChange={(e) => { setLifiFromToken(e.target.value); setLifiQuote(null) }}>
-                        {getLifiFromTokens(lifiFromChainId).map((s) => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="lifi-row">
-                    <div className="lifi-col">
-                      <label className="input-label">To</label>
-                      <select className="action-input" value={lifiToChainId}
-                        onChange={(e) => { setLifiToChainId(Number(e.target.value)); setLifiToToken('USDC'); setLifiQuote(null) }}>
-                        {LIFI_CHAINS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-                      </select>
-                    </div>
-                    <div className="lifi-col">
-                      <label className="input-label">Receive</label>
-                      <select className="action-input" value={lifiToToken}
-                        onChange={(e) => { setLifiToToken(e.target.value); setLifiQuote(null) }}>
-                        {getLifiFromTokens(lifiToChainId).map((s) => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <label className="input-label">Amount ({lifiFromToken})</label>
-                  <input className="action-input" type="number" placeholder="0.0" value={lifiAmount}
-                    onChange={(e) => { setLifiAmount(e.target.value); setLifiQuote(null) }} />
-                  {lifiError && <div style={{ color: 'var(--error)', fontSize: 'var(--text-xs)', padding: '2px 0' }}>{lifiError}</div>}
-                  {!lifiQuote
-                    ? <button className="btn-primary" onClick={fetchLiFiQuote} disabled={lifiLoading || !lifiAmount}>
-                        {lifiLoading ? 'Getting quote...' : 'Get Quote'}
-                      </button>
-                    : <>
-                      <LiFiQuoteCard />
-                      <button className="btn-primary" onClick={executeLiFiSwap} disabled={lifiExecuting}>
-                        {lifiExecuting ? 'Executing...' : 'Swap via LI.FI'}
-                      </button>
-                      <button className="btn-outline" onClick={() => setLifiQuote(null)}>
-                        <RefreshCw size={12} /> New quote
-                      </button>
-                    </>
-                  }
-                </>}
-
-                {/* ── SWAP (Coming Soon / Arc App Kit) ── */}
-                {defiSeg === 'swap' && <>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 0 8px' }}>
-                    <div className="swap-row">
-                      <div className="swap-badge">ETH</div>
-                      <ArrowRight size={14} className="swap-arrow-icon" />
-                      <div className="swap-badge usdc">USDC</div>
-                    </div>
-                  </div>
-                  <label className="input-label">Amount (ETH)</label>
-                  <input className="action-input" type="number" placeholder="0.0" value={amount}
-                    onChange={(e) => setAmount(e.target.value)} />
-                  <button className="btn-primary" onClick={openSwapConfirm} disabled={txLoading}>
-                    {txLoading ? 'Processing...' : 'Swap to USDC'}
-                  </button>
-                  <div className="coming-soon">
-                    <span className="coming-soon-label">Arc Testnet only</span>
-                    Powered by Circle App Kit
-                  </div>
-                </>}
-
-                {/* ── BRIDGE (CCTP V2 Native) ── */}
-                {defiSeg === 'bridge' && <>
-                  {/* 진행 스텝 표시 */}
-                  {cctpStep !== 'idle' && (
-                    <div className="cctp-steps">
-                      {(['approving','burning','attesting','minting'] as const).map((s, i) => {
-                        const labels = ['Approve','Burn','Attest','Mint']
-                        const idx    = ['approving','burning','attesting','minting'].indexOf(cctpStep)
-                        const status = i < idx ? 'done' : i === idx ? 'active' : 'pending'
-                        return (
-                          <div key={s} className={`cctp-step ${status}`}>
-                            <div className="cctp-dot">
-                              {status === 'done' ? '✓' : i + 1}
-                            </div>
-                            <span>{labels[i]}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-
-                  {cctpStep === 'done' ? (
-                    <div className="cctp-done">
-                      <div style={{ fontSize: 24, marginBottom: 6 }}>✅</div>
-                      <div style={{ fontWeight: 600, marginBottom: 2 }}>Bridged to Arc!</div>
-                      <div style={{ opacity: 0.5, fontSize: 'var(--text-xs)' }}>{cctpAmount} USDC → Arc Testnet</div>
-                      <button className="btn-ghost" style={{ marginTop: 10 }} onClick={() => { setCctpStep('idle'); setCctpBurnHash('') }}>
-                        Bridge again
-                      </button>
-                    </div>
-                  ) : <>
-                    <label className="input-label">From chain</label>
-                    <div className="cctp-chain-badge">
-                      <span className="arc-dot" style={{ background: '#627eea' }} />
-                      Ethereum Sepolia → Arc Testnet
-                    </div>
-
-                    <label className="input-label">Amount (USDC)</label>
-                    <input className="action-input" type="number" placeholder="0.0"
-                      value={cctpAmount} onChange={(e) => setCctpAmount(e.target.value)}
-                      disabled={cctpStep !== 'idle'} />
-
-                    <label className="input-label">Arc recipient (optional)</label>
-                    <input className="action-input" placeholder="0x… (default: your wallet)"
-                      value={cctpRecipient} onChange={(e) => setCctpRecipient(e.target.value)}
-                      disabled={cctpStep !== 'idle'} />
-
-                    <button className="btn-primary" style={{ marginTop: 4 }}
-                      onClick={executeCCTPBridge}
-                      disabled={cctpStep !== 'idle' && cctpStep !== 'error'}>
-                      {cctpStep === 'idle'      ? 'Bridge to Arc'          :
-                       cctpStep === 'approving' ? 'Approving USDC...'      :
-                       cctpStep === 'burning'   ? 'Burning on Sepolia...'  :
-                       cctpStep === 'attesting' ? 'Waiting attestation...' :
-                       cctpStep === 'minting'   ? 'Minting on Arc...'      :
-                       cctpStep === 'error'     ? 'Retry Bridge'           : '...'}
-                    </button>
-
-                    <div className="coming-soon" style={{ marginTop: 6 }}>
-                      <span className="coming-soon-label">CCTP V2</span>
-                      Circle 공식 브릿지 · 슬리피지 0 · 1:1 발행
-                    </div>
-
-                    {cctpBurnHash && (
-                      <a className="cctp-tx-link"
-                        href={`https://sepolia.etherscan.io/tx/${cctpBurnHash}`}
-                        target="_blank" rel="noreferrer">
-                        Burn tx ↗
-                      </a>
-                    )}
-                  </>}
-                </>}
-
-                {/* ── AGENT ESCROW ── */}
-                {defiSeg === 'agent' && (
-                  <div className="escrow-board">
-                    {/* 탭 헤더 */}
-                    <div className="escrow-board-tabs">
-                      <button className={escrowMyTab === 'new' ? 'active' : ''} onClick={() => setEscrowMyTab('new')}>
-                        + New Job
-                      </button>
-                      <button className={escrowMyTab === 'jobs' ? 'active' : ''} onClick={() => setEscrowMyTab('jobs')}>
-                        My Jobs {recentJobIds.length > 0 && <span className="escrow-badge-count">{recentJobIds.length}</span>}
-                      </button>
-                    </div>
-
-                    {escrowMyTab === 'new' ? (
-                      <div className="escrow-form">
-                        <div className="escrow-form-group">
-                          <label>Agent Wallet Address</label>
-                          <input className="action-input" placeholder="0x..." value={escrowAgent}
-                            onChange={(e) => setEscrowAgent(e.target.value)} />
-                        </div>
-                        <div className="escrow-form-row">
-                          <div className="escrow-form-group">
-                            <label>Amount</label>
-                            <div className="escrow-input-suffix">
-                              <input className="action-input" inputMode="decimal" placeholder="0.00" value={escrowAmount}
-                                onChange={(e) => setEscrowAmount(e.target.value)} />
-                              <span>USDC</span>
-                            </div>
-                          </div>
-                          <div className="escrow-form-group">
-                            <label>Deadline</label>
-                            <div className="escrow-input-suffix">
-                              <input className="action-input" inputMode="numeric" placeholder="7" value={escrowDays}
-                                onChange={(e) => setEscrowDays(e.target.value)} />
-                              <span>days</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="escrow-form-group">
-                          <label>Job Description</label>
-                          <input className="action-input" placeholder="Describe the task clearly..." value={escrowDesc}
-                            onChange={(e) => setEscrowDesc(e.target.value)} />
-                        </div>
-                        <button className="btn-primary escrow-submit-btn" onClick={escrowCreateJob} disabled={escrowLoading}>
-                          {escrowLoading ? 'Processing...' : '🔒 Lock USDC & Post Job'}
-                        </button>
-                        <div className="escrow-hint">USDC is held in the ArcEscrow contract until you approve the result.</div>
-                      </div>
-                    ) : (
-                      <div className="escrow-jobs-panel">
-                        {/* 최근 잡 목록 */}
-                        {recentJobIds.length > 0 && (
-                          <div className="escrow-job-list">
-                            {recentJobIds.map(id => (
-                              <button key={id}
-                                className={`escrow-job-row ${escrowJobId === String(id) ? 'selected' : ''}`}
-                                onClick={() => escrowLookupJob(id)}>
-                                <span className="escrow-job-row-id">#{id}</span>
-                                <span className="escrow-job-row-label">Job #{id}</span>
-                                <span className="escrow-job-row-arrow">→</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Job ID 조회 */}
-                        <div className="escrow-search-block">
-                          <label className="escrow-search-label">Search by Job ID</label>
-                          <input
-                            className="escrow-search-input"
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="Enter Job ID (e.g. 0)"
-                            value={escrowJobId}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/[^0-9]/g, '')
-                              setEscrowJobId(val)
-                              setEscrowJob(null)
-                              setAiVerdict(null)
-                            }}
-                            onKeyDown={(e) => e.key === 'Enter' && escrowLookupJob()}
-                          />
-                          <button className="btn-primary" onClick={() => escrowLookupJob()} disabled={escrowLoading || escrowJobId === ''}>
-                            {escrowLoading ? 'Loading...' : 'Look up Job'}
-                          </button>
-                        </div>
-
-                        {/* 잡 상세 카드 */}
-                        {escrowJob && (() => {
-                          const STATUS_LABEL = ['Open', 'Submitted', 'Approved', 'Refunded']
-                          const STATUS_COLOR = ['#f5a623', '#2775ca', '#27ae60', '#e74c3c']
-                          const STATUS_BG    = ['rgba(245,166,35,0.1)', 'rgba(39,117,202,0.1)', 'rgba(39,174,96,0.1)', 'rgba(231,76,60,0.1)']
-                          const statusLabel  = STATUS_LABEL[escrowJob.status] ?? '?'
-                          const statusColor  = STATUS_COLOR[escrowJob.status] ?? '#888'
-                          const statusBg     = STATUS_BG[escrowJob.status]    ?? 'transparent'
-                          const expired      = Date.now() / 1000 > Number(escrowJob.deadline)
-                          const myAddr       = (allAddresses[0] ?? '').toLowerCase()
-                          const isClient     = escrowJob.client.toLowerCase() === myAddr
-                          const isAgent      = escrowJob.agent.toLowerCase()  === myAddr
-                          const usdcAmt      = (Number(escrowJob.amount) / 1e6).toFixed(2)
-                          const deadlineDate = new Date(Number(escrowJob.deadline) * 1000)
-                          return (
-                            <div className="escrow-detail-card">
-                              {/* 헤더 */}
-                              <div className="escrow-detail-header">
-                                <div>
-                                  <div className="escrow-detail-id">Job #{escrowJobId}</div>
-                                  <div className="escrow-detail-desc">{escrowJob.description}</div>
-                                </div>
-                                <span className="escrow-status-badge" style={{ color: statusColor, background: statusBg }}>
-                                  {statusLabel}
-                                </span>
-                              </div>
-
-                              {/* 메타 */}
-                              <div className="escrow-detail-meta">
-                                <div className="escrow-meta-item">
-                                  <span className="escrow-meta-label">Amount</span>
-                                  <span className="escrow-meta-value" style={{ color: 'var(--arc)', fontFamily: 'var(--font-mono)' }}>
-                                    {usdcAmt} USDC
-                                  </span>
-                                </div>
-                                <div className="escrow-meta-item">
-                                  <span className="escrow-meta-label">Deadline</span>
-                                  <span className="escrow-meta-value" style={{ color: expired ? 'var(--error)' : undefined }}>
-                                    {deadlineDate.toLocaleDateString()} {expired && '(Expired)'}
-                                  </span>
-                                </div>
-                                <div className="escrow-meta-item">
-                                  <span className="escrow-meta-label">Role</span>
-                                  <span className="escrow-meta-value">
-                                    {isClient ? 'Client' : isAgent ? 'Agent' : 'Observer'}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* 주소 */}
-                              <div className="escrow-detail-addrs">
-                                <div><span>Client</span><code>{escrowJob.client.slice(0,8)}…{escrowJob.client.slice(-6)}</code></div>
-                                <div><span>Agent</span><code>{escrowJob.agent.slice(0,8)}…{escrowJob.agent.slice(-6)}</code></div>
-                              </div>
-
-                              {/* 결과물 링크 */}
-                              {escrowJob.resultUri && (
-                                <a className="escrow-result-link" href={escrowJob.resultUri} target="_blank" rel="noreferrer">
-                                  📎 View Result ↗
-                                </a>
-                              )}
-
-                              {/* 액션 영역 */}
-                              <div className="escrow-actions">
-                                {/* 에이전트: 결과 제출 */}
-                                {isAgent && escrowJob.status === 0 && !expired && (
-                                  <div className="escrow-action-group">
-                                    <div className="escrow-submit-label">결과물 제출</div>
-                                    <textarea
-                                      className="escrow-work-textarea"
-                                      placeholder="완료한 작업 내용을 상세히 작성하세요. Claude가 실제로 읽고 평가합니다."
-                                      value={escrowWorkText}
-                                      onChange={(e) => setEscrowWorkText(e.target.value)}
-                                      rows={4}
-                                    />
-                                    <div className="escrow-file-upload">
-                                      <label className="escrow-file-label" htmlFor="escrow-file-input">
-                                        {escrowWorkFile ? `📎 ${escrowWorkFile.name}` : '+ 파일 첨부 (이미지 · PDF · TXT)'}
-                                      </label>
-                                      <input
-                                        id="escrow-file-input"
-                                        type="file"
-                                        accept="image/*,application/pdf,text/plain"
-                                        style={{ display: 'none' }}
-                                        onChange={(e) => setEscrowWorkFile(e.target.files?.[0] ?? null)}
-                                      />
-                                      {escrowWorkFile && (
-                                        <button className="escrow-file-remove" onClick={() => setEscrowWorkFile(null)}>✕</button>
-                                      )}
-                                    </div>
-                                    <div className="escrow-submit-hint">
-                                      업로드 후 Claude가 실제 내용을 읽어 평가합니다.
-                                    </div>
-                                    <button className="btn-primary" onClick={escrowSubmitWork}
-                                      disabled={escrowLoading || escrowWorkUploading || (!escrowWorkText.trim() && !escrowWorkFile)}>
-                                      {escrowWorkUploading ? '업로드 중...' : escrowLoading ? '제출 중...' : 'Submit Work'}
-                                    </button>
-                                  </div>
-                                )}
-
-                                {/* 클라이언트: AI 평가 + 승인 */}
-                                {isClient && escrowJob.status === 1 && (
-                                  <div className="escrow-action-group">
-                                    <button className="escrow-ai-btn" onClick={evaluateWithAI} disabled={aiLoading || escrowLoading}>
-                                      {aiLoading ? '✦ Evaluating...' : '✦ Ask Claude to Evaluate'}
-                                    </button>
-
-                                    {aiVerdict && (
-                                      <div className={`escrow-verdict ${aiVerdict.verdict}`}>
-                                        <div className="escrow-verdict-title">
-                                          {aiVerdict.verdict === 'approve' ? '✓ Claude recommends Approve' : '✗ Claude recommends Reject'}
-                                        </div>
-                                        <div className="escrow-verdict-reason">{aiVerdict.reasoning}</div>
-                                      </div>
-                                    )}
-
-                                    <button className="btn-primary" onClick={escrowApproveWork} disabled={escrowLoading}>
-                                      {escrowLoading ? 'Approving...' : 'Approve & Release USDC'}
-                                    </button>
-                                  </div>
-                                )}
-
-                                {/* 클라이언트: 환불 */}
-                                {isClient && (escrowJob.status === 0 || escrowJob.status === 1) && expired && (
-                                  <button className="btn-outline" onClick={escrowClaimRefund} disabled={escrowLoading}>
-                                    {escrowLoading ? 'Refunding...' : 'Claim Refund'}
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          )
-                        })()}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* ── 가스 카드 ── */}
+          <div className="portfolio-sidebar">
             {Object.keys(gasPrices).length > 0 && (
               <div className="gas-card">
                 <div className="gas-card-label"><Fuel size={11} /> Gas</div>
@@ -2054,16 +2130,15 @@ export default function App() {
               </div>
             )}
 
-            {/* ── 가격 카드 ── */}
             {Object.keys(prices).length > 0 && (
               <div className="action-card prices-card">
                 <div className="action-card-label">Live Prices</div>
                 <div className="action-card-body">
                   {[
-                    { id: 'ethereum',     label: 'ETH'  },
-                    { id: 'usd-coin',     label: 'USDC' },
+                    { id: 'ethereum',      label: 'ETH'  },
+                    { id: 'usd-coin',      label: 'USDC' },
                     { id: 'matic-network', label: 'POL'  },
-                    { id: 'avalanche-2',  label: 'AVAX' },
+                    { id: 'avalanche-2',   label: 'AVAX' },
                   ].filter((p) => prices[p.id]).map((p) => (
                     <div key={p.id} className="price-item">
                       <span className="price-symbol">{p.label}</span>
@@ -2077,14 +2152,55 @@ export default function App() {
               </div>
             )}
 
-            {/* ── 보안 안내 ── */}
             <div className="security-note">
               <ShieldCheck size={12} style={{ opacity: 0.4, flexShrink: 0, marginTop: 1 }} />
               Never stores your private keys. Always verify transactions before signing.
             </div>
           </div>
         </div>
-      </main>
+      </section>
+
+      {/* ─── STACK ─── */}
+      <section className="stack-section">
+        <div className="section-center">
+          <h2 className="stack-title">Built With</h2>
+          <div className="stack-cards">
+            {[
+              { name: 'Arc Testnet',    desc: 'EVM-compatible chain for stablecoin commerce', color: '#00c2ff' },
+              { name: 'Circle CCTP V2', desc: 'Native USDC burn-and-mint bridge, 0 slippage',  color: '#2775ca' },
+              { name: 'Claude Haiku',   desc: 'AI judge that reads work results and verdicts',  color: '#d4a574' },
+              { name: 'wagmi + viem',   desc: 'Type-safe Ethereum wallet & contract layer',     color: '#627eea' },
+              { name: 'LI.FI',          desc: 'Cross-chain routing across 6 mainnet chains',    color: '#bf5af2' },
+              { name: 'Vercel Blob',    desc: 'Serverless storage for agent work results',      color: '#555'    },
+            ].map((s, i) => (
+              <div key={i} className="stack-card">
+                <div className="stack-card-dot" style={{ background: s.color }} />
+                <div className="stack-card-name">{s.name}</div>
+                <div className="stack-card-desc">{s.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── FOOTER ─── */}
+      <footer className="site-footer">
+        <div className="footer-inner">
+          <div className="footer-left">
+            <span className="footer-logo">
+              <CircleDollarSign size={14} style={{ verticalAlign: 'middle', marginRight: 4, color: 'var(--accent)' }} />
+              USDC Portal
+            </span>
+            <span className="footer-tag">Circle + Arc Stablecoin Commerce Hackathon · Agentic Economy Track</span>
+          </div>
+          <div className="footer-links">
+            <a href="https://testnet.arcscan.app" target="_blank" rel="noreferrer">ArcScan</a>
+            <a href="https://faucet.circle.com" target="_blank" rel="noreferrer">Circle Faucet</a>
+            <a href="https://developers.circle.com" target="_blank" rel="noreferrer">Circle Docs</a>
+          </div>
+          <div className="footer-disclaimer">Testnet demo only · Not financial advice</div>
+        </div>
+      </footer>
     </div>
   )
 }
