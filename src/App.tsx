@@ -43,9 +43,8 @@ const ARC_MSG_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x$
 const ARC_ONBOARDER = '0x495825fF81B048B2A6e1FE10571625496f8fF1FD' as `0x${string}`
 
 // ─── ArcEscrow ────────────────────────────────────────────────────────────
-// TODO: Remix로 Arc Testnet 배포 후 이 주소를 실제 컨트랙트 주소로 교체
-const ARC_ESCROW = '0x0000000000000000000000000000000000000000' as `0x${string}`
-const ARC_TESTNET_USDC = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}` // TODO: Arc Testnet USDC로 교체
+const ARC_ESCROW = '0xC1f03548caEf00E56c788Bd02fBBcFD3219FD798' as `0x${string}`
+const ARC_TESTNET_USDC = '0xECF3365559FfE5fdBE1953df0A01244e234e4453' as `0x${string}`
 
 const ARC_ESCROW_ABI = [
   { name: 'createJob', type: 'function', stateMutability: 'nonpayable',
