@@ -423,10 +423,12 @@ export default function App() {
     client: string; agent: string; amount: bigint; deadline: bigint;
     description: string; resultUri: string; status: number
   } | null>(null)
-  const [escrowWorkUri,  setEscrowWorkUri]  = useState('')
-  const [escrowLoading,  setEscrowLoading]  = useState(false)
-  const [aiVerdict,      setAiVerdict]      = useState<{ verdict: 'approve' | 'reject'; reasoning: string } | null>(null)
-  const [aiLoading,      setAiLoading]      = useState(false)
+  const [escrowWorkText,     setEscrowWorkText]     = useState('')
+  const [escrowWorkFile,     setEscrowWorkFile]     = useState<File | null>(null)
+  const [escrowWorkUploading,setEscrowWorkUploading]= useState(false)
+  const [escrowLoading,      setEscrowLoading]      = useState(false)
+  const [aiVerdict,          setAiVerdict]          = useState<{ verdict: 'approve' | 'reject'; reasoning: string } | null>(null)
+  const [aiLoading,          setAiLoading]          = useState(false)
   const [escrowMyTab,    setEscrowMyTab]    = useState<'new' | 'jobs'>('new')
   const [recentJobIds,   setRecentJobIds]   = useState<number[]>(() => {
     try { return JSON.parse(localStorage.getItem('arc_escrow_jobs') ?? '[]') } catch { return [] }
@@ -1021,24 +1023,66 @@ export default function App() {
     }
   }
 
+  async function uploadToBlob(file: File): Promise<string> {
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const result = e.target?.result as string
+        resolve(result.split(',')[1])
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ filename: file.name, contentType: file.type, data: base64 }),
+    })
+    if (!res.ok) throw new Error('File upload failed')
+    const { url } = await res.json()
+    return url
+  }
+
+  async function uploadTextToBlob(text: string): Promise<string> {
+    const base64 = btoa(unescape(encodeURIComponent(text)))
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ filename: 'result.txt', contentType: 'text/plain', data: base64 }),
+    })
+    if (!res.ok) throw new Error('Upload failed')
+    const { url } = await res.json()
+    return url
+  }
+
   async function escrowSubmitWork() {
     const { encodeFunctionData } = await import('viem')
-    if (!escrowWorkUri.trim()) return addToast({ type: 'error', message: 'Enter result URI' })
-    setEscrowLoading(true)
+    if (!escrowWorkText.trim() && !escrowWorkFile) return addToast({ type: 'error', message: '결과물을 입력하거나 파일을 첨부하세요' })
+    setEscrowWorkUploading(true)
     try {
+      let resultUrl = ''
+      if (escrowWorkFile) {
+        resultUrl = await uploadToBlob(escrowWorkFile)
+      } else {
+        resultUrl = await uploadTextToBlob(escrowWorkText)
+      }
+      setEscrowWorkUploading(false)
+      setEscrowLoading(true)
       await switchChain({ chainId: arcTestnet.id })
       await sendTransactionAsync({
         to: ARC_ESCROW,
         data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'submitWork',
-          args: [BigInt(parseInt(escrowJobId)), escrowWorkUri] }),
+          args: [BigInt(parseInt(escrowJobId)), resultUrl] }),
       })
-      addToast({ type: 'success', message: 'Work submitted!' })
-      setEscrowWorkUri('')
+      addToast({ type: 'success', message: 'Work submitted! Claude will read the actual content.' })
+      setEscrowWorkText('')
+      setEscrowWorkFile(null)
       await escrowLookupJob()
     } catch (e: unknown) {
-      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Transaction failed' })
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Submission failed' })
     } finally {
       setEscrowLoading(false)
+      setEscrowWorkUploading(false)
     }
   }
 
@@ -1921,10 +1965,35 @@ export default function App() {
                                 {/* 에이전트: 결과 제출 */}
                                 {isAgent && escrowJob.status === 0 && !expired && (
                                   <div className="escrow-action-group">
-                                    <input className="action-input" placeholder="Result URL or IPFS hash"
-                                      value={escrowWorkUri} onChange={(e) => setEscrowWorkUri(e.target.value)} />
-                                    <button className="btn-primary" onClick={escrowSubmitWork} disabled={escrowLoading}>
-                                      {escrowLoading ? 'Submitting...' : 'Submit Work'}
+                                    <div className="escrow-submit-label">결과물 제출</div>
+                                    <textarea
+                                      className="escrow-work-textarea"
+                                      placeholder="완료한 작업 내용을 상세히 작성하세요. Claude가 실제로 읽고 평가합니다."
+                                      value={escrowWorkText}
+                                      onChange={(e) => setEscrowWorkText(e.target.value)}
+                                      rows={4}
+                                    />
+                                    <div className="escrow-file-upload">
+                                      <label className="escrow-file-label" htmlFor="escrow-file-input">
+                                        {escrowWorkFile ? `📎 ${escrowWorkFile.name}` : '+ 파일 첨부 (이미지 · PDF · TXT)'}
+                                      </label>
+                                      <input
+                                        id="escrow-file-input"
+                                        type="file"
+                                        accept="image/*,application/pdf,text/plain"
+                                        style={{ display: 'none' }}
+                                        onChange={(e) => setEscrowWorkFile(e.target.files?.[0] ?? null)}
+                                      />
+                                      {escrowWorkFile && (
+                                        <button className="escrow-file-remove" onClick={() => setEscrowWorkFile(null)}>✕</button>
+                                      )}
+                                    </div>
+                                    <div className="escrow-submit-hint">
+                                      업로드 후 Claude가 실제 내용을 읽어 평가합니다.
+                                    </div>
+                                    <button className="btn-primary" onClick={escrowSubmitWork}
+                                      disabled={escrowLoading || escrowWorkUploading || (!escrowWorkText.trim() && !escrowWorkFile)}>
+                                      {escrowWorkUploading ? '업로드 중...' : escrowLoading ? '제출 중...' : 'Submit Work'}
                                     </button>
                                   </div>
                                 )}

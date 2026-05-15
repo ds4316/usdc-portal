@@ -1180,3 +1180,27 @@ body {
 .escrow-verdict.approve .escrow-verdict-title { color: #27ae60; }
 .escrow-verdict.reject  .escrow-verdict-title { color: #e74c3c; }
 .escrow-verdict-reason { font-size: var(--text-xs); color: var(--text-sub); line-height: 1.5; }
+
+/* Submit Work */
+.escrow-submit-label { font-size: var(--text-xs); font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.escrow-work-textarea {
+  width: 100%; background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 8px; color: var(--text); font-size: var(--text-sm);
+  font-family: inherit; outline: none; padding: 10px 12px; resize: vertical;
+  transition: border-color 0.15s; line-height: 1.6;
+}
+.escrow-work-textarea:focus { border-color: var(--accent); }
+.escrow-work-textarea::placeholder { color: var(--text-muted); }
+.escrow-file-upload { display: flex; align-items: center; gap: 6px; }
+.escrow-file-label {
+  flex: 1; padding: 8px 12px; border: 1px dashed var(--border2);
+  border-radius: 8px; font-size: var(--text-xs); color: var(--text-sub);
+  cursor: pointer; text-align: center; transition: border-color 0.15s, color 0.15s;
+}
+.escrow-file-label:hover { border-color: var(--accent); color: var(--accent); }
+.escrow-file-remove {
+  background: none; border: none; color: var(--text-muted); cursor: pointer;
+  font-size: var(--text-base); padding: 4px; width: auto; line-height: 1;
+}
+.escrow-file-remove:hover { color: var(--error); }
+.escrow-submit-hint { font-size: 10px; color: var(--text-muted); text-align: center; }
