@@ -422,6 +422,8 @@ export default function App() {
   } | null>(null)
   const [escrowWorkUri,  setEscrowWorkUri]  = useState('')
   const [escrowLoading,  setEscrowLoading]  = useState(false)
+  const [aiVerdict,      setAiVerdict]      = useState<{ verdict: 'approve' | 'reject'; reasoning: string } | null>(null)
+  const [aiLoading,      setAiLoading]      = useState(false)
   const [sortBy, setSortBy]         = useState<'value' | 'symbol' | 'chain'>('value')
 
   const [assets, setAssets]         = useState<AssetRow[]>([])
@@ -946,10 +948,31 @@ export default function App() {
     }
   }
 
+  async function evaluateWithAI() {
+    if (!escrowJob) return
+    setAiLoading(true)
+    setAiVerdict(null)
+    try {
+      const res = await fetch('/api/evaluate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jobDescription: escrowJob.description, resultUri: escrowJob.resultUri }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setAiVerdict(data)
+    } catch (e) {
+      addToast({ type: 'error', message: 'AI evaluation failed — check API key config' })
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
   async function escrowLookupJob() {
     const id = parseInt(escrowJobId)
     if (isNaN(id) || id < 0) return addToast({ type: 'error', message: 'Enter valid Job ID' })
 
+    setAiVerdict(null)
     setEscrowLoading(true)
     try {
       const { encodeFunctionData, decodeFunctionResult } = await import('viem')
@@ -1800,12 +1823,34 @@ export default function App() {
                             </button>
                           </>}
 
-                          {/* 의뢰인 액션: 승인 or 환불 */}
-                          {isClient && escrowJob.status === 1 && (
+                          {/* 의뢰인 액션: AI 평가 + 승인 */}
+                          {isClient && escrowJob.status === 1 && (<>
+                            <button className="btn-outline" onClick={evaluateWithAI}
+                              disabled={aiLoading || escrowLoading}
+                              style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                              {aiLoading ? 'Evaluating...' : '✦ Ask Claude to Evaluate'}
+                            </button>
+
+                            {aiVerdict && (
+                              <div style={{
+                                padding: '10px 12px',
+                                borderRadius: 8,
+                                background: aiVerdict.verdict === 'approve' ? 'rgba(39,174,96,0.1)' : 'rgba(231,76,60,0.1)',
+                                border: `1px solid ${aiVerdict.verdict === 'approve' ? 'rgba(39,174,96,0.3)' : 'rgba(231,76,60,0.3)'}`,
+                                fontSize: 'var(--text-xs)',
+                                lineHeight: 1.5,
+                              }}>
+                                <div style={{ fontWeight: 700, marginBottom: 3, color: aiVerdict.verdict === 'approve' ? '#27ae60' : '#e74c3c' }}>
+                                  Claude: {aiVerdict.verdict === 'approve' ? '✓ Approve' : '✗ Reject'}
+                                </div>
+                                <div style={{ opacity: 0.8 }}>{aiVerdict.reasoning}</div>
+                              </div>
+                            )}
+
                             <button className="btn-primary" onClick={escrowApproveWork} disabled={escrowLoading}>
                               {escrowLoading ? 'Approving...' : 'Approve & Release USDC'}
                             </button>
-                          )}
+                          </>)}
                           {isClient && (escrowJob.status === 0 || escrowJob.status === 1) && expired && (
                             <button className="btn-outline" onClick={escrowClaimRefund} disabled={escrowLoading}>
                               {escrowLoading ? 'Refunding...' : 'Claim Refund'}
