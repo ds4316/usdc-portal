@@ -1091,9 +1091,25 @@ body {
 .escrow-job-row-label { flex: 1; font-size: var(--text-sm); color: var(--text-sub); }
 .escrow-job-row-arrow { color: var(--text-muted); font-size: var(--text-xs); }
 
-.escrow-lookup-row { display: flex; gap: 6px; }
-.escrow-lookup-row input { flex: 1; }
-.escrow-lookup-row button { white-space: nowrap; }
+.escrow-search-block {
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--surface3); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 12px;
+}
+.escrow-search-label {
+  font-size: var(--text-xs); font-weight: 600;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em;
+}
+.escrow-search-input {
+  width: 100%; background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 8px; color: var(--text); font-size: var(--text-lg);
+  font-weight: 600; font-family: var(--font-mono);
+  outline: none; padding: 12px 16px;
+  transition: border-color 0.15s;
+  letter-spacing: 0.05em;
+}
+.escrow-search-input:focus { border-color: var(--accent); }
+.escrow-search-input::placeholder { color: var(--text-muted); font-weight: 400; font-size: var(--text-base); }
 
 /* Job Detail Card */
 .escrow-detail-card {

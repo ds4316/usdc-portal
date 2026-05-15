@@ -1832,13 +1832,25 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* 수동 Job ID 조회 */}
-                        <div className="escrow-lookup-row">
-                          <input className="action-input" inputMode="numeric" placeholder="Look up by Job ID..."
+                        {/* Job ID 조회 */}
+                        <div className="escrow-search-block">
+                          <label className="escrow-search-label">Search by Job ID</label>
+                          <input
+                            className="escrow-search-input"
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="Enter Job ID (e.g. 0)"
                             value={escrowJobId}
-                            onChange={(e) => { setEscrowJobId(e.target.value); setEscrowJob(null); setAiVerdict(null) }} />
-                          <button className="btn-outline" onClick={() => escrowLookupJob()} disabled={escrowLoading}>
-                            {escrowLoading ? '...' : 'Search'}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/[^0-9]/g, '')
+                              setEscrowJobId(val)
+                              setEscrowJob(null)
+                              setAiVerdict(null)
+                            }}
+                            onKeyDown={(e) => e.key === 'Enter' && escrowLookupJob()}
+                          />
+                          <button className="btn-primary" onClick={() => escrowLookupJob()} disabled={escrowLoading || escrowJobId === ''}>
+                            {escrowLoading ? 'Loading...' : 'Look up Job'}
                           </button>
                         </div>
 
