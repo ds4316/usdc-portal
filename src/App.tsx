@@ -43,8 +43,8 @@ const ARC_MSG_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x$
 const ARC_ONBOARDER = '0x495825fF81B048B2A6e1FE10571625496f8fF1FD' as `0x${string}`
 
 // ─── ArcEscrow ────────────────────────────────────────────────────────────
-const ARC_ESCROW = '0xC1f03548caEf00E56c788Bd02fBBcFD3219FD798' as `0x${string}`
-const ARC_TESTNET_USDC = '0xECF3365559FfE5fdBE1953df0A01244e234e4453' as `0x${string}`
+const ARC_ESCROW = '0xc73821142DeD9Ab7f0F299389Fd3a186475676d5' as `0x${string}`
+const ARC_TESTNET_USDC = '0x3600000000000000000000000000000000000000' as `0x${string}`
 
 const ARC_ESCROW_ABI = [
   { name: 'createJob', type: 'function', stateMutability: 'nonpayable',
