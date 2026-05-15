@@ -414,11 +414,11 @@ function HolographicArcVisual() {
         </div>
         <div className="hologram-orbit orbit-cw">
           <div className="hologram-node node-top counter-cw"><span>USDC</span></div>
-          <div className="hologram-node node-bottom counter-cw"><span>ETH</span></div>
+          <div className="hologram-node node-bottom counter-cw"><span>CCTP</span></div>
         </div>
         <div className="hologram-orbit orbit-ccw">
           <div className="hologram-node node-top counter-ccw"><span>AI</span></div>
-          <div className="hologram-node node-bottom counter-ccw"><span>CCTP</span></div>
+          <div className="hologram-node node-bottom counter-ccw"><span>ESC</span></div>
         </div>
       </div>
     </div>
