@@ -400,55 +400,49 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
 }
 
 // ??? ?濡쒓렇?섑뵿 鍮꾩＜??????????????????????????????????????????????????????
-function EscrowFlowMock() {
+function SettlementFlowDiagram() {
+  const steps = [
+    {
+      icon: '↓',
+      title: 'Lock Funds',
+      caption: 'Client deposits Arc USDC into escrow.',
+      color: '#2775ca',
+    },
+    {
+      icon: '↑',
+      title: 'Submit Work',
+      caption: 'Agent submits a deliverable, file, or public URI.',
+      color: '#627eea',
+    },
+    {
+      icon: '◈',
+      title: 'Claude Review',
+      caption: 'Claude evaluates the submitted result against the job description.',
+      color: '#d4a574',
+    },
+    {
+      icon: '→',
+      title: 'Release Payout',
+      caption: 'Approved work unlocks Arc USDC settlement to the agent.',
+      color: '#00c2ff',
+    },
+  ]
   return (
-    <div className="esflow">
-      <div className="esflow-card">
-        <div className="esflow-card-header">
-          <span className="esflow-label">Client Wallet</span>
-          <span className="esflow-badge esflow-badge--funded">Funded</span>
-        </div>
-        <div className="esflow-rows">
-          <div className="esflow-row"><span>Locked</span><span className="esflow-val">100 USDC</span></div>
-          <div className="esflow-row"><span>Network</span><span className="esflow-val">Arc Testnet</span></div>
-          <div className="esflow-row"><span>Status</span><span className="esflow-val">Active</span></div>
-        </div>
-      </div>
-      <div className="esflow-rail"><div className="esflow-rail-line" /><div className="esflow-rail-dot" /></div>
-      <div className="esflow-card">
-        <div className="esflow-card-header">
-          <span className="esflow-label">ArcEscrow Job</span>
-          <span className="esflow-badge esflow-badge--submitted">Submitted</span>
-        </div>
-        <div className="esflow-rows">
-          <div className="esflow-row"><span>Job ID</span><span className="esflow-val">#1024</span></div>
-          <div className="esflow-row"><span>Agent</span><span className="esflow-mono">0x91…A8F2</span></div>
-          <div className="esflow-row"><span>Result</span><span className="esflow-val">deliverable.pdf</span></div>
-        </div>
-      </div>
-      <div className="esflow-rail"><div className="esflow-rail-line" /><div className="esflow-rail-dot" /></div>
-      <div className="esflow-card">
-        <div className="esflow-card-header">
-          <span className="esflow-label">Claude Review</span>
-          <span className="esflow-badge esflow-badge--approved">Approved</span>
-        </div>
-        <div className="esflow-rows">
-          <div className="esflow-row"><span>Verdict</span><span className="esflow-val">Approved</span></div>
-          <div className="esflow-row"><span>Confidence</span><span className="esflow-val">High</span></div>
-        </div>
-        <div className="esflow-reasoning">Deliverable matches requested output</div>
-      </div>
-      <div className="esflow-rail"><div className="esflow-rail-line" /><div className="esflow-rail-dot" /></div>
-      <div className="esflow-card esflow-card--payout">
-        <div className="esflow-card-header">
-          <span className="esflow-label">Arc USDC Payout</span>
-          <span className="esflow-badge esflow-badge--ready">Ready</span>
-        </div>
-        <div className="esflow-rows">
-          <div className="esflow-row"><span>Payout</span><span className="esflow-val esflow-amount">100 USDC</span></div>
-          <div className="esflow-row"><span>Recipient</span><span className="esflow-val">Agent</span></div>
-          <div className="esflow-row"><span>Status</span><span className="esflow-val">Ready to release</span></div>
-        </div>
+    <div className="sfd-wrap">
+      <div className="sfd-label">Settlement lifecycle</div>
+      <div className="sfd-steps">
+        {steps.map((s, i) => (
+          <div key={i} className="sfd-step" style={{ '--sfd-color': s.color, '--sfd-i': i } as React.CSSProperties}>
+            <div className="sfd-icon-col">
+              <div className="sfd-icon">{s.icon}</div>
+              {i < steps.length - 1 && <div className="sfd-connector" />}
+            </div>
+            <div className="sfd-content">
+              <div className="sfd-title">{s.title}</div>
+              <div className="sfd-caption">{s.caption}</div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -1455,8 +1449,8 @@ export default function App() {
                 <div className="ov-eyebrow">Circle + Arc · Agentic Economy Track</div>
                 <h1 className="ov-h1">Agentic USDC settlement<br />for AI work</h1>
                 <p className="ov-lead">
-                  Lock USDC, verify submitted work with Claude, and release Arc Testnet USDC
-                  through onchain escrow.
+                  Lock funds, verify submitted work with Claude, and release Arc Testnet USDC
+                  through programmable escrow.
                 </p>
                 <div className="ov-status-row">
                   <span className="status-dot green" /><span>ArcEscrow live</span>
@@ -1484,7 +1478,7 @@ export default function App() {
                 </div>
               </div>
               <div className="ov-hero-visual">
-                <EscrowFlowMock />
+                <SettlementFlowDiagram />
               </div>
             </section>
 

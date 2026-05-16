@@ -1510,62 +1510,66 @@ body {
 .ov-ctas { display: flex; gap: 10px; flex-wrap: wrap; }
 .ov-cta { display: flex; align-items: center; gap: 6px; }
 
-/* ── Escrow Flow Mock ── */
-.esflow { display: flex; flex-direction: column; width: 100%; }
+/* ── Settlement Flow Diagram ── */
+.sfd-wrap { display: flex; flex-direction: column; width: 100%; gap: 0; }
 
-.esflow-card {
-  background: var(--surface);
-  border: 1px solid var(--border2);
-  border-radius: 10px; padding: 14px 16px;
-  transition: border-color 0.2s;
-}
-.esflow-card:hover { border-color: var(--border3); }
-.esflow-card--payout { border-color: rgba(0,194,255,0.2); }
-
-.esflow-card-header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 10px;
-}
-.esflow-label {
-  font-size: 10px; font-weight: 700; letter-spacing: 0.6px;
-  color: var(--text-muted); text-transform: uppercase;
-}
-.esflow-badge {
-  font-size: 10px; font-weight: 600; letter-spacing: 0.2px;
-  padding: 2px 8px; border-radius: 20px;
-}
-.esflow-badge--funded    { background: rgba(34,197,94,0.1);  color: #22c55e; border: 1px solid rgba(34,197,94,0.2); }
-.esflow-badge--submitted { background: rgba(39,117,202,0.1); color: #4a9de0; border: 1px solid rgba(39,117,202,0.2); }
-.esflow-badge--approved  { background: rgba(212,165,116,0.1);color: #d4a574; border: 1px solid rgba(212,165,116,0.2); }
-.esflow-badge--ready     { background: rgba(0,194,255,0.08); color: var(--arc); border: 1px solid rgba(0,194,255,0.2); }
-
-.esflow-rows { display: flex; flex-direction: column; gap: 5px; }
-.esflow-row {
-  display: flex; justify-content: space-between; align-items: center;
-  font-size: 11px; color: var(--text-muted);
-}
-.esflow-val {
-  font-size: 11px; font-weight: 600; color: var(--text);
-}
-.esflow-amount { color: var(--arc); font-family: var(--font-mono); }
-.esflow-mono   { font-family: var(--font-mono); font-size: 10px; color: var(--text); }
-.esflow-reasoning {
-  margin-top: 8px; padding-top: 8px;
-  border-top: 1px solid var(--border);
-  font-size: 10px; font-style: italic; color: var(--text-sub);
+.sfd-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--text-muted);
+  margin-bottom: 20px;
 }
 
-.esflow-rail {
+.sfd-steps { display: flex; flex-direction: column; }
+
+.sfd-step {
+  display: flex; gap: 16px; align-items: flex-start;
+  animation: sfd-in 0.4s ease both;
+  animation-delay: calc(var(--sfd-i, 0) * 0.09s);
+}
+
+@keyframes sfd-in {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sfd-step { animation: none; }
+}
+
+.sfd-icon-col {
   display: flex; flex-direction: column; align-items: center;
-  height: 22px;
+  flex-shrink: 0; width: 32px;
 }
-.esflow-rail-line {
-  width: 1px; flex: 1;
-  background: linear-gradient(to bottom, var(--border2), var(--border3));
+
+.sfd-icon {
+  width: 32px; height: 32px;
+  border: 1px solid var(--sfd-color, var(--border2));
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; color: var(--sfd-color, var(--text-muted));
+  background: var(--surface);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sfd-color, transparent) 8%, transparent);
 }
-.esflow-rail-dot {
-  width: 5px; height: 5px; border-radius: 50%;
-  background: var(--arc); opacity: 0.7;
+
+.sfd-connector {
+  width: 1px; flex: 1; min-height: 20px;
+  background: linear-gradient(to bottom, var(--border2), transparent);
+  margin: 4px auto;
+}
+
+.sfd-content {
+  padding: 4px 0 20px;
+  flex: 1; min-width: 0;
+}
+
+.sfd-title {
+  font-family: var(--font-heading);
+  font-size: 14px; font-weight: 600; color: var(--text);
+  margin-bottom: 4px; line-height: 1.3;
+}
+
+.sfd-caption {
+  font-size: 12px; color: var(--text-sub); line-height: 1.6;
 }
 
 /* ── Section label (shared) ── */
