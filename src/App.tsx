@@ -400,25 +400,54 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
 }
 
 // ??? ?濡쒓렇?섑뵿 鍮꾩＜??????????????????????????????????????????????????????
-function HolographicArcVisual() {
+function EscrowFlowMock() {
   return (
-    <div className="hologram-wrap">
-      <div className="hologram-glow" />
-      <div className="hologram-core">
-        <div className="hologram-ring ring-1" />
-        <div className="hologram-ring ring-2" />
-        <div className="hologram-ring ring-3" />
-        <div className="hologram-center">
-          <div className="hologram-arc-label">ARC</div>
-          <div className="hologram-usdc-label">USDC</div>
+    <div className="esflow">
+      <div className="esflow-card">
+        <div className="esflow-card-header">
+          <span className="esflow-label">Client Wallet</span>
+          <span className="esflow-badge esflow-badge--funded">Funded</span>
         </div>
-        <div className="hologram-orbit orbit-cw">
-          <div className="hologram-node node-top counter-cw"><span>USDC</span></div>
-          <div className="hologram-node node-bottom counter-cw"><span>ETH</span></div>
+        <div className="esflow-rows">
+          <div className="esflow-row"><span>Locked</span><span className="esflow-val">100 USDC</span></div>
+          <div className="esflow-row"><span>Network</span><span className="esflow-val">Arc Testnet</span></div>
+          <div className="esflow-row"><span>Status</span><span className="esflow-val">Active</span></div>
         </div>
-        <div className="hologram-orbit orbit-ccw">
-          <div className="hologram-node node-top counter-ccw"><span>AI</span></div>
-          <div className="hologram-node node-bottom counter-ccw"><span>CCTP</span></div>
+      </div>
+      <div className="esflow-rail"><div className="esflow-rail-line" /><div className="esflow-rail-dot" /></div>
+      <div className="esflow-card">
+        <div className="esflow-card-header">
+          <span className="esflow-label">ArcEscrow Job</span>
+          <span className="esflow-badge esflow-badge--submitted">Submitted</span>
+        </div>
+        <div className="esflow-rows">
+          <div className="esflow-row"><span>Job ID</span><span className="esflow-val">#1024</span></div>
+          <div className="esflow-row"><span>Agent</span><span className="esflow-mono">0x91…A8F2</span></div>
+          <div className="esflow-row"><span>Result</span><span className="esflow-val">deliverable.pdf</span></div>
+        </div>
+      </div>
+      <div className="esflow-rail"><div className="esflow-rail-line" /><div className="esflow-rail-dot" /></div>
+      <div className="esflow-card">
+        <div className="esflow-card-header">
+          <span className="esflow-label">Claude Review</span>
+          <span className="esflow-badge esflow-badge--approved">Approved</span>
+        </div>
+        <div className="esflow-rows">
+          <div className="esflow-row"><span>Verdict</span><span className="esflow-val">Approved</span></div>
+          <div className="esflow-row"><span>Confidence</span><span className="esflow-val">High</span></div>
+        </div>
+        <div className="esflow-reasoning">Deliverable matches requested output</div>
+      </div>
+      <div className="esflow-rail"><div className="esflow-rail-line" /><div className="esflow-rail-dot" /></div>
+      <div className="esflow-card esflow-card--payout">
+        <div className="esflow-card-header">
+          <span className="esflow-label">Arc USDC Payout</span>
+          <span className="esflow-badge esflow-badge--ready">Ready</span>
+        </div>
+        <div className="esflow-rows">
+          <div className="esflow-row"><span>Payout</span><span className="esflow-val esflow-amount">100 USDC</span></div>
+          <div className="esflow-row"><span>Recipient</span><span className="esflow-val">Agent</span></div>
+          <div className="esflow-row"><span>Status</span><span className="esflow-val">Ready to release</span></div>
         </div>
       </div>
     </div>
@@ -648,6 +677,20 @@ export default function App() {
   }, [allAddresses.join(',')])
 
   useEffect(() => { if (isConnected && allAddresses[0]) loadCctpBalances() }, [isConnected, allAddresses.join(',')])
+
+  useEffect(() => {
+    if (activePage !== 'overview') return
+    let obs: IntersectionObserver
+    const timer = setTimeout(() => {
+      const els = document.querySelectorAll<HTMLElement>('.reveal-section')
+      obs = new IntersectionObserver(
+        (entries) => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('in-view') }),
+        { threshold: 0.08 }
+      )
+      els.forEach(el => obs.observe(el))
+    }, 80)
+    return () => { clearTimeout(timer); obs?.disconnect() }
+  }, [activePage])
 
   // ??? 二쇱냼濡???????????????????????????????????????????????????????????????
   function addContact() {
@@ -1402,28 +1445,33 @@ export default function App() {
       <main className="page-container">
 
         {/* ─── OVERVIEW ─── */}
+        {/* ─── OVERVIEW ─── */}
         {activePage === 'overview' && (
           <div className="page overview-page">
 
-            <div className="ov-hero">
-              <div className="ov-hero-left">
-                <div className="ov-badge">Circle + Arc Stablecoin Commerce · Agentic Economy Track</div>
-                <h1 className="ov-title">Agentic USDC<br />payments on Arc</h1>
-                <p className="ov-sub">
-                  Trustless escrow for AI agent workflows. Lock USDC, submit work on-chain,
-                  get AI-verified payouts — fully on-chain on Arc Testnet.
+            {/* Hero */}
+            <section className="ov-hero">
+              <div className="ov-hero-text">
+                <div className="ov-eyebrow">Circle + Arc · Agentic Economy Track</div>
+                <h1 className="ov-h1">Agentic USDC settlement<br />for AI work</h1>
+                <p className="ov-lead">
+                  Lock USDC, verify submitted work with Claude, and release Arc Testnet USDC
+                  through onchain escrow.
                 </p>
                 <div className="ov-status-row">
                   <span className="status-dot green" /><span>ArcEscrow live</span>
-                  <span className="ov-status-sep" />
+                  <span className="ov-sep" />
                   <span className="status-dot green" /><span>CCTP V2 active</span>
-                  <span className="ov-status-sep" />
+                  <span className="ov-sep" />
                   <span className="status-dot green" /><span>Claude Haiku ready</span>
-                  {isConnected && <><span className="ov-status-sep" /><span className="status-dot green" /><span className="ov-wallet-addr">{allAddresses[0]?.slice(0,6)}…{allAddresses[0]?.slice(-4)} connected</span></>}
+                  {isConnected && (
+                    <><span className="ov-sep" /><span className="status-dot green" />
+                    <span className="ov-mono">{allAddresses[0]?.slice(0,6)}…{allAddresses[0]?.slice(-4)} connected</span></>
+                  )}
                 </div>
                 <div className="ov-ctas">
                   <button className="btn-primary ov-cta" onClick={() => setActivePage('escrow')}>
-                    <Lock size={14} /> Try Agent Escrow
+                    <Lock size={14} /> Launch Agent Escrow
                   </button>
                   <button className="btn-outline ov-cta" onClick={() => setActivePage('funds')}>
                     <ArrowRightLeft size={14} /> Move Funds to Arc
@@ -1435,69 +1483,108 @@ export default function App() {
                   )}
                 </div>
               </div>
-              <div className="ov-hero-right">
-                <HolographicArcVisual />
+              <div className="ov-hero-visual">
+                <EscrowFlowMock />
               </div>
-            </div>
+            </section>
 
-            <div className="ov-section">
-              <div className="ov-section-label">How It Works</div>
-              <div className="workflow-steps">
-                {[
-                  { icon: <Lock size={20} />, step: 'Lock', desc: 'Client locks USDC in ArcEscrow contract on Arc Testnet' },
-                  { icon: <Upload size={20} />, step: 'Submit', desc: 'AI agent completes work and submits result URI on-chain' },
-                  { icon: <Bot size={20} />, step: 'Review', desc: 'Claude Haiku reads the deliverable and returns a verdict' },
-                  { icon: <CircleDollarSign size={20} />, step: 'Payout', desc: 'Client releases — USDC transferred trustlessly to agent' },
-                ].map((s, i) => (
-                  <div key={i} className="workflow-step-wrap">
-                    <div className="workflow-step">
-                      <div className="workflow-step-icon icon-badge">{s.icon}</div>
-                      <div className="workflow-step-label">{s.step}</div>
-                      <div className="workflow-step-desc">{s.desc}</div>
+            {/* Settlement Workflow */}
+            <section className="ov-workflow reveal-section">
+              <div className="ov-label">Settlement Workflow</div>
+              <div className="ov-pipeline">
+                {([
+                  { n: '01', title: 'Lock USDC',      sub: 'ArcEscrow.createJob()',   desc: 'Client deposits USDC into the ArcEscrow contract with agent address, deadline, and deliverable spec.' },
+                  { n: '02', title: 'Submit Work',     sub: 'ArcEscrow.submitWork()',  desc: 'Agent completes the task and submits a result URI on-chain — Vercel Blob, IPFS, or Arweave.' },
+                  { n: '03', title: 'Claude Review',   sub: 'POST /api/evaluate',      desc: 'Claude Haiku reads the deliverable and returns a structured verdict: approved or rejected with reasoning.' },
+                  { n: '04', title: 'Release Payout',  sub: 'ArcEscrow.approveWork()', desc: 'Client confirms verdict. USDC transfers trustlessly from escrow to agent wallet on Arc Testnet.' },
+                ] as const).map((s, i) => (
+                  <div key={i} className="ov-pipeline-step" style={{ '--step-i': i } as React.CSSProperties}>
+                    <div className="ov-step-n">{s.n}</div>
+                    <div className="ov-step-title">{s.title}</div>
+                    <div className="ov-step-sub">{s.sub}</div>
+                    <div className="ov-step-desc">{s.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Who Uses It */}
+            <section className="ov-audiences reveal-section">
+              <div className="ov-label">Who Uses It</div>
+              <div className="ov-audience-grid">
+                {([
+                  {
+                    role: 'Clients', tag: 'Fund + Verify',
+                    desc: 'Lock funds, define deliverables, and release payment only after Claude-verified work is confirmed on-chain.',
+                    items: ['Define escrow terms', 'Review Claude verdict', 'One-click payout release'],
+                  },
+                  {
+                    role: 'Agents', tag: 'Work + Earn',
+                    desc: 'Submit proof of work and receive Arc USDC after approval — no trust required from either party.',
+                    items: ['Submit result URI on-chain', 'Get AI-verified payment', 'Zero counterparty risk'],
+                  },
+                  {
+                    role: 'Protocols', tag: 'Build + Scale',
+                    desc: 'Build task markets, agent marketplaces, and service automation on top of escrow rails.',
+                    items: ['Composable escrow API', 'Cross-chain USDC inflow', 'Programmable verification'],
+                  },
+                ] as const).map((a, i) => (
+                  <div key={i} className="ov-audience-card" style={{ '--step-i': i } as React.CSSProperties}>
+                    <div className="ov-audience-header">
+                      <div className="ov-audience-role">{a.role}</div>
+                      <div className="ov-audience-tag">{a.tag}</div>
                     </div>
-                    {i < 3 && <div className="workflow-arrow"><ArrowRight size={18} /></div>}
+                    <p className="ov-audience-desc">{a.desc}</p>
+                    <ul className="ov-audience-items">
+                      {a.items.map((item, j) => <li key={j}>{item}</li>)}
+                    </ul>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
 
-            <div className="ov-section">
-              <div className="ov-section-label">What Agents Can Do</div>
-              <div className="agent-use-cases">
-                {[
-                  { icon: <Bot size={18} />, title: 'Code Generation', desc: 'Agent writes code, submits on-chain. Client reviews output via ArcScan link.' },
-                  { icon: <Upload size={18} />, title: 'Research & Reports', desc: 'Agent delivers PDF/text reports via Vercel Blob. Claude Haiku verifies completeness.' },
-                  { icon: <Lock size={18} />, title: 'Trustless Milestones', desc: 'Multi-step deliverables locked at project start, released on AI-verified completion.' },
-                  { icon: <Network size={18} />, title: 'Cross-chain Payroll', desc: 'Move USDC from any mainnet chain to Arc for agent payouts via CCTP V2 or LI.FI.' },
-                ].map((uc, i) => (
-                  <div key={i} className="agent-use-case">
-                    <div className="agent-uc-icon">{uc.icon}</div>
-                    <div className="agent-uc-title">{uc.title}</div>
-                    <div className="agent-uc-desc">{uc.desc}</div>
+            {/* Architecture */}
+            <section className="ov-arch reveal-section">
+              <div className="ov-label">Architecture</div>
+              <div className="ov-arch-rail">
+                {([
+                  { name: 'Wallet',       tech: 'wagmi / viem',     color: '#627eea' },
+                  { name: 'ArcEscrow',    tech: 'Solidity 0.8.20',  color: '#2775ca' },
+                  { name: 'Storage',      tech: 'Vercel Blob',       color: '#888'    },
+                  { name: 'Review API',   tech: 'Claude Haiku',      color: '#d4a574' },
+                  { name: 'Arc USDC',     tech: 'Arc Testnet',       color: '#00c2ff' },
+                ] as const).map((node, i) => (
+                  <div key={i} className="ov-arch-item">
+                    <div className="ov-arch-node">
+                      <div className="ov-arch-name">{node.name}</div>
+                      <div className="ov-arch-tech" style={{ color: node.color }}>{node.tech}</div>
+                    </div>
+                    {i < 4 && <div className="ov-arch-conn">→</div>}
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
 
-            <div className="ov-section">
-              <div className="ov-section-label">Built With</div>
-              <div className="stack-cards">
-                {[
-                  { name: 'Arc Testnet',    desc: 'EVM-compatible chain for stablecoin commerce', color: '#00c2ff' },
-                  { name: 'Circle CCTP V2', desc: 'Native USDC burn-and-mint bridge, 0 slippage',  color: '#2775ca' },
-                  { name: 'Claude Haiku',   desc: 'AI judge that reads work results and verdicts',  color: '#d4a574' },
-                  { name: 'wagmi + viem',   desc: 'Type-safe Ethereum wallet & contract layer',     color: '#627eea' },
-                  { name: 'LI.FI',          desc: 'Cross-chain routing across 6 mainnet chains',    color: '#bf5af2' },
-                  { name: 'Vercel Blob',    desc: 'Serverless storage for agent work results',      color: '#555'    },
-                ].map((s, i) => (
-                  <div key={i} className="stack-card">
-                    <div className="stack-card-dot" style={{ background: s.color }} />
-                    <div className="stack-card-name">{s.name}</div>
-                    <div className="stack-card-desc">{s.desc}</div>
-                  </div>
-                ))}
+            {/* Final CTA */}
+            <section className="ov-final-cta reveal-section">
+              <div className="ov-final-inner">
+                <h2 className="ov-final-title">Test agentic settlement on Arc</h2>
+                <p className="ov-final-sub">
+                  Create an escrow job, submit work, and run Claude-based verification on Arc Testnet.
+                </p>
+                <div className="ov-final-btns">
+                  <button className="btn-primary ov-cta" onClick={() => setActivePage('escrow')}>
+                    <Lock size={14} /> Launch Agent Escrow
+                  </button>
+                  <button className="btn-outline ov-cta" onClick={() => setActivePage('funds')}>
+                    <ArrowRightLeft size={14} /> Move Funds to Arc
+                  </button>
+                  <button className="btn-ghost ov-cta" onClick={() => setActivePage('docs')}>
+                    <BookOpen size={14} /> View Docs
+                  </button>
+                </div>
               </div>
-            </div>
+            </section>
 
           </div>
         )}
