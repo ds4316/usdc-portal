@@ -466,6 +466,53 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
   )
 }
 
+type PendingBridge = {
+  burnHash: string; messageBytes: string; messageHash: string
+  direction: 'to-arc' | 'to-sepolia'; amount: string; savedAt: number; attestation?: string
+}
+
+function RecoverBridgeForm({ onRecover }: { onRecover: (pb: PendingBridge) => void }) {
+  const [hash, setHash] = React.useState('')
+  const [dir, setDir]   = React.useState<'to-arc' | 'to-sepolia'>('to-sepolia')
+  const [amt, setAmt]   = React.useState('')
+  const [loading, setLoading] = React.useState(false)
+
+  async function recover() {
+    if (!hash.startsWith('0x')) return
+    setLoading(true)
+    try {
+      const { createPublicClient, http, decodeEventLog, keccak256 } = await import('viem')
+      const { arcTestnet } = await import('@reown/appkit/networks')
+      const client = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
+      const receipt = await client.waitForTransactionReceipt({ hash: hash as `0x${string}` })
+      const MSG_SENT_TOPIC = '0x8c5261668696ce22758910d05bab8f186d6eb247ceac2af2e82c7dc17669b036'
+      const msgLog = receipt.logs.find((l) => l.topics[0]?.toLowerCase() === MSG_SENT_TOPIC)
+      if (!msgLog) throw new Error('MessageSent not found in this tx — is this an Arc burn tx?')
+      const MESSAGE_SENT_EVENT = [{ name: 'MessageSent', type: 'event', inputs: [{ name: 'message', type: 'bytes', indexed: false }] }] as const
+      const { args } = decodeEventLog({ abi: MESSAGE_SENT_EVENT, data: msgLog.data, topics: msgLog.topics })
+      const messageBytes = args.message as `0x${string}`
+      const messageHash  = keccak256(messageBytes)
+      onRecover({ burnHash: hash, messageBytes, messageHash, direction: dir, amount: amt || '?', savedAt: Date.now() })
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Recovery failed')
+    } finally { setLoading(false) }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button className={`cctp-dir-btn ${dir==='to-arc'?'active':''}`} onClick={() => setDir('to-arc')} style={{ fontSize: 11 }}>Sepolia→Arc</button>
+        <button className={`cctp-dir-btn ${dir==='to-sepolia'?'active':''}`} onClick={() => setDir('to-sepolia')} style={{ fontSize: 11 }}>Arc→Sepolia</button>
+      </div>
+      <input className="action-input" placeholder="Arc burn tx hash (0x...)" value={hash} onChange={(e) => setHash(e.target.value)} />
+      <input className="action-input" placeholder="Amount (optional, e.g. 1.0)" value={amt} onChange={(e) => setAmt(e.target.value)} />
+      <button className="btn-ghost" onClick={recover} disabled={loading || !hash.startsWith('0x')}>
+        {loading ? 'Fetching receipt...' : 'Recover'}
+      </button>
+    </div>
+  )
+}
+
 // ??? ?濡쒓렇?섑뵿 鍮꾩＜??????????????????????????????????????????????????????
 function SettlementFlowDiagram() {
   const steps = [
@@ -597,10 +644,6 @@ export default function App() {
   const [cctpBurnHash,  setCctpBurnHash]  = useState('')
   const [cctpDirection, setCctpDirection] = useState<'to-arc' | 'to-sepolia'>('to-arc')
 
-  type PendingBridge = {
-    burnHash: string; messageBytes: string; messageHash: string
-    direction: 'to-arc' | 'to-sepolia'; amount: string; savedAt: number; attestation?: string
-  }
   const [pendingBridge, setPendingBridge] = useState<PendingBridge | null>(() => {
     try { return JSON.parse(localStorage.getItem('cctp_pending_bridge') ?? 'null') } catch { return null }
   })
@@ -2450,6 +2493,15 @@ export default function App() {
                           Circle attestation takes ~15 min on testnet. Click "Check & Claim" when ready.
                         </div>
                       </div>
+                    )}
+                    {/* Manual recover — for existing burn tx without localStorage */}
+                    {!pendingBridge && cctpStep === 'idle' && (
+                      <details className="cctp-recover-details">
+                        <summary>Already burned? Recover a pending bridge</summary>
+                        <RecoverBridgeForm
+                          onRecover={(pb) => { setPendingBridge(pb); localStorage.setItem('cctp_pending_bridge', JSON.stringify(pb)) }}
+                        />
+                      </details>
                     )}
                     {/* Direction toggle */}
                     <div className="cctp-direction-toggle">
