@@ -305,6 +305,7 @@ type FaucetPollState = 'idle' | 'polling' | 'received'
 type NetworkMode = 'mainnet' | 'testnet'
 type MainTab     = 'assets' | 'history' | 'faucet'
 type Theme       = 'dark' | 'light'
+type InAppFaucetChain = 'ARC-TESTNET' | 'ETH-SEPOLIA' | 'BASE-SEPOLIA'
 
 interface Contact { id: string; name: string; address: string }
 const CONTACTS_KEY = 'usdc_portal_contacts'
@@ -353,6 +354,12 @@ const FAUCETS: FaucetInfo[] = [
   { chain: 'Base Sepolia', chainId: baseSepolia.id, name: 'Coinbase Faucet', url: 'https://www.coinbase.com/faucets/base-ethereum-goerli-faucet',
     tokens: ['ETH'], desc: 'Coinbase official Base faucet', cooldownHours: 24, pollToken: 'native' },
 ]
+
+const IN_APP_FAUCETS: Record<InAppFaucetChain, { label: string; chainId: number; token: string; desc: string }> = {
+  'ARC-TESTNET':  { label: 'Arc Testnet',      chainId: arcTestnet.id,   token: 'USDC', desc: 'Native testnet USDC for gas, payments, bridge tests, and escrow demos.' },
+  'ETH-SEPOLIA':  { label: 'Ethereum Sepolia', chainId: sepolia.id,      token: 'USDC', desc: 'Sepolia USDC for CCTP bridge testing into Arc.' },
+  'BASE-SEPOLIA': { label: 'Base Sepolia',     chainId: baseSepolia.id,  token: 'USDC', desc: 'Base Sepolia USDC for wallet and route testing.' },
+}
 
 // ??? Public clients ???????????????????????????????????????????????????????
 const publicClients = Object.fromEntries(
@@ -597,6 +604,9 @@ export default function App() {
 
   // ?뚯슦???대쭅
   const [faucetPoll, setFaucetPoll] = useState<Record<number, FaucetPollState>>({})
+  const [inAppFaucetChain, setInAppFaucetChain] = useState<InAppFaucetChain>('ARC-TESTNET')
+  const [inAppFaucetLoading, setInAppFaucetLoading] = useState(false)
+  const [inAppFaucetMessage, setInAppFaucetMessage] = useState('')
   const pollTimers = useRef<Record<number, ReturnType<typeof setInterval>>>({})
 
   // ???곹깭
@@ -860,6 +870,44 @@ export default function App() {
         setFaucetPoll((p) => p[idx] === 'polling' ? { ...p, [idx]: 'idle' } : p)
       }
     }, 180000)
+  }
+
+  async function requestInAppFaucet() {
+    const addr = allAddresses[0]
+    if (!addr) return addToast({ type: 'error', message: 'Connect a wallet first' })
+
+    setInAppFaucetLoading(true)
+    setInAppFaucetMessage('')
+    const loadId = addToast({ type: 'loading', message: `Requesting ${IN_APP_FAUCETS[inAppFaucetChain].token} from Circle faucet...` })
+    try {
+      const res = await fetch('/api/faucet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address: addr,
+          blockchain: inAppFaucetChain,
+          native: false,
+          usdc: true,
+          eurc: false,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Faucet request failed')
+
+      removeToast(loadId)
+      setInAppFaucetMessage('Request sent. Balance will refresh when tokens arrive.')
+      addToast({ type: 'success', message: `${IN_APP_FAUCETS[inAppFaucetChain].token} faucet request submitted` })
+      const faucetIdx = FAUCETS.findIndex((f) => f.chainId === IN_APP_FAUCETS[inAppFaucetChain].chainId && f.tokens.includes('USDC'))
+      if (faucetIdx >= 0) startFaucetPoll(faucetIdx)
+      setTimeout(loadAssets, 8000)
+    } catch (e) {
+      removeToast(loadId)
+      const msg = e instanceof Error ? e.message : 'Faucet request failed'
+      setInAppFaucetMessage(msg)
+      addToast({ type: 'error', message: msg })
+    } finally {
+      setInAppFaucetLoading(false)
+    }
   }
 
   // ??? CSV ?대낫?닿린 ?????????????????????????????????????????????????????????
@@ -3191,6 +3239,35 @@ export default function App() {
                     )
                   ) : (
                     <div className="faucet-list">
+                      <div className="in-app-faucet-card">
+                        <div className="in-app-faucet-head">
+                          <div>
+                            <span className="faucet-card-chain">In-app faucet</span>
+                            <p className="faucet-step-title">Request testnet USDC without leaving the portal</p>
+                            <p className="faucet-step-sub">{IN_APP_FAUCETS[inAppFaucetChain].desc}</p>
+                          </div>
+                          <span className="arc-badge"><span className="arc-dot" /> Circle API</span>
+                        </div>
+                        <div className="in-app-faucet-controls">
+                          <select className="action-input" value={inAppFaucetChain}
+                            onChange={(e) => { setInAppFaucetChain(e.target.value as InAppFaucetChain); setInAppFaucetMessage('') }}>
+                            {Object.entries(IN_APP_FAUCETS).map(([id, f]) => (
+                              <option key={id} value={id}>{f.label} · {f.token}</option>
+                            ))}
+                          </select>
+                          <button className="btn-primary" onClick={requestInAppFaucet} disabled={!isConnected || inAppFaucetLoading}>
+                            {inAppFaucetLoading ? 'Requesting...' : `Request ${IN_APP_FAUCETS[inAppFaucetChain].token}`}
+                          </button>
+                        </div>
+                        {inAppFaucetMessage && (
+                          <div className={`in-app-faucet-message ${inAppFaucetMessage.toLowerCase().includes('error') || inAppFaucetMessage.toLowerCase().includes('key') ? 'error' : ''}`}>
+                            {inAppFaucetMessage}
+                          </div>
+                        )}
+                        {!isConnected && (
+                          <div className="in-app-faucet-message">Connect a wallet to request tokens directly in the app.</div>
+                        )}
+                      </div>
                       <div className="faucet-step-card">
                         <div className="faucet-step-num">1</div>
                         <div className="faucet-step-body">

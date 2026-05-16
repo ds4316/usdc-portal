@@ -1,5 +1,11 @@
 # USDC Portal
 
+## Environment
+
+Set these in Vercel project settings when using server-side features:
+
+- `CIRCLE_API_KEY`: required for the in-app testnet faucet (`/api/faucet`). Circle's faucet API requires a Circle API key and a mainnet-upgraded Circle developer account.
+
 A cross-chain USDC management portal built on [Arc Network](https://arc.network) using Circle's [App Kit](https://docs.arc.network/app-kit).
 
 🔗 **Live Demo:** [usdc-portal.vercel.app](https://usdc-portal.vercel.app)
