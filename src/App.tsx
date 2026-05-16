@@ -600,38 +600,53 @@ export default function App() {
     if (!allAddresses.length) return
     setLoadingAssets(true)
     try {
-      const rows: AssetRow[] = []
+      // All RPC calls fire in parallel — no sequential chain/token loop
+      const balanceTasks: Promise<AssetRow | null>[] = []
       for (const address of allAddresses) {
         const shortAddr = `${address.slice(0, 6)}...${address.slice(-4)}`
         for (const chain of CHAINS) {
           const client = publicClients[chain.id]
-          try {
-            const bal = await client.getBalance({ address })
-            if (bal > 0n) {
-              const isArc  = chain.id === arcTestnet.id
-              const isPoly = chain.id === polygon.id
-              const isAvax = chain.id === avalanche.id
-              rows.push({
-                wallet: shortAddr, chain: chain.id,
+          const isArc  = chain.id === arcTestnet.id
+          const isPoly = chain.id === polygon.id
+          const isAvax = chain.id === avalanche.id
+          balanceTasks.push(
+            client.getBalance({ address }).then(bal => {
+              if (bal === 0n) return null
+              return {
+                wallet: shortAddr, chain: chain.id, change24h: 0,
                 symbol: isArc ? 'USDC (gas)' : isPoly ? 'POL' : isAvax ? 'AVAX' : 'ETH',
-                balance: parseFloat(formatUnits(bal, 18)).toFixed(6), usdcValue: '0', change24h: 0,
+                balance: parseFloat(formatUnits(bal, 18)).toFixed(6),
+                usdcValue: '0',
                 coingeckoId: isArc ? 'usd-coin' : isPoly ? 'matic-network' : isAvax ? 'avalanche-2' : 'ethereum',
-              })
-            }
-          } catch { /* ignore */ }
+              } as AssetRow
+            }).catch(() => null)
+          )
           for (const token of TOKENS[chain.id] ?? []) {
-            try {
-              const bal = await client.readContract({ address: token.address, abi: ERC20_ABI, functionName: 'balanceOf', args: [address] })
-              if ((bal as bigint) > 0n)
-                rows.push({ wallet: shortAddr, chain: chain.id, symbol: token.symbol, change24h: 0,
-                  balance: parseFloat(formatUnits(bal as bigint, token.decimals)).toFixed(6),
-                  usdcValue: '0', coingeckoId: token.coingeckoId })
-            } catch { /* ignore */ }
+            balanceTasks.push(
+              client.readContract({ address: token.address, abi: ERC20_ABI, functionName: 'balanceOf', args: [address] })
+                .then(bal => {
+                  if ((bal as bigint) === 0n) return null
+                  return {
+                    wallet: shortAddr, chain: chain.id, symbol: token.symbol, change24h: 0,
+                    balance: parseFloat(formatUnits(bal as bigint, token.decimals)).toFixed(6),
+                    usdcValue: '0', coingeckoId: token.coingeckoId,
+                  } as AssetRow
+                }).catch(() => null)
+            )
           }
         }
       }
-      const ids = [...new Set(rows.map((r) => r.coingeckoId))]
-      const priceMap = await fetchPrices(ids)
+      // Price fetch runs in parallel with all balance queries
+      const allCgIds = ['ethereum', 'usd-coin', 'tether', 'weth', 'dai',
+        'matic-network', 'arbitrum', 'optimism', 'avalanche-2']
+      const [settled, priceMap] = await Promise.all([
+        Promise.allSettled(balanceTasks),
+        fetchPrices(allCgIds),
+      ])
+      const rows = settled
+        .filter((r): r is PromiseFulfilledResult<AssetRow | null> => r.status === 'fulfilled')
+        .map(r => r.value)
+        .filter((r): r is AssetRow => r !== null)
       setPrices(priceMap)
       let total = 0
       const enriched = rows.map((r) => {
