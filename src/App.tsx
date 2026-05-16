@@ -1191,7 +1191,7 @@ export default function App() {
       let attestation = ''
       for (let i = 0; i < 60; i++) {
         await new Promise((r) => setTimeout(r, 5000))
-        const res  = await fetch(`/api/attestation?messageHash=${messageHash}`)
+        const res  = await fetch(`/api/attestation?txHash=${burnHash}&sourceDomain=26`)
         const json = await res.json()
         if (json.status === 'complete') { attestation = json.attestation; break }
       }
