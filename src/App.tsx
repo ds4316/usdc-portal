@@ -2026,7 +2026,48 @@ export default function App() {
                 </div>
               </div>
               <div className="ov-hero-visual">
-                <div className="ov-status-panel">
+                <div className="ov-showcase-wall" aria-hidden="true">
+                  <div className="showcase-column slow">
+                    {[
+                      ['Portfolio', '$12,480.42', 'Across 4 chains'],
+                      ['USDC', '8,920.00', 'Stable balance'],
+                      ['Gas', '24.1 Gwei', 'Arc native'],
+                    ].map((item, i) => (
+                      <div className="showcase-card" key={`a-${i}`}>
+                        <span>{item[0]}</span>
+                        <strong>{item[1]}</strong>
+                        <small>{item[2]}</small>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="showcase-column reverse">
+                    {[
+                      ['CCTP V2', 'Ready', 'Sepolia recovery'],
+                      ['Pay Hub', 'Live', 'Arc Testnet'],
+                      ['Claude Review', 'Approved', 'Escrow flow'],
+                    ].map((item, i) => (
+                      <div className="showcase-card accent" key={`b-${i}`}>
+                        <span>{item[0]}</span>
+                        <strong>{item[1]}</strong>
+                        <small>{item[2]}</small>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="showcase-column slow">
+                    {[
+                      ['Bridge', '1:1 mint', 'Circle attested'],
+                      ['Wallets', 'Multi', 'Injected + WC'],
+                      ['Activity', 'Synced', 'Recent txs'],
+                    ].map((item, i) => (
+                      <div className="showcase-card" key={`c-${i}`}>
+                        <span>{item[0]}</span>
+                        <strong>{item[1]}</strong>
+                        <small>{item[2]}</small>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="ov-status-panel framer-style-panel">
                   <div className="ov-status-panel-head">
                     <div>
                       <span className="ov-panel-kicker">Active session</span>
