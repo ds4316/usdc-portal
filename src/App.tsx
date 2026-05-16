@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { useConnect, useDisconnect, useConnections, useSwitchChain, useSendTransaction } from 'wagmi'
 import { createPublicClient, fallback, http, formatUnits, isAddress } from 'viem'
 import { mainnet, base, polygon, arbitrum, optimism, avalanche, sepolia, baseSepolia } from 'wagmi/chains'
@@ -14,6 +14,108 @@ import {
 import { QRCodeSVG } from 'qrcode.react'
 import { arcTestnet } from './wagmi.config'
 import './App.css'
+
+// ═══ Scroll Reveal Component ═══════════════════════════════════════════════
+// Intersection Observer-based reveal animation with reduced-motion support
+function Reveal({ 
+  children, 
+  delay = 0, 
+  className = '' 
+}: { 
+  children: ReactNode
+  delay?: number
+  className?: string 
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [isVisible, setIsVisible] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+
+    // Check for reduced motion preference
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (prefersReducedMotion) {
+      setIsVisible(true)
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -40px 0px' }
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div
+      ref={ref}
+      className={`reveal ${isVisible ? 'reveal--visible' : ''} ${className}`}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      {children}
+    </div>
+  )
+}
+
+// Staggered reveal for groups of items
+function RevealGroup({ 
+  children, 
+  stagger = 80,
+  className = '' 
+}: { 
+  children: ReactNode[]
+  stagger?: number
+  className?: string 
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [isVisible, setIsVisible] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (prefersReducedMotion) {
+      setIsVisible(true)
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.05, rootMargin: '0px 0px -20px 0px' }
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div ref={ref} className={className}>
+      {Array.isArray(children) && children.map((child, i) => (
+        <div
+          key={i}
+          className={`reveal-item ${isVisible ? 'reveal-item--visible' : ''}`}
+          style={{ transitionDelay: `${i * stagger}ms` }}
+        >
+          {child}
+        </div>
+      ))}
+    </div>
+  )
+}
 
 const kit = new AppKit()
 
@@ -399,27 +501,67 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
   )
 }
 
-// ??? ?濡쒓렇?섑뵿 鍮꾩＜??????????????????????????????????????????????????????
+// Settlement Architecture Visual - Technical infrastructure diagram
 function HolographicArcVisual() {
   return (
-    <div className="hologram-wrap">
-      <div className="hologram-glow" />
-      <div className="hologram-core">
-        <div className="hologram-ring ring-1" />
-        <div className="hologram-ring ring-2" />
-        <div className="hologram-ring ring-3" />
-        <div className="hologram-center">
-          <div className="hologram-arc-label">ARC</div>
-          <div className="hologram-usdc-label">USDC</div>
+    <div className="arc-diagram">
+      {/* Background grid */}
+      <svg className="arc-grid" viewBox="0 0 400 400" fill="none">
+        <defs>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="0.5" opacity="0.15"/>
+          </pattern>
+        </defs>
+        <rect width="400" height="400" fill="url(#grid)"/>
+      </svg>
+      
+      {/* Central settlement node */}
+      <div className="arc-center">
+        <div className="arc-center-ring" />
+        <div className="arc-center-ring arc-center-ring-2" />
+        <div className="arc-center-core">
+          <span className="arc-center-label">ARC</span>
+          <span className="arc-center-sub">Settlement</span>
         </div>
-        <div className="hologram-orbit orbit-cw">
-          <div className="hologram-node node-top counter-cw"><span>USDC</span></div>
-          <div className="hologram-node node-bottom counter-cw"><span>ETH</span></div>
+      </div>
+      
+      {/* Connected modules */}
+      <div className="arc-module arc-module-tl">
+        <div className="arc-module-line arc-line-tl" />
+        <div className="arc-module-content">
+          <span className="arc-module-tag">Input</span>
+          <span className="arc-module-name">USDC</span>
         </div>
-        <div className="hologram-orbit orbit-ccw">
-          <div className="hologram-node node-top counter-ccw"><span>AI</span></div>
-          <div className="hologram-node node-bottom counter-ccw"><span>CCTP</span></div>
+      </div>
+      
+      <div className="arc-module arc-module-tr">
+        <div className="arc-module-line arc-line-tr" />
+        <div className="arc-module-content">
+          <span className="arc-module-tag">Bridge</span>
+          <span className="arc-module-name">CCTP</span>
         </div>
+      </div>
+      
+      <div className="arc-module arc-module-bl">
+        <div className="arc-module-line arc-line-bl" />
+        <div className="arc-module-content">
+          <span className="arc-module-tag">Review</span>
+          <span className="arc-module-name">Claude</span>
+        </div>
+      </div>
+      
+      <div className="arc-module arc-module-br">
+        <div className="arc-module-line arc-line-br" />
+        <div className="arc-module-content">
+          <span className="arc-module-tag">Contract</span>
+          <span className="arc-module-name">Escrow</span>
+        </div>
+      </div>
+      
+      {/* Status indicator */}
+      <div className="arc-status">
+        <span className="arc-status-indicator" />
+        <span className="arc-status-text">Live on Testnet</span>
       </div>
     </div>
   )
@@ -1403,104 +1545,233 @@ export default function App() {
 
         {/* ─── OVERVIEW ─── */}
         {activePage === 'overview' && (
-          <div className="page overview-page">
+          <div className="page ov">
 
-            <div className="ov-hero">
-              <div className="ov-hero-left">
-                <div className="ov-badge">Circle + Arc Stablecoin Commerce · Agentic Economy Track</div>
-                <h1 className="ov-title">Agentic USDC<br />payments on Arc</h1>
-                <p className="ov-sub">
-                  Trustless escrow for AI agent workflows. Lock USDC, submit work on-chain,
-                  get AI-verified payouts — fully on-chain on Arc Testnet.
-                </p>
-                <div className="ov-status-row">
-                  <span className="status-dot green" /><span>ArcEscrow live</span>
-                  <span className="ov-status-sep" />
-                  <span className="status-dot green" /><span>CCTP V2 active</span>
-                  <span className="ov-status-sep" />
-                  <span className="status-dot green" /><span>Claude Haiku ready</span>
-                  {isConnected && <><span className="ov-status-sep" /><span className="status-dot green" /><span className="ov-wallet-addr">{allAddresses[0]?.slice(0,6)}…{allAddresses[0]?.slice(-4)} connected</span></>}
-                </div>
-                <div className="ov-ctas">
-                  <button className="btn-primary ov-cta" onClick={() => setActivePage('escrow')}>
-                    <Lock size={14} /> Try Agent Escrow
-                  </button>
-                  <button className="btn-outline ov-cta" onClick={() => setActivePage('funds')}>
-                    <ArrowRightLeft size={14} /> Move Funds to Arc
-                  </button>
-                  {!isConnected && (
-                    <button className="btn-ghost ov-cta" onClick={() => setShowConnectors(true)}>
-                      <Wallet size={14} /> Connect Wallet
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className="ov-hero-right">
-                <HolographicArcVisual />
-              </div>
+            {/* Background atmosphere layers */}
+            <div className="ov-atmosphere">
+              <div className="ov-atmos-gradient" />
+              <div className="ov-atmos-grid" />
+              <div className="ov-atmos-glow ov-atmos-glow-1" />
+              <div className="ov-atmos-glow ov-atmos-glow-2" />
             </div>
 
-            <div className="ov-section">
-              <div className="ov-section-label">How It Works</div>
-              <div className="workflow-steps">
-                {[
-                  { icon: <Lock size={20} />, step: 'Lock', desc: 'Client locks USDC in ArcEscrow contract on Arc Testnet' },
-                  { icon: <Upload size={20} />, step: 'Submit', desc: 'AI agent completes work and submits result URI on-chain' },
-                  { icon: <Bot size={20} />, step: 'Review', desc: 'Claude Haiku reads the deliverable and returns a verdict' },
-                  { icon: <CircleDollarSign size={20} />, step: 'Payout', desc: 'Client releases — USDC transferred trustlessly to agent' },
-                ].map((s, i) => (
-                  <div key={i} className="workflow-step-wrap">
-                    <div className="workflow-step">
-                      <div className="workflow-step-icon icon-badge">{s.icon}</div>
-                      <div className="workflow-step-label">{s.step}</div>
-                      <div className="workflow-step-desc">{s.desc}</div>
+            {/* ═══ HERO ═══ */}
+            <section className="ov-hero">
+              <Reveal className="ov-hero-inner">
+                <header className="ov-hero-header">
+                  <div className="ov-meta">
+                    <span className="ov-meta-dot" />
+                    <span className="ov-meta-item">Arc Testnet</span>
+                    <span className="ov-meta-sep" />
+                    <span className="ov-meta-item">Circle CCTP V2</span>
+                    <span className="ov-meta-sep" />
+                    <span className="ov-meta-item">Claude Review</span>
+                  </div>
+                </header>
+                
+                <div className="ov-hero-main">
+                  <div className="ov-hero-copy">
+                    <h1 className="ov-title">
+                      Agentic USDC<br />
+                      <span className="ov-title-accent">payments</span> on Arc
+                    </h1>
+                    <p className="ov-subtitle">
+                      Create escrow jobs, let agents submit work, and use Claude to verify 
+                      results before automatic settlement in Arc Testnet USDC.
+                    </p>
+                    <div className="ov-actions">
+                      <button className="ov-cta-primary" onClick={() => setActivePage('escrow')}>
+                        Launch Agent Escrow
+                        <ArrowRight size={15} />
+                      </button>
+                      <button className="ov-cta-secondary" onClick={() => setActivePage('funds')}>
+                        Move Funds to Arc
+                      </button>
                     </div>
-                    {i < 3 && <div className="workflow-arrow"><ArrowRight size={18} /></div>}
                   </div>
-                ))}
-              </div>
-            </div>
+                  
+                  <div className="ov-hero-diagram">
+                    <HolographicArcVisual />
+                  </div>
+                </div>
+              </Reveal>
+            </section>
 
-            <div className="ov-section">
-              <div className="ov-section-label">What Agents Can Do</div>
-              <div className="agent-use-cases">
-                {[
-                  { icon: <Bot size={18} />, title: 'Code Generation', desc: 'Agent writes code, submits on-chain. Client reviews output via ArcScan link.' },
-                  { icon: <Upload size={18} />, title: 'Research & Reports', desc: 'Agent delivers PDF/text reports via Vercel Blob. Claude Haiku verifies completeness.' },
-                  { icon: <Lock size={18} />, title: 'Trustless Milestones', desc: 'Multi-step deliverables locked at project start, released on AI-verified completion.' },
-                  { icon: <Network size={18} />, title: 'Cross-chain Payroll', desc: 'Move USDC from any mainnet chain to Arc for agent payouts via CCTP V2 or LI.FI.' },
-                ].map((uc, i) => (
-                  <div key={i} className="agent-use-case">
-                    <div className="agent-uc-icon">{uc.icon}</div>
-                    <div className="agent-uc-title">{uc.title}</div>
-                    <div className="agent-uc-desc">{uc.desc}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Section divider */}
+            <div className="ov-divider" />
 
-            <div className="ov-section">
-              <div className="ov-section-label">Built With</div>
-              <div className="stack-cards">
+            {/* ═══ PROCESS / PIPELINE ═══ */}
+            <section className="ov-process">
+              <Reveal>
+                <header className="ov-section-head">
+                  <span className="ov-section-label">Process</span>
+                  <h2 className="ov-section-title">From escrow to verified payout</h2>
+                  <p className="ov-section-sub">Funds stay locked until submitted work is reviewed and approved.</p>
+                </header>
+              </Reveal>
+              
+              <div className="ov-pipeline">
+                <div className="ov-pipeline-track">
+                  <div className="ov-pipeline-track-fill" />
+                </div>
+                
+                <RevealGroup stagger={100} className="ov-pipeline-steps">
+                  {[
+                    { num: '01', icon: <Lock size={18} />, title: 'Lock USDC', desc: 'Client creates job and deposits payment into ArcEscrow contract.' },
+                    { num: '02', icon: <Upload size={18} />, title: 'Submit Work', desc: 'Agent completes task and submits deliverable URI on-chain.' },
+                    { num: '03', icon: <Bot size={18} />, title: 'Claude Review', desc: 'AI evaluates deliverable against job requirements.' },
+                    { num: '04', icon: <CircleDollarSign size={18} />, title: 'Release Payment', desc: 'USDC transferred to agent wallet upon approval.' },
+                  ].map((step, i) => (
+                    <div key={i} className="ov-step">
+                      <div className="ov-step-num">{step.num}</div>
+                      <div className="ov-step-body">
+                        <div className="ov-step-icon">{step.icon}</div>
+                        <h3 className="ov-step-title">{step.title}</h3>
+                        <p className="ov-step-desc">{step.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </RevealGroup>
+              </div>
+            </section>
+
+            {/* Section divider */}
+            <div className="ov-divider" />
+
+            {/* ═══ CAPABILITIES / BENTO ═══ */}
+            <section className="ov-capabilities">
+              <Reveal>
+                <header className="ov-section-head">
+                  <span className="ov-section-label">Capabilities</span>
+                  <h2 className="ov-section-title">What agents can do</h2>
+                </header>
+              </Reveal>
+              
+              <div className="ov-bento">
+                <Reveal delay={0} className="ov-bento-main-wrap">
+                  <article className="ov-bento-main">
+                    <span className="ov-bento-label">Primary Use Case</span>
+                    <h3 className="ov-bento-heading">Earn through verified work</h3>
+                    <p className="ov-bento-text">
+                      Agents can submit deliverables—code, reports, or data—and receive 
+                      Arc USDC automatically after Claude-based approval. No intermediary needed.
+                    </p>
+                    <div className="ov-bento-visual">
+                      <div className="ov-bento-flow">
+                        <span>Submit</span>
+                        <ArrowRight size={14} />
+                        <span>Review</span>
+                        <ArrowRight size={14} />
+                        <span>Earn</span>
+                      </div>
+                    </div>
+                  </article>
+                </Reveal>
+                
+                <RevealGroup stagger={80} className="ov-bento-cards">
+                  {[
+                    { title: 'File & URL submissions', desc: 'Work results stored through Vercel Blob or linked as public URIs.' },
+                    { title: 'Claude verification', desc: 'Reviews text, HTML, and images with explainable reasoning.' },
+                    { title: 'Refund protection', desc: 'Clients reclaim funds if deadline passes without approval.', sm: true },
+                    { title: 'Cross-chain funding', desc: 'Move assets into Arc via CCTP or LI.FI routing.', sm: true },
+                  ].map((card, i) => (
+                    <article key={i} className={`ov-bento-card ${card.sm ? 'ov-bento-sm' : ''}`}>
+                      <h4 className="ov-bento-card-title">{card.title}</h4>
+                      <p className="ov-bento-card-text">{card.desc}</p>
+                    </article>
+                  ))}
+                </RevealGroup>
+              </div>
+            </section>
+
+            {/* Section divider */}
+            <div className="ov-divider" />
+
+            {/* ═══ ARCHITECTURE ═══ */}
+            <section className="ov-arch">
+              <Reveal>
+                <header className="ov-section-head">
+                  <span className="ov-section-label">Architecture</span>
+                  <h2 className="ov-section-title">Settlement flow</h2>
+                </header>
+              </Reveal>
+              
+              <RevealGroup stagger={120} className="ov-flow">
                 {[
-                  { name: 'Arc Testnet',    desc: 'EVM-compatible chain for stablecoin commerce', color: '#00c2ff' },
-                  { name: 'Circle CCTP V2', desc: 'Native USDC burn-and-mint bridge, 0 slippage',  color: '#2775ca' },
-                  { name: 'Claude Haiku',   desc: 'AI judge that reads work results and verdicts',  color: '#d4a574' },
-                  { name: 'wagmi + viem',   desc: 'Type-safe Ethereum wallet & contract layer',     color: '#627eea' },
-                  { name: 'LI.FI',          desc: 'Cross-chain routing across 6 mainnet chains',    color: '#bf5af2' },
-                  { name: 'Vercel Blob',    desc: 'Serverless storage for agent work results',      color: '#555'    },
-                ].map((s, i) => (
-                  <div key={i} className="stack-card">
-                    <div className="stack-card-dot" style={{ background: s.color }} />
-                    <div className="stack-card-name">{s.name}</div>
-                    <div className="stack-card-desc">{s.desc}</div>
+                  { label: 'Client Wallet', sub: 'USDC' },
+                  { label: 'ArcEscrow', sub: 'Contract' },
+                  { label: 'Agent Work', sub: 'Vercel Blob' },
+                  { label: 'Claude API', sub: 'Review' },
+                  { label: 'USDC Payout', sub: 'Settlement', end: true },
+                ].flatMap((node, i, arr) => {
+                  const items = [
+                    <div key={`node-${i}`} className={`ov-flow-node ${node.end ? 'ov-flow-node-end' : ''}`}>
+                      <span className="ov-flow-node-label">{node.label}</span>
+                      <span className="ov-flow-node-sub">{node.sub}</span>
+                    </div>
+                  ]
+                  if (i < arr.length - 1) {
+                    items.push(<div key={`conn-${i}`} className="ov-flow-connector"><div className="ov-flow-connector-line" /></div>)
+                  }
+                  return items
+                })}
+              </RevealGroup>
+            </section>
+
+            {/* Section divider */}
+            <div className="ov-divider" />
+
+            {/* ═══ STACK ═══ */}
+            <section className="ov-stack">
+              <Reveal>
+                <header className="ov-section-head">
+                  <span className="ov-section-label">Stack</span>
+                  <h2 className="ov-section-title">Built with</h2>
+                </header>
+              </Reveal>
+              
+              <RevealGroup stagger={60} className="ov-stack-list">
+                {[
+                  { name: 'Arc Testnet', desc: 'EVM-compatible settlement chain' },
+                  { name: 'Circle CCTP V2', desc: 'Native USDC burn-and-mint bridge' },
+                  { name: 'Claude Haiku', desc: 'AI evaluation for work verification' },
+                  { name: 'wagmi + viem', desc: 'Type-safe wallet and contract layer' },
+                  { name: 'LI.FI', desc: 'Cross-chain swap aggregation' },
+                  { name: 'Vercel Blob', desc: 'Serverless file storage' },
+                ].map((tech, i) => (
+                  <div key={i} className="ov-stack-row">
+                    <span className="ov-stack-name">{tech.name}</span>
+                    <span className="ov-stack-desc">{tech.desc}</span>
                   </div>
                 ))}
-              </div>
-            </div>
+              </RevealGroup>
+            </section>
+
+            {/* ═══ FINAL CTA ═══ */}
+            <section className="ov-cta">
+              <Reveal>
+                <div className="ov-cta-inner">
+                  <h2 className="ov-cta-title">Test agentic settlement</h2>
+                  <p className="ov-cta-desc">Create an escrow job on Arc Testnet.</p>
+                  <div className="ov-cta-row">
+                    <button className="ov-cta-primary" onClick={() => setActivePage('escrow')}>
+                      Launch Agent Escrow
+                      <ArrowRight size={15} />
+                    </button>
+                    <button className="ov-cta-secondary" onClick={() => setActivePage('funds')}>
+                      Move Funds
+                    </button>
+                    <button className="ov-cta-tertiary" onClick={() => setActivePage('docs')}>
+                      Documentation
+                    </button>
+                  </div>
+                </div>
+              </Reveal>
+            </section>
 
           </div>
         )}
+
 
         {/* ─── AGENT ESCROW ─── */}
         {activePage === 'escrow' && (
