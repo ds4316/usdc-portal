@@ -1157,7 +1157,7 @@ export default function App() {
       const burnHash = await sendTransactionAsync({
         to: ARC_TOKEN_MESSENGER,
         data: encodeFunctionData({ abi: DEPOSIT_FOR_BURN_ABI, functionName: 'depositForBurn',
-          args: [usdcAmount, 0, mintRecipient, ARC_TESTNET_USDC, `0x${'0'.repeat(64)}` as `0x${string}`, 0n, 1000] }),
+          args: [usdcAmount, 0, mintRecipient, ARC_TESTNET_USDC, `0x${'0'.repeat(64)}` as `0x${string}`, 500n, 1000] }),
       })
       setCctpBurnHash(burnHash)
 
