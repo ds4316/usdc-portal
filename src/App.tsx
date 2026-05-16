@@ -54,10 +54,11 @@ const ARC_TOKEN_MESSENGER = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA' as `0x$
 const DEPOSIT_FOR_BURN_ABI = [
   { name: 'depositForBurn', type: 'function', stateMutability: 'nonpayable',
     inputs: [
-      { name: 'amount',            type: 'uint256' },
-      { name: 'destinationDomain', type: 'uint32'  },
-      { name: 'mintRecipient',     type: 'bytes32' },
-      { name: 'burnToken',         type: 'address' },
+      { name: 'amount',             type: 'uint256' },
+      { name: 'destinationDomain',  type: 'uint32'  },
+      { name: 'mintRecipient',      type: 'bytes32' },
+      { name: 'burnToken',          type: 'address' },
+      { name: 'destinationCaller',  type: 'bytes32' }, // CCTP V2: 0x0 = anyone can relay
     ], outputs: [{ name: '_nonce', type: 'uint64' }] },
 ] as const
 
@@ -1138,7 +1139,7 @@ export default function App() {
       const burnHash = await sendTransactionAsync({
         to: ARC_TOKEN_MESSENGER,
         data: encodeFunctionData({ abi: DEPOSIT_FOR_BURN_ABI, functionName: 'depositForBurn',
-          args: [usdcAmount, 0, mintRecipient, ARC_TESTNET_USDC] }),
+          args: [usdcAmount, 0, mintRecipient, ARC_TESTNET_USDC, `0x${'0'.repeat(64)}` as `0x${string}`] }),
       })
       setCctpBurnHash(burnHash)
 
