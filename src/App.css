@@ -2830,6 +2830,246 @@ body {
   50% { transform: translateX(8%) rotate(3deg); opacity: 0.5; }
 }
 
+/* Marketplace */
+.marketplace-header {
+  align-items: center;
+}
+
+.marketplace-tabs {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface2);
+}
+
+.marketplace-tabs button {
+  width: auto;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.marketplace-tabs button.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.marketplace-hero,
+.market-create-card,
+.market-request-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.marketplace-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 28px;
+  align-items: center;
+  padding: 28px;
+  margin-bottom: 20px;
+}
+
+.market-kicker,
+.market-category,
+.market-deliverable span {
+  display: block;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.marketplace-hero h3 {
+  margin: 8px 0 12px;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 36px;
+  line-height: 1.08;
+}
+
+.marketplace-hero p {
+  max-width: 680px;
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.market-flow-mini {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--border);
+}
+
+.market-flow-step {
+  min-height: 96px;
+  padding: 14px;
+  background: var(--surface2);
+}
+
+.market-flow-step span {
+  display: block;
+  margin-bottom: 22px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.market-flow-step strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.market-create-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+}
+
+.market-form-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr 0.7fr 0.7fr;
+  gap: 14px;
+}
+
+.market-textarea {
+  min-height: 128px;
+  resize: vertical;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.6;
+  outline: none;
+  padding: 12px;
+}
+
+.market-textarea.small {
+  min-height: 86px;
+}
+
+.market-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.market-request-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.market-request-card {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding: 20px;
+}
+
+.market-card-top,
+.market-meta-row,
+.market-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.market-status,
+.market-budget {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--surface2);
+  color: var(--text-sub);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.market-status.open {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+}
+
+.market-status.matched,
+.market-status.escrow-ready {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.market-budget {
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+
+.market-request-card h3 {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.market-request-card p {
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.market-deliverable {
+  padding: 12px;
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  background: var(--surface2);
+}
+
+.market-deliverable strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.market-meta-row {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.market-meta-row.agent strong {
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+
+.market-card-actions {
+  margin-top: auto;
+}
+
 /* Pay page */
 .pay-header {
   align-items: center;
@@ -2989,6 +3229,26 @@ body {
 }
 
 @media (max-width: 900px) {
+  .marketplace-header {
+    align-items: flex-start;
+  }
+  .marketplace-tabs {
+    margin-left: 0;
+  }
+  .marketplace-hero,
+  .market-form-grid,
+  .market-request-grid {
+    grid-template-columns: 1fr;
+  }
+  .market-flow-mini {
+    grid-template-columns: 1fr;
+  }
+  .market-flow-step {
+    min-height: 0;
+  }
+  .market-card-actions {
+    flex-direction: column;
+  }
   .pay-layout {
     grid-template-columns: 1fr;
   }

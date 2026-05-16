@@ -306,13 +306,66 @@ type NetworkMode = 'mainnet' | 'testnet'
 type MainTab     = 'assets' | 'history' | 'faucet'
 type Theme       = 'dark' | 'light'
 type InAppFaucetChain = 'ARC-TESTNET' | 'ETH-SEPOLIA' | 'BASE-SEPOLIA'
+type MarketRequestStatus = 'open' | 'matched' | 'escrow-ready'
 
 interface Contact { id: string; name: string; address: string }
+interface MarketRequest {
+  id: string
+  title: string
+  category: string
+  budget: string
+  deadlineDays: string
+  description: string
+  deliverable: string
+  client: string
+  agent?: string
+  status: MarketRequestStatus
+  createdAt: string
+}
+
 const CONTACTS_KEY = 'usdc_portal_contacts'
+const REQUESTS_KEY = 'usdc_portal_requests'
 function loadContacts(): Contact[] {
   try { return JSON.parse(localStorage.getItem(CONTACTS_KEY) ?? '[]') } catch { return [] }
 }
 function saveContacts(c: Contact[]) { localStorage.setItem(CONTACTS_KEY, JSON.stringify(c)) }
+function seedMarketRequests(): MarketRequest[] {
+  return [
+    {
+      id: 'req-demo-1',
+      title: 'Audit landing page copy and UX flow',
+      category: 'Design Review',
+      budget: '25',
+      deadlineDays: '3',
+      description: 'Review the USDC Portal landing page, identify confusing sections, and propose clearer copy for marketplace users.',
+      deliverable: 'A short UX critique with rewritten hero, workflow, and CTA copy.',
+      client: 'Demo client',
+      status: 'open',
+      createdAt: new Date(Date.now() - 3600_000).toISOString(),
+    },
+    {
+      id: 'req-demo-2',
+      title: 'Build an Arc escrow explainer diagram',
+      category: 'Visual Design',
+      budget: '40',
+      deadlineDays: '5',
+      description: 'Create a clean diagram that explains Wallet -> USDC Route -> Arc Contract -> Verification -> Payout.',
+      deliverable: 'SVG or image-ready diagram plus short implementation notes.',
+      client: 'Demo client',
+      status: 'open',
+      createdAt: new Date(Date.now() - 7200_000).toISOString(),
+    },
+  ]
+}
+function loadMarketRequests(): MarketRequest[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(REQUESTS_KEY) ?? '[]')
+    return Array.isArray(stored) && stored.length ? stored : seedMarketRequests()
+  } catch { return seedMarketRequests() }
+}
+function saveMarketRequests(requests: MarketRequest[]) {
+  localStorage.setItem(REQUESTS_KEY, JSON.stringify(requests))
+}
 
 // LI.FI
 interface LiFiQuote {
@@ -553,7 +606,7 @@ export default function App() {
   const [transferSeg, setTransferSeg] = useState<TransferSeg>('send')
   const [defiSeg, setDefiSeg]       = useState<DefiSeg>('cross')
   const [moveFundsTab, setMoveFundsTab] = useState<'bridge' | 'cross' | 'send'>('bridge')
-  const [activePage, setActivePage] = useState<'overview' | 'portfolio' | 'pay' | 'funds' | 'escrow' | 'activity' | 'docs'>('overview')
+  const [activePage, setActivePage] = useState<'overview' | 'marketplace' | 'portfolio' | 'pay' | 'funds' | 'escrow' | 'activity' | 'docs'>('overview')
 
   // ?? ArcEscrow ?곹깭 ????????????????????????????????????????????????????????
   const [escrowAgent,  setEscrowAgent]  = useState('')
@@ -576,6 +629,14 @@ export default function App() {
   const [recentJobIds,   setRecentJobIds]   = useState<number[]>(() => {
     try { return JSON.parse(localStorage.getItem('arc_escrow_jobs') ?? '[]') } catch { return [] }
   })
+  const [marketRequests, setMarketRequests] = useState<MarketRequest[]>(loadMarketRequests)
+  const [marketTab, setMarketTab] = useState<'browse' | 'create'>('browse')
+  const [requestTitle, setRequestTitle] = useState('')
+  const [requestCategory, setRequestCategory] = useState('AI Work')
+  const [requestBudget, setRequestBudget] = useState('')
+  const [requestDays, setRequestDays] = useState('3')
+  const [requestDescription, setRequestDescription] = useState('')
+  const [requestDeliverable, setRequestDeliverable] = useState('')
   const [sortBy, setSortBy]         = useState<'value' | 'symbol' | 'chain'>('value')
 
   const [assets, setAssets]         = useState<AssetRow[]>([])
@@ -685,6 +746,7 @@ export default function App() {
 
   useEffect(() => { localStorage.setItem('theme', theme) }, [theme])
   useEffect(() => { localStorage.setItem('networkMode', networkMode) }, [networkMode])
+  useEffect(() => { saveMarketRequests(marketRequests) }, [marketRequests])
   useEffect(() => { if (allAddresses.length) loadAssets() }, [connections.length, allAddresses.join(',')])
 
   // 60珥??먮룞 ?덈줈怨좎묠
@@ -833,6 +895,50 @@ export default function App() {
   function removeContact(id: string) {
     const next = contacts.filter((c) => c.id !== id)
     setContacts(next); saveContacts(next)
+  }
+
+  function createMarketRequest() {
+    if (!isConnected || !activeWallet) return addToast({ type: 'error', message: 'Connect a wallet first' })
+    if (!requestTitle.trim()) return addToast({ type: 'error', message: 'Enter a request title' })
+    if (!requestDescription.trim()) return addToast({ type: 'error', message: 'Describe the work request' })
+    if (!requestDeliverable.trim()) return addToast({ type: 'error', message: 'Define the expected deliverable' })
+    const budget = parseFloat(requestBudget)
+    if (!budget || budget <= 0) return addToast({ type: 'error', message: 'Enter a USDC budget' })
+    const next: MarketRequest = {
+      id: `req-${Date.now()}`,
+      title: requestTitle.trim(),
+      category: requestCategory.trim() || 'AI Work',
+      budget: budget.toFixed(2),
+      deadlineDays: requestDays || '3',
+      description: requestDescription.trim(),
+      deliverable: requestDeliverable.trim(),
+      client: activeWallet,
+      status: 'open',
+      createdAt: new Date().toISOString(),
+    }
+    setMarketRequests((prev) => [next, ...prev])
+    setRequestTitle(''); setRequestBudget(''); setRequestDays('3')
+    setRequestDescription(''); setRequestDeliverable(''); setRequestCategory('AI Work')
+    setMarketTab('browse')
+    addToast({ type: 'success', message: 'Request posted to marketplace' })
+  }
+
+  function acceptMarketRequest(id: string) {
+    if (!isConnected || !activeWallet) return addToast({ type: 'error', message: 'Connect a wallet first' })
+    setMarketRequests((prev) => prev.map((r) => r.id === id ? { ...r, agent: activeWallet, status: 'matched' } : r))
+    addToast({ type: 'success', message: 'Request matched. Ready to create escrow.' })
+  }
+
+  function useRequestForEscrow(request: MarketRequest) {
+    setEscrowAgent(request.agent ?? '')
+    setEscrowAmount(request.budget)
+    setEscrowDays(request.deadlineDays)
+    setEscrowDesc(`${request.title}: ${request.deliverable}`)
+    setEscrowProtocol('arc-escrow')
+    setEscrowMyTab('new')
+    setActivePage('escrow')
+    setMarketRequests((prev) => prev.map((r) => r.id === request.id ? { ...r, status: 'escrow-ready' } : r))
+    addToast({ type: 'success', message: 'Escrow form prepared from request' })
   }
 
   // ??? ?뚯슦???대쭅 ?????????????????????????????????????????????????????????
@@ -1868,6 +1974,7 @@ export default function App() {
   // ??? ?뚮뜑 ?????????????????????????????????????????????????????????????????
   const NAV_ITEMS = [
     { id: 'overview'  as const, label: 'Overview',     icon: <LayoutDashboard size={13} /> },
+    { id: 'marketplace' as const, label: 'Requests',    icon: <BookUser size={13} /> },
     { id: 'portfolio' as const, label: 'Portfolio',    icon: <Wallet size={13} /> },
     { id: 'pay'       as const, label: 'Pay',          icon: <CircleDollarSign size={13} /> },
     { id: 'funds'     as const, label: 'Move Funds',   icon: <ArrowRightLeft size={13} /> },
@@ -2048,8 +2155,8 @@ export default function App() {
                   )}
                 </div>
                 <div className="ov-ctas">
-                  <button className="btn-primary ov-cta" onClick={() => setActivePage('pay')}>
-                    <CircleDollarSign size={14} /> Pay with USDC
+                  <button className="btn-primary ov-cta" onClick={() => setActivePage('marketplace')}>
+                    <BookUser size={14} /> Browse Requests
                   </button>
                   <button className="btn-outline ov-cta" onClick={() => setActivePage('funds')}>
                     <ArrowRightLeft size={14} /> Move Funds to Arc
@@ -2132,9 +2239,9 @@ export default function App() {
                     </div>
                   )}
                   <div className="ov-action-grid">
-                    <button className="ov-action-tile primary" onClick={() => setActivePage('pay')}>
-                      <CircleDollarSign size={16} />
-                      <span>Pay</span>
+                    <button className="ov-action-tile primary" onClick={() => setActivePage('marketplace')}>
+                      <BookUser size={16} />
+                      <span>Requests</span>
                     </button>
                     <button className="ov-action-tile" onClick={() => setActivePage('portfolio')}>
                       <Wallet size={16} />
@@ -2233,7 +2340,7 @@ export default function App() {
                   { name: 'Network Safety', detail: 'Mainnet/testnet mode, Arc Testnet badges, and clear value disclaimers.' },
                   { name: 'Transaction Feedback', detail: 'Loading, submitted, confirmed, already-claimed, and explorer states.' },
                   { name: 'Developer Rails', detail: 'Vercel APIs, Circle attestation recovery, viem clients, and contract reads.' },
-                  { name: 'Agent Commerce', detail: 'Escrow jobs, deliverable submission, Claude review, payout release.' },
+                  { name: 'Agent Marketplace', detail: 'Post requests, match with agents, convert agreements into escrow jobs.' },
                 ] as const).map((service, i) => (
                   <div className="ov-service-card" key={service.name} style={{ '--step-i': i } as React.CSSProperties}>
                     <span>{String(i + 1).padStart(2, '0')}</span>
@@ -2329,8 +2436,8 @@ export default function App() {
                   Create an escrow job, submit work, and run Claude-based verification on Arc Testnet.
                 </p>
                 <div className="ov-final-btns">
-                  <button className="btn-primary ov-cta" onClick={() => setActivePage('escrow')}>
-                    <Lock size={14} /> Launch Agent Escrow
+                  <button className="btn-primary ov-cta" onClick={() => setActivePage('marketplace')}>
+                    <BookUser size={14} /> Open Requests
                   </button>
                   <button className="btn-outline ov-cta" onClick={() => setActivePage('funds')}>
                     <ArrowRightLeft size={14} /> Move Funds to Arc
@@ -2346,6 +2453,121 @@ export default function App() {
         )}
 
         {/* ─── AGENT ESCROW ─── */}
+        {activePage === 'marketplace' && (
+          <div className="page marketplace-page">
+            <div className="page-header marketplace-header">
+              <BookUser size={20} style={{ color: 'var(--accent)' }} />
+              <div>
+                <h2 className="page-title">Requests Marketplace</h2>
+                <p className="page-sub">Post work, match with an agent, then lock USDC in escrow.</p>
+              </div>
+              <div className="marketplace-tabs">
+                <button className={marketTab === 'browse' ? 'active' : ''} onClick={() => setMarketTab('browse')}>Browse</button>
+                <button className={marketTab === 'create' ? 'active' : ''} onClick={() => setMarketTab('create')}>Create Request</button>
+              </div>
+            </div>
+
+            <div className="marketplace-hero">
+              <div>
+                <span className="market-kicker">USDC-powered service board</span>
+                <h3>From request to escrow in one flow</h3>
+                <p>Clients define work and budget. Agents accept a request. The app turns that agreement into an Arc escrow job with USDC locked until delivery is approved.</p>
+              </div>
+              <div className="market-flow-mini">
+                {['Post', 'Match', 'Escrow', 'Deliver', 'Release'].map((step, i) => (
+                  <div className="market-flow-step" key={step}>
+                    <span>{String(i + 1).padStart(2, '0')}</span>
+                    <strong>{step}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {marketTab === 'create' ? (
+              <section className="market-create-card">
+                <div className="market-form-grid">
+                  <label className="pay-field">
+                    <span>Request title</span>
+                    <input className="pay-text-input" value={requestTitle} onChange={(e) => setRequestTitle(e.target.value)} placeholder="Design a settlement workflow diagram" />
+                  </label>
+                  <label className="pay-field">
+                    <span>Category</span>
+                    <select className="action-input" value={requestCategory} onChange={(e) => setRequestCategory(e.target.value)}>
+                      <option>AI Work</option><option>Design Review</option><option>Frontend Build</option><option>Research</option><option>Smart Contract</option>
+                    </select>
+                  </label>
+                  <label className="pay-field">
+                    <span>Budget</span>
+                    <div className="pay-amount-input">
+                      <input value={requestBudget} onChange={(e) => setRequestBudget(e.target.value)} inputMode="decimal" placeholder="0.00" />
+                      <strong>USDC</strong>
+                    </div>
+                  </label>
+                  <label className="pay-field">
+                    <span>Deadline</span>
+                    <div className="pay-amount-input">
+                      <input value={requestDays} onChange={(e) => setRequestDays(e.target.value)} inputMode="numeric" placeholder="3" />
+                      <strong>days</strong>
+                    </div>
+                  </label>
+                </div>
+                <label className="pay-field">
+                  <span>Description</span>
+                  <textarea className="market-textarea" value={requestDescription} onChange={(e) => setRequestDescription(e.target.value)} placeholder="Explain the task, context, quality bar, and any references." />
+                </label>
+                <label className="pay-field">
+                  <span>Expected deliverable</span>
+                  <textarea className="market-textarea small" value={requestDeliverable} onChange={(e) => setRequestDeliverable(e.target.value)} placeholder="Define exactly what the agent should submit before payment is released." />
+                </label>
+                <button className="btn-primary market-submit" onClick={createMarketRequest} disabled={!isConnected}>
+                  <Plus size={14} /> Post Request
+                </button>
+                {!isConnected && <div className="pay-inline-warning"><Wallet size={14} /> Connect a wallet to post as the request owner.</div>}
+              </section>
+            ) : (
+              <section className="market-request-grid">
+                {marketRequests.map((request) => {
+                  const isOwner = activeWallet?.toLowerCase() === request.client.toLowerCase()
+                  const isAgent = activeWallet && request.agent?.toLowerCase() === activeWallet.toLowerCase()
+                  return (
+                    <article className="market-request-card" key={request.id}>
+                      <div className="market-card-top">
+                        <span className={`market-status ${request.status}`}>{request.status.replace('-', ' ')}</span>
+                        <span className="market-budget">{request.budget} USDC</span>
+                      </div>
+                      <div className="market-category">{request.category}</div>
+                      <h3>{request.title}</h3>
+                      <p>{request.description}</p>
+                      <div className="market-deliverable">
+                        <span>Deliverable</span>
+                        <strong>{request.deliverable}</strong>
+                      </div>
+                      <div className="market-meta-row">
+                        <span>Client {request.client.startsWith('0x') ? `${request.client.slice(0, 6)}...${request.client.slice(-4)}` : request.client}</span>
+                        <span>{request.deadlineDays} days</span>
+                      </div>
+                      {request.agent && (
+                        <div className="market-meta-row agent">
+                          <span>Matched agent</span>
+                          <strong>{request.agent.slice(0, 6)}...{request.agent.slice(-4)}</strong>
+                        </div>
+                      )}
+                      <div className="market-card-actions">
+                        <button className="btn-outline" onClick={() => acceptMarketRequest(request.id)} disabled={!isConnected || request.status !== 'open' || isOwner}>
+                          {request.status === 'open' ? 'Accept Request' : 'Matched'}
+                        </button>
+                        <button className="btn-primary" onClick={() => useRequestForEscrow(request)} disabled={!isConnected || (!request.agent && !isAgent && !isOwner)}>
+                          Start Escrow
+                        </button>
+                      </div>
+                    </article>
+                  )
+                })}
+              </section>
+            )}
+          </div>
+        )}
+
         {activePage === 'pay' && (
           <div className="page pay-page">
             <div className="page-header pay-header">
