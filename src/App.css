@@ -1582,8 +1582,9 @@ body {
 
 /* ── Reveal animation ── */
 .reveal-section {
-  opacity: 0; transform: translateY(16px);
-  transition: opacity 0.5s ease, transform 0.5s ease;
+  opacity: 0;
+  transform: translateY(36px);
+  transition: opacity 0.85s ease, transform 0.85s cubic-bezier(.2,.8,.2,1);
 }
 .reveal-section.in-view { opacity: 1; transform: translateY(0); }
 @media (prefers-reduced-motion: reduce) {
@@ -2368,15 +2369,24 @@ body {
 }
 
 .ov-section-heading {
-  max-width: 720px;
-  margin-bottom: 28px;
+  max-width: 860px;
+  margin-bottom: 36px;
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.reveal-section.in-view .ov-section-heading,
+.reveal-section.in-view .ov-flow-copy {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .ov-section-heading h2,
 .ov-flow-copy h2 {
   margin: 0 0 12px;
   color: var(--text);
-  font-size: 30px;
+  font-size: 36px;
   line-height: 1.12;
   letter-spacing: 0;
 }
@@ -2385,12 +2395,22 @@ body {
 .ov-flow-copy p {
   margin: 0;
   color: var(--text-sub);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.75;
 }
 
+.ov-flow-copy {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
 .ov-section-heading.compact {
-  max-width: 640px;
+  max-width: 1180px;
+}
+
+.ov-section-heading.compact h2 {
+  white-space: nowrap;
 }
 
 .ov-explain-grid {
@@ -2474,6 +2494,17 @@ body {
   flex: 1;
   padding: 16px 14px;
   border-radius: 13px;
+  position: relative;
+  overflow: hidden;
+}
+
+.ov-flow-box::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--arc) 18%, transparent), transparent 60%);
+  transition: opacity 0.25s ease;
 }
 
 .ov-flow-box strong,
@@ -2501,6 +2532,41 @@ body {
 .ov-flow-arrow {
   color: var(--text-muted);
   display: flex;
+  opacity: 0.42;
+  transition: color 0.25s ease, opacity 0.25s ease, transform 0.25s ease;
+}
+
+.reveal-section.in-view .ov-flow-node-wrap {
+  animation: flow-node-highlight 5.8s ease-in-out infinite;
+  animation-delay: calc(var(--step-i, 0) * 0.72s + 0.45s);
+}
+
+.reveal-section.in-view .ov-flow-node-wrap .ov-flow-arrow {
+  animation: flow-arrow-highlight 5.8s ease-in-out infinite;
+  animation-delay: calc(var(--step-i, 0) * 0.72s + 0.58s);
+}
+
+.reveal-section.in-view .ov-flow-node-wrap .ov-flow-box::before {
+  animation: flow-glow 5.8s ease-in-out infinite;
+  animation-delay: calc(var(--step-i, 0) * 0.72s + 0.45s);
+}
+
+@keyframes flow-node-highlight {
+  0%, 100% { transform: translateY(0); }
+  8% { transform: translateY(-5px); }
+  16% { transform: translateY(0); }
+}
+
+@keyframes flow-arrow-highlight {
+  0%, 100% { color: var(--text-muted); opacity: 0.42; transform: translateX(0); }
+  8% { color: var(--arc); opacity: 1; transform: translateX(3px); }
+  16% { color: var(--text-muted); opacity: 0.42; transform: translateX(0); }
+}
+
+@keyframes flow-glow {
+  0%, 100% { opacity: 0; }
+  8% { opacity: 1; }
+  18% { opacity: 0; }
 }
 
 .ov-service-grid {
@@ -2530,9 +2596,9 @@ body {
 .reveal-section .ov-audience-card,
 .reveal-section .ov-arch-item {
   opacity: 0;
-  transform: translateY(18px);
-  transition: opacity 0.56s ease, transform 0.56s ease, border-color 0.18s ease, background 0.18s ease;
-  transition-delay: calc(var(--step-i, 0) * 0.08s);
+  transform: translateY(26px);
+  transition: opacity 0.72s ease, transform 0.72s cubic-bezier(.2,.8,.2,1), border-color 0.18s ease, background 0.18s ease;
+  transition-delay: calc(var(--step-i, 0) * 0.13s + 0.18s);
 }
 
 .reveal-section.in-view .ov-explain-card,
@@ -2796,6 +2862,11 @@ body {
   .showcase-column {
     animation: none;
   }
+  .reveal-section.in-view .ov-flow-node-wrap,
+  .reveal-section.in-view .ov-flow-node-wrap .ov-flow-arrow,
+  .reveal-section.in-view .ov-flow-node-wrap .ov-flow-box::before {
+    animation: none;
+  }
   .reveal-section .ov-explain-card,
   .reveal-section .ov-flow-node-wrap,
   .reveal-section .ov-service-card,
@@ -2864,6 +2935,13 @@ body {
   .ov-service-grid,
   .ov-flow-section {
     grid-template-columns: 1fr;
+  }
+  .ov-section-heading.compact h2 {
+    white-space: normal;
+  }
+  .ov-section-heading h2,
+  .ov-flow-copy h2 {
+    font-size: 30px;
   }
   .ov-flow-diagram {
     align-items: stretch;
