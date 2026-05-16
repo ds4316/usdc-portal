@@ -1315,9 +1315,10 @@ export default function App() {
     setE8183Loading(true)
     try {
       const arcClient = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
-      const job = await arcClient.readContract({
+      const raw = await arcClient.readContract({
         address: ERC8183_CONTRACT, abi: ERC8183_ABI, functionName: 'getJob', args: [BigInt(id)],
-      }) as { id: bigint; client: string; provider: string; evaluator: string; description: string; budget: bigint; expiredAt: bigint; status: number }
+      }) as unknown as readonly [bigint, string, string, string, string, bigint, bigint, number, string]
+      const job = { id: raw[0], client: raw[1], provider: raw[2], evaluator: raw[3], description: raw[4], budget: raw[5], expiredAt: raw[6], status: raw[7] }
       setE8183Job(job)
     } catch (e: unknown) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Lookup failed' })
