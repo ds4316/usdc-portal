@@ -597,6 +597,15 @@ export default function App() {
   const [cctpBurnHash,  setCctpBurnHash]  = useState('')
   const [cctpDirection, setCctpDirection] = useState<'to-arc' | 'to-sepolia'>('to-arc')
 
+  type PendingBridge = {
+    burnHash: string; messageBytes: string; messageHash: string
+    direction: 'to-arc' | 'to-sepolia'; amount: string; savedAt: number; attestation?: string
+  }
+  const [pendingBridge, setPendingBridge] = useState<PendingBridge | null>(() => {
+    try { return JSON.parse(localStorage.getItem('cctp_pending_bridge') ?? 'null') } catch { return null }
+  })
+  const [claimLoading, setClaimLoading] = useState(false)
+
   // ERC-8183 state
   type E8183Step = 'idle' | 'creating' | 'funding' | 'submitting' | 'completing' | 'done' | 'error'
   const [e8183Tab,       setE8183Tab]       = useState<'create' | 'lookup'>('create')
@@ -1078,6 +1087,11 @@ export default function App() {
       const messageBytes = args.message as `0x${string}`
       const messageHash  = keccak256(messageBytes)
 
+      // Save to localStorage so user can close tab and claim later
+      const pendingToArc: PendingBridge = { burnHash, messageBytes, messageHash, direction: 'to-arc', amount: cctpAmount, savedAt: Date.now() }
+      localStorage.setItem('cctp_pending_bridge', JSON.stringify(pendingToArc))
+      setPendingBridge(pendingToArc)
+
       // ?? Step 5: Circle Attestation API ?대쭅 ?????????????????????????
       setCctpStep('attesting')
       addToast({ type: 'loading', message: '3/4 Waiting Circle attestation...' })
@@ -1101,6 +1115,7 @@ export default function App() {
       })
 
       setCctpStep('done')
+      localStorage.removeItem('cctp_pending_bridge'); setPendingBridge(null)
       addToast({ type: 'success', message: `${cctpAmount} USDC arrived on Arc!`, txHash: burnHash })
       setCctpAmount('')
 
@@ -1164,6 +1179,11 @@ export default function App() {
       const messageBytes = args.message as `0x${string}`
       const messageHash  = keccak256(messageBytes)
 
+      // Save to localStorage so user can close tab and claim later
+      const pendingToSep: PendingBridge = { burnHash, messageBytes, messageHash, direction: 'to-sepolia', amount: cctpAmount, savedAt: Date.now() }
+      localStorage.setItem('cctp_pending_bridge', JSON.stringify(pendingToSep))
+      setPendingBridge(pendingToSep)
+
       // Step 5: Poll Circle attestation
       setCctpStep('attesting')
       addToast({ type: 'loading', message: '3/4 Waiting Circle attestation...' })
@@ -1187,12 +1207,45 @@ export default function App() {
       })
 
       setCctpStep('done')
+      localStorage.removeItem('cctp_pending_bridge'); setPendingBridge(null)
       addToast({ type: 'success', message: `${cctpAmount} USDC arrived on Sepolia!`, txHash: burnHash })
       setCctpAmount('')
 
     } catch (e: unknown) {
       setCctpStep('error')
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Bridge failed' })
+    }
+  }
+
+  // Claim a pending CCTP bridge after attestation is ready
+  async function claimPendingBridge() {
+    if (!pendingBridge) return
+    setClaimLoading(true)
+    try {
+      addToast({ type: 'loading', message: 'Checking attestation...' })
+      const res  = await fetch(`/api/attestation?messageHash=${pendingBridge.messageHash}`)
+      const json = await res.json()
+      if (json.status !== 'complete') {
+        addToast({ type: 'error', message: 'Attestation not ready yet — Circle is still processing. Try again in a few minutes.' })
+        return
+      }
+      const attestation = json.attestation as `0x${string}`
+      const { encodeFunctionData } = await import('viem')
+      const destChainId = pendingBridge.direction === 'to-arc' ? arcTestnet.id : sepolia.id
+      await switchChain({ chainId: destChainId })
+      addToast({ type: 'loading', message: 'Claiming — sign the receiveMessage tx...' })
+      const claimHash = await sendTransactionAsync({
+        to: ARC_MSG_TRANSMITTER,
+        data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
+          args: [pendingBridge.messageBytes as `0x${string}`, attestation] }),
+      })
+      localStorage.removeItem('cctp_pending_bridge')
+      setPendingBridge(null)
+      addToast({ type: 'success', message: `${pendingBridge.amount} USDC arrived on ${pendingBridge.direction === 'to-arc' ? 'Arc' : 'Sepolia'}!`, txHash: claimHash })
+    } catch (e: unknown) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Claim failed' })
+    } finally {
+      setClaimLoading(false)
     }
   }
 
@@ -2372,6 +2425,30 @@ export default function App() {
                             </div>
                           )
                         })}
+                      </div>
+                    )}
+                    {/* Pending bridge claim card */}
+                    {pendingBridge && cctpStep === 'idle' && (
+                      <div className="cctp-pending-card">
+                        <div className="cctp-pending-header">
+                          <span className="cctp-pending-dot" />
+                          Pending Bridge
+                        </div>
+                        <div className="cctp-pending-info">
+                          <span>{pendingBridge.amount} USDC → {pendingBridge.direction === 'to-arc' ? 'Arc Testnet' : 'Sepolia'}</span>
+                          <span className="cctp-pending-age">{Math.round((Date.now() - pendingBridge.savedAt) / 60000)} min ago</span>
+                        </div>
+                        <div className="cctp-pending-actions">
+                          <button className="btn-primary" style={{ flex: 1 }} onClick={claimPendingBridge} disabled={claimLoading}>
+                            {claimLoading ? 'Checking...' : 'Check & Claim'}
+                          </button>
+                          <button className="btn-ghost" onClick={() => { localStorage.removeItem('cctp_pending_bridge'); setPendingBridge(null) }}>
+                            Dismiss
+                          </button>
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                          Circle attestation takes ~15 min on testnet. Click "Check & Claim" when ready.
+                        </div>
                       </div>
                     )}
                     {/* Direction toggle */}
