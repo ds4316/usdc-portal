@@ -2016,7 +2016,7 @@ export default function App() {
               <div className="ov-ambient ov-ambient-one" />
               <div className="ov-ambient ov-ambient-two" />
               <div className="ov-hero-text">
-                <div className="ov-eyebrow">Circle + Arc · Agentic Economy Track</div>
+                <div className="ov-eyebrow">Circle + Arc payment infrastructure</div>
                 <h1 className="ov-h1">USDC Portal for agentic settlement</h1>
                 <p className="ov-lead">
                   A finance-grade workspace for moving testnet USDC, funding Arc contracts,
@@ -2044,7 +2044,7 @@ export default function App() {
                   <span className="status-dot green" /><span>Claude Haiku ready</span>
                   {isConnected && (
                     <><span className="ov-sep" /><span className="status-dot green" />
-                    <span className="ov-mono">{allAddresses[0]?.slice(0,6)}…{allAddresses[0]?.slice(-4)} connected</span></>
+                    <span className="ov-mono">{allAddresses[0]?.slice(0, 6)}...{allAddresses[0]?.slice(-4)} connected</span></>
                   )}
                 </div>
                 <div className="ov-ctas">
@@ -2204,7 +2204,7 @@ export default function App() {
               <div className="ov-flow-diagram">
                 {([
                   { title: 'Wallet', sub: activeWalletShort, tone: 'blue' },
-                  { title: 'USDC Route', sub: 'Send · Bridge · Swap', tone: 'cyan' },
+                  { title: 'USDC Route', sub: 'Send / Bridge / Swap', tone: 'cyan' },
                   { title: 'Arc Contract', sub: 'Pay Hub / Escrow', tone: 'blue' },
                   { title: 'Verification', sub: 'Claude verdict', tone: 'gold' },
                   { title: 'Payout', sub: 'Agent receives USDC', tone: 'green' },
@@ -2250,7 +2250,7 @@ export default function App() {
               <div className="ov-pipeline">
                 {([
                   { n: '01', title: 'Lock USDC',      sub: 'ArcEscrow.createJob()',   desc: 'Client deposits USDC into the ArcEscrow contract with agent address, deadline, and deliverable spec.' },
-                  { n: '02', title: 'Submit Work',     sub: 'ArcEscrow.submitWork()',  desc: 'Agent completes the task and submits a result URI on-chain — Vercel Blob, IPFS, or Arweave.' },
+                  { n: '02', title: 'Submit Work',     sub: 'ArcEscrow.submitWork()',  desc: 'Agent completes the task and submits a result URI on-chain through Vercel Blob, IPFS, or Arweave.' },
                   { n: '03', title: 'Claude Review',   sub: 'POST /api/evaluate',      desc: 'Claude Haiku reads the deliverable and returns a structured verdict: approved or rejected with reasoning.' },
                   { n: '04', title: 'Release Payout',  sub: 'ArcEscrow.approveWork()', desc: 'Client confirms verdict. USDC transfers trustlessly from escrow to agent wallet on Arc Testnet.' },
                 ] as const).map((s, i) => (
