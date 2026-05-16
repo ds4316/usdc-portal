@@ -9,8 +9,8 @@
   --border2:        #2a2a2a;
   --border3:        #383838;
   --text:           #f0f0f0;
-  --text-sub:       #909090;
-  --text-muted:     #484848;
+  --text-sub:       #a8a8a8;
+  --text-muted:     #666666;
   --accent:         #2775ca;
   --accent-light:   #3a8de0;
   --accent-dim:     rgba(39,117,202,0.12);
@@ -38,8 +38,8 @@
   --border2:        #d8d8d8;
   --border3:        #c0c0c0;
   --text:           #111111;
-  --text-sub:       #555555;
-  --text-muted:     #aaaaaa;
+  --text-sub:       #475569;
+  --text-muted:     #7c8798;
   --accent:         #2775ca;
   --accent-light:   #3a8de0;
   --accent-dim:     rgba(39,117,202,0.08);
@@ -59,13 +59,13 @@
 
 /* ─── 타이포그래피 스케일 ──────────────────────────────────────────────── */
 :root {
-  --text-xs:   11px;
-  --text-sm:   12px;
-  --text-base: 13px;
-  --text-md:   14px;
-  --text-lg:   16px;
-  --text-xl:   20px;
-  --text-2xl:  28px;
+  --text-xs:   12px;
+  --text-sm:   13px;
+  --text-base: 14px;
+  --text-md:   15px;
+  --text-lg:   17px;
+  --text-xl:   22px;
+  --text-2xl:  30px;
   --text-hero: 36px;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', Consolas, monospace;
@@ -79,6 +79,7 @@ body {
   font-size: var(--text-base);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
 }
 
 .root {
@@ -397,7 +398,7 @@ body {
   background: var(--surface2);
   border-bottom: 1px solid var(--border);
   color: var(--text-muted);
-  font-size: var(--text-xs); font-weight: 600;
+  font-size: var(--text-xs); font-weight: 700;
   letter-spacing: 0.07em;
   padding: 8px 14px;
   text-align: left; text-transform: uppercase;
@@ -413,7 +414,7 @@ body {
 .asset-table td {
   border-bottom: 1px solid var(--border);
   color: var(--text); font-size: var(--text-base);
-  padding: 10px 14px; vertical-align: middle;
+  padding: 12px 14px; vertical-align: middle;
 }
 .asset-tr:last-child td { border-bottom: none; }
 
@@ -435,8 +436,8 @@ body {
   border: 2px solid var(--surface);
 }
 
-.token-name { font-weight: 600; font-size: var(--text-md); }
-.token-subname { font-size: var(--text-xs); color: var(--text-muted); display: block; }
+.token-name { font-weight: 700; font-size: var(--text-md); }
+.token-subname { font-size: var(--text-xs); color: var(--text-sub); display: block; }
 
 .chain-dot {
   display: inline-block; width: 6px; height: 6px;
@@ -444,9 +445,9 @@ body {
 }
 
 .chain-label { color: var(--text-sub); font-size: var(--text-sm); }
-.wallet-cell { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); }
-.mono { font-family: var(--font-mono); font-size: var(--text-sm); }
-.usdc-val { color: var(--text); font-weight: 600; font-family: var(--font-mono); font-size: var(--text-sm); }
+.wallet-cell { color: var(--text-sub); font-family: var(--font-mono); font-size: var(--text-xs); }
+.mono { font-family: var(--font-mono); font-size: var(--text-base); }
+.usdc-val { color: var(--text); font-weight: 700; font-family: var(--font-mono); font-size: var(--text-base); }
 .empty-cell { color: var(--text-muted); padding: 40px 14px; text-align: center; font-size: var(--text-sm); }
 
 /* ─── 24h 변동 ───────────────────────────────────────────────────────── */
@@ -530,7 +531,7 @@ body {
 .action-card-label {
   padding: 10px 14px 0;
   font-size: var(--text-xs);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -549,7 +550,7 @@ body {
   border: none; border-radius: 7px;
   background: none;
   color: var(--text-muted);
-  font-size: var(--text-sm); font-weight: 500;
+  font-size: var(--text-sm); font-weight: 700;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
   display: flex; align-items: center; justify-content: center; gap: 4px;
@@ -625,7 +626,7 @@ body {
 .action-input {
   background: var(--surface2); border: 1px solid var(--border2);
   border-radius: 8px; color: var(--text); font-size: var(--text-base);
-  outline: none; padding: 9px 12px; width: 100%;
+  outline: none; padding: 11px 12px; width: 100%;
   transition: border-color 0.15s;
   font-family: inherit;
 }
@@ -636,8 +637,8 @@ body {
 .btn-primary {
   background: var(--accent);
   border: none; border-radius: 8px; color: #fff;
-  cursor: pointer; font-size: var(--text-sm); font-weight: 600;
-  padding: 10px 16px; width: 100%;
+  cursor: pointer; font-size: var(--text-base); font-weight: 700;
+  padding: 11px 16px; width: 100%;
   transition: opacity 0.15s, transform 0.1s;
 }
 .btn-primary:hover:not(:disabled) { opacity: 0.88; }
@@ -648,7 +649,7 @@ body {
   display: inline-flex; align-items: center; gap: 6px;
   background: none; border: 1px solid var(--border2);
   border-radius: 8px; color: var(--text-sub);
-  cursor: pointer; font-size: var(--text-sm); font-weight: 500;
+  cursor: pointer; font-size: var(--text-base); font-weight: 700;
   padding: 9px 14px; width: 100%; justify-content: center;
   transition: border-color 0.15s, color 0.15s;
 }
@@ -1235,12 +1236,12 @@ body {
 .nav-links { display: flex; gap: 2px; }
 .nav-link {
   background: none; border: none; color: var(--text-sub); font-size: var(--text-sm);
-  font-family: var(--font-sans); padding: 5px 10px; border-radius: 6px; cursor: pointer;
+  font-family: var(--font-sans); font-weight: 600; padding: 5px 10px; border-radius: 6px; cursor: pointer;
   transition: color 0.15s, background 0.15s; white-space: nowrap;
   display: flex; align-items: center; gap: 5px;
 }
 .nav-link:hover { color: var(--text); background: var(--surface3); }
-.nav-link.active { color: var(--accent); background: rgba(0, 194, 255, 0.08); font-weight: 500; }
+.nav-link.active { color: var(--accent); background: rgba(0, 194, 255, 0.08); font-weight: 700; }
 
 /* Hero Section */
 .hero-section {
@@ -1834,6 +1835,7 @@ body {
 .overview-page .ov-hero-text {
   max-width: 650px;
   align-self: center;
+  animation: landing-copy-in 0.7s ease both;
 }
 
 .overview-page .ov-eyebrow {
@@ -1911,6 +1913,15 @@ body {
   min-width: 0;
   padding: 14px 16px;
   background: color-mix(in srgb, var(--surface) 88%, transparent);
+  animation: landing-card-in 0.55s ease both;
+}
+
+.ov-metric:nth-child(2) {
+  animation-delay: 0.08s;
+}
+
+.ov-metric:nth-child(3) {
+  animation-delay: 0.16s;
 }
 
 .ov-metric-value {
@@ -2126,6 +2137,7 @@ body {
   box-shadow: 0 24px 70px rgba(0,0,0,0.2);
   padding: 20px;
   backdrop-filter: blur(18px);
+  animation: landing-panel-in 0.78s cubic-bezier(.2,.8,.2,1) both;
 }
 
 .ov-status-panel-head {
@@ -2248,6 +2260,15 @@ body {
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  animation: landing-card-in 0.55s ease both;
+}
+
+.ov-action-tile:nth-child(2) {
+  animation-delay: 0.08s;
+}
+
+.ov-action-tile:nth-child(3) {
+  animation-delay: 0.16s;
 }
 
 .ov-action-tile:hover {
@@ -2259,6 +2280,39 @@ body {
 .ov-action-tile.primary {
   background: color-mix(in srgb, var(--accent) 12%, var(--surface2));
   color: var(--accent);
+}
+
+@keyframes landing-copy-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes landing-panel-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes landing-card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.overview-page .ov-hero::after {
+  content: '';
+  position: absolute;
+  inset: 8% -20% auto;
+  height: 220px;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--arc) 18%, transparent), color-mix(in srgb, var(--accent) 12%, transparent), transparent);
+  filter: blur(34px);
+  opacity: 0.45;
+  animation: landing-light-sweep 9s ease-in-out infinite;
+}
+
+@keyframes landing-light-sweep {
+  0%, 100% { transform: translateX(-8%) rotate(-4deg); opacity: 0.28; }
+  50% { transform: translateX(8%) rotate(3deg); opacity: 0.5; }
 }
 
 /* Pay page */
@@ -2466,6 +2520,13 @@ body {
   .ov-orbit,
   .ov-layer-img,
   .ov-eyebrow::before {
+    animation: none;
+  }
+  .overview-page .ov-hero-text,
+  .overview-page .ov-hero::after,
+  .ov-metric,
+  .ov-status-panel,
+  .ov-action-tile {
     animation: none;
   }
 }
