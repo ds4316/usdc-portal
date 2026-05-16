@@ -636,7 +636,8 @@ export default function App() {
   function addToast(t: Omit<Toast, 'id'>): string {
     const id = Date.now().toString() + Math.random().toString(36).slice(2)
     setToasts((prev) => [...prev, { ...t, id }])
-    if (t.type !== 'loading') setTimeout(() => removeToast(id), 5000)
+    if (t.type === 'success') setTimeout(() => removeToast(id), 6000)
+    // errors stay until dismissed (click X on toast)
     return id
   }
   function removeToast(id: string) { setToasts((prev) => prev.filter((x) => x.id !== id)) }
@@ -1144,12 +1145,13 @@ export default function App() {
       // Step 4: Find MessageSent log — filter by topic hash, not address (Arc MessageTransmitter may differ)
       const arcClient = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
       const receipt = await arcClient.waitForTransactionReceipt({ hash: burnHash })
+      if (receipt.status === 'reverted') throw new Error(`depositForBurn reverted on Arc. Check ARC_TOKEN_MESSENGER address or USDC approval.`)
       // keccak256('MessageSent(bytes)') = 0x8c5261...
       const MSG_SENT_TOPIC = '0x8c5261668696ce22758910d05bab8f186d6eb247ceac2af2e82c7dc17669b036'
       const msgLog = receipt.logs.find(
         (l) => l.topics[0]?.toLowerCase() === MSG_SENT_TOPIC
       )
-      if (!msgLog) throw new Error(`MessageSent event not found. Logs: ${receipt.logs.map(l => l.address).join(', ')}`)
+      if (!msgLog) throw new Error(`MessageSent not found. Contract addrs in receipt: ${[...new Set(receipt.logs.map(l => l.address))].join(' | ')}`)
 
       const { args } = decodeEventLog({
         abi: MESSAGE_SENT_EVENT,
