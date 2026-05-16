@@ -14,6 +14,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react'
 import { arcTestnet } from './wagmi.config'
 import './App.css'
+import heroLayer from './assets/hero.png'
 
 const kit = new AppKit()
 
@@ -365,6 +366,7 @@ const publicClients = Object.fromEntries(
       [optimism.id]:   ['https://mainnet.optimism.io', 'https://1rpc.io/op'],
       [avalanche.id]:  ['https://api.avax.network/ext/bc/C/rpc', 'https://1rpc.io/avax/c'],
       [arcTestnet.id]: ['https://rpc.testnet.arc.network'],
+      [sepolia.id]:    ['https://ethereum-sepolia-rpc.publicnode.com', 'https://1rpc.io/sepolia'],
     }
     const urls = rpcs[chain.id]
     return [chain.id, createPublicClient({ chain, transport: urls ? fallback(urls.map((u) => http(u))) : http() })]
@@ -379,6 +381,17 @@ function loadHistory(): TxRecord[] {
 function saveHistory(records: TxRecord[]) { localStorage.setItem(TX_KEY, JSON.stringify(records.slice(0, 50))) }
 function addHistory(records: TxRecord[], entry: TxRecord): TxRecord[] {
   const next = [entry, ...records].slice(0, 50); saveHistory(next); return next
+}
+
+function isNonceAlreadyUsedError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const msg = error.message.toLowerCase()
+  return msg.includes('nonce already used') || msg.includes('nonce has already been used')
+}
+
+function isReceiptTimeout(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  return error.message.toLowerCase().includes('timed out while waiting for transaction')
 }
 
 // ??? ?좏떥 而댄룷?뚰듃 ????????????????????????????????????????????????????????
@@ -1209,16 +1222,35 @@ export default function App() {
       setCctpStep('minting')
       addToast({ type: 'loading', message: '4/4 Minting USDC on Sepolia...' })
       await switchChain({ chainId: sepolia.id })
-      const mintHash = await sendTransactionAsync({
-        to: ARC_MSG_TRANSMITTER,
-        data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
-          args: [apiMessage as `0x${string}`, attestation as `0x${string}`] }),
-      })
+      let mintHash: `0x${string}` | undefined
+      try {
+        mintHash = await sendTransactionAsync({
+          to: ARC_MSG_TRANSMITTER,
+          data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
+            args: [apiMessage as `0x${string}`, attestation as `0x${string}`] }),
+        })
+      } catch (sendError: unknown) {
+        if (isNonceAlreadyUsedError(sendError)) {
+          setCctpStep('done')
+          localStorage.removeItem('cctp_pending_bridge'); setPendingBridge(null)
+          addToast({ type: 'success', message: `${cctpAmount} USDC was already bridged to Sepolia. Refresh balances in a minute.` })
+          setCctpAmount('')
+          return
+        }
+        throw sendError
+      }
+      if (!mintHash) throw new Error('receiveMessage transaction was not submitted')
       try {
         const mintRcpt = await publicClients[11155111].waitForTransactionReceipt({ hash: mintHash, timeout: 90_000 })
-        if (mintRcpt.status === 'reverted') throw new Error('receiveMessage reverted on Sepolia')
+        if (mintRcpt.status === 'reverted') {
+          setCctpStep('done')
+          localStorage.removeItem('cctp_pending_bridge'); setPendingBridge(null)
+          addToast({ type: 'success', message: `${cctpAmount} USDC appears already claimed or relayed on Sepolia. Refresh balances to confirm.`, txHash: mintHash })
+          setCctpAmount('')
+          return
+        }
       } catch (re: unknown) {
-        if (re instanceof Error && re.message.includes('reverted')) throw re
+        if (!isReceiptTimeout(re)) throw re
         // receipt polling timed out — tx is submitted, just couldn't confirm in time
       }
 
@@ -1260,18 +1292,37 @@ export default function App() {
       await switchChain({ chainId: isV2 ? sepolia.id : arcTestnet.id })
       removeToast(loadId)
       loadId = addToast({ type: 'loading', message: 'Claiming — sign the receiveMessage tx...' })
-      const claimHash = await sendTransactionAsync({
-        to: ARC_MSG_TRANSMITTER,
-        data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
-          args: [message, attestation] }),
-      })
+      let claimHash: `0x${string}` | undefined
+      try {
+        claimHash = await sendTransactionAsync({
+          to: ARC_MSG_TRANSMITTER,
+          data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
+            args: [message, attestation] }),
+        })
+      } catch (sendError: unknown) {
+        if (isNonceAlreadyUsedError(sendError)) {
+          removeToast(loadId); loadId = ''
+          localStorage.removeItem('cctp_pending_bridge')
+          setPendingBridge(null)
+          addToast({ type: 'success', message: `This bridge was already claimed or relayed to ${isV2 ? 'Sepolia' : 'Arc'}. Refresh balances to confirm.` })
+          return
+        }
+        throw sendError
+      }
+      if (!claimHash) throw new Error('receiveMessage transaction was not submitted')
       removeToast(loadId)
       loadId = addToast({ type: 'loading', message: 'Confirming on destination chain...' })
       try {
         const rcpt = await publicClients[isV2 ? 11155111 : 5042002].waitForTransactionReceipt({ hash: claimHash, timeout: 90_000 })
-        if (rcpt.status === 'reverted') throw new Error('receiveMessage reverted on destination chain')
+        if (rcpt.status === 'reverted') {
+          removeToast(loadId); loadId = ''
+          localStorage.removeItem('cctp_pending_bridge')
+          setPendingBridge(null)
+          addToast({ type: 'success', message: `This bridge appears already claimed or relayed to ${isV2 ? 'Sepolia' : 'Arc'}. Refresh balances to confirm.`, txHash: claimHash })
+          return
+        }
       } catch (re: unknown) {
-        if (re instanceof Error && re.message.includes('reverted')) throw re
+        if (!isReceiptTimeout(re)) throw re
         // receipt polling timed out — tx is submitted
       }
       removeToast(loadId); loadId = ''
@@ -1307,18 +1358,35 @@ export default function App() {
       await switchChain({ chainId: sepolia.id })
       removeToast(loadId)
       loadId = addToast({ type: 'loading', message: 'Claiming — sign receiveMessage on Sepolia...' })
-      const claimHash = await sendTransactionAsync({
-        to: ARC_MSG_TRANSMITTER,
-        data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
-          args: [json.message as `0x${string}`, json.attestation as `0x${string}`] }),
-      })
+      let claimHash: `0x${string}` | undefined
+      try {
+        claimHash = await sendTransactionAsync({
+          to: ARC_MSG_TRANSMITTER,
+          data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
+            args: [json.message as `0x${string}`, json.attestation as `0x${string}`] }),
+        })
+      } catch (sendError: unknown) {
+        if (isNonceAlreadyUsedError(sendError)) {
+          removeToast(loadId); loadId = ''
+          setRecoverHash('')
+          addToast({ type: 'success', message: 'This burn was already claimed or relayed to Sepolia. Refresh balances to confirm.' })
+          return
+        }
+        throw sendError
+      }
+      if (!claimHash) throw new Error('receiveMessage transaction was not submitted')
       removeToast(loadId)
       loadId = addToast({ type: 'loading', message: 'Confirming on Sepolia...' })
       try {
         const rcpt = await publicClients[11155111].waitForTransactionReceipt({ hash: claimHash, timeout: 90_000 })
-        if (rcpt.status === 'reverted') throw new Error('receiveMessage reverted on Sepolia')
+        if (rcpt.status === 'reverted') {
+          removeToast(loadId); loadId = ''
+          setRecoverHash('')
+          addToast({ type: 'success', message: 'This burn appears already claimed or relayed to Sepolia. Refresh balances to confirm.', txHash: claimHash })
+          return
+        }
       } catch (re: unknown) {
-        if (re instanceof Error && re.message.includes('reverted')) throw re
+        if (!isReceiptTimeout(re)) throw re
         // receipt polling timed out — tx is submitted
       }
       removeToast(loadId); loadId = ''
@@ -1906,13 +1974,29 @@ export default function App() {
 
             {/* Hero */}
             <section className="ov-hero">
+              <div className="ov-ambient ov-ambient-one" />
+              <div className="ov-ambient ov-ambient-two" />
               <div className="ov-hero-text">
                 <div className="ov-eyebrow">Circle + Arc · Agentic Economy Track</div>
-                <h1 className="ov-h1">Agentic USDC settlement<br />for AI work</h1>
+                <h1 className="ov-h1">USDC rails for<br />autonomous work</h1>
                 <p className="ov-lead">
-                  Lock funds, verify submitted work with Claude, and release Arc Testnet USDC
-                  through programmable escrow.
+                  A polished settlement console for AI agents: bridge testnet USDC, lock funds
+                  in escrow, verify deliverables with Claude, and release payouts on Arc.
                 </p>
+                <div className="ov-metrics">
+                  <div className="ov-metric">
+                    <span className="ov-metric-value">CCTP V2</span>
+                    <span className="ov-metric-label">Arc to Sepolia recovery</span>
+                  </div>
+                  <div className="ov-metric">
+                    <span className="ov-metric-value">Claude</span>
+                    <span className="ov-metric-label">AI verdict workflow</span>
+                  </div>
+                  <div className="ov-metric">
+                    <span className="ov-metric-value">USDC</span>
+                    <span className="ov-metric-label">native settlement asset</span>
+                  </div>
+                </div>
                 <div className="ov-status-row">
                   <span className="status-dot green" /><span>ArcEscrow live</span>
                   <span className="ov-sep" />
@@ -1939,7 +2023,36 @@ export default function App() {
                 </div>
               </div>
               <div className="ov-hero-visual">
-                <SettlementFlowDiagram />
+                <div className="ov-visual-card">
+                  <div className="ov-orbit ov-orbit-one" />
+                  <div className="ov-orbit ov-orbit-two" />
+                  <img className="ov-layer-img" src={heroLayer} alt="" />
+                  <div className="ov-flow-node ov-flow-client">
+                    <span>Client</span>
+                    <strong>10.00 USDC</strong>
+                  </div>
+                  <div className="ov-flow-node ov-flow-agent">
+                    <span>Agent</span>
+                    <strong>Ready</strong>
+                  </div>
+                  <div className="ov-flow-node ov-flow-claude">
+                    <span>Claude Review</span>
+                    <strong>Approved</strong>
+                  </div>
+                  <div className="ov-visual-console">
+                    <div className="ov-console-top">
+                      <span>Settlement route</span>
+                      <span className="ov-live-pill">Live</span>
+                    </div>
+                    <div className="ov-console-route">
+                      <span>Arc</span>
+                      <ArrowRight size={14} />
+                      <span>Escrow</span>
+                      <ArrowRight size={14} />
+                      <span>Agent</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </section>
 

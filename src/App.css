@@ -1758,6 +1758,459 @@ body {
 }
 
 /* ─── CCTP Direction Toggle ─────────────────────────────────────── */
+.overview-page {
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
+}
+
+.overview-page .ov-hero,
+.overview-page .ov-workflow,
+.overview-page .ov-audiences,
+.overview-page .ov-arch,
+.overview-page .ov-final-cta {
+  max-width: 1180px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.overview-page .ov-hero {
+  min-height: calc(100vh - 92px);
+  padding: 72px 40px 84px;
+  margin-bottom: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
+  gap: 56px;
+  border-bottom: 0;
+  isolation: isolate;
+}
+
+.overview-page .ov-hero::before {
+  inset: 0;
+  width: auto;
+  height: auto;
+  top: auto;
+  right: auto;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 13%, transparent), transparent 34%, color-mix(in srgb, var(--arc) 10%, transparent)),
+    repeating-linear-gradient(90deg, transparent 0 72px, color-mix(in srgb, var(--border2) 44%, transparent) 72px 73px),
+    repeating-linear-gradient(0deg, transparent 0 72px, color-mix(in srgb, var(--border2) 34%, transparent) 72px 73px);
+  opacity: 0.28;
+  mask-image: linear-gradient(to bottom, black, transparent 80%);
+}
+
+.ov-ambient {
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.44;
+  filter: blur(1px);
+}
+
+.ov-ambient-one {
+  width: 520px;
+  height: 180px;
+  right: -120px;
+  top: 42px;
+  background: linear-gradient(110deg, transparent, color-mix(in srgb, var(--arc) 28%, transparent), transparent);
+  transform: rotate(-18deg);
+  animation: drift-band 10s ease-in-out infinite;
+}
+
+.ov-ambient-two {
+  width: 420px;
+  height: 140px;
+  left: -160px;
+  bottom: 64px;
+  background: linear-gradient(110deg, transparent, color-mix(in srgb, var(--accent) 22%, transparent), transparent);
+  transform: rotate(12deg);
+  animation: drift-band 12s ease-in-out infinite reverse;
+}
+
+@keyframes drift-band {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-18deg); opacity: 0.28; }
+  50% { transform: translate3d(18px, -14px, 0) rotate(-14deg); opacity: 0.52; }
+}
+
+.overview-page .ov-hero-text {
+  max-width: 650px;
+  align-self: center;
+}
+
+.overview-page .ov-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 12px;
+  margin-bottom: 22px;
+  border: 1px solid color-mix(in srgb, var(--arc) 36%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  color: var(--arc);
+  font-size: 0;
+  letter-spacing: 0;
+  box-shadow: 0 16px 50px color-mix(in srgb, var(--arc) 12%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.overview-page .ov-eyebrow::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 18px var(--success);
+  animation: live-dot 1.8s ease-in-out infinite;
+}
+
+.overview-page .ov-eyebrow::after {
+  content: 'Circle + Arc agentic payment infrastructure';
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+@keyframes live-dot {
+  0%, 100% { transform: scale(0.86); opacity: 0.68; }
+  50% { transform: scale(1.16); opacity: 1; }
+}
+
+.overview-page .ov-h1 {
+  max-width: 760px;
+  margin-bottom: 22px;
+  font-size: 76px;
+  line-height: 0.98;
+  letter-spacing: 0;
+  font-weight: 800;
+  background: linear-gradient(180deg, var(--text) 0%, color-mix(in srgb, var(--text) 62%, var(--arc)) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.overview-page .ov-lead {
+  max-width: 590px;
+  margin-bottom: 24px;
+  font-size: 17px;
+  line-height: 1.75;
+  color: color-mix(in srgb, var(--text-sub) 88%, var(--text));
+}
+
+.ov-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  max-width: 590px;
+  margin: 0 0 26px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--border);
+}
+
+.ov-metric {
+  min-width: 0;
+  padding: 14px 16px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
+
+.ov-metric-value {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ov-metric-label {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.overview-page .ov-status-row {
+  margin-bottom: 28px;
+  color: color-mix(in srgb, var(--text-sub) 92%, var(--text));
+}
+
+.overview-page .ov-ctas {
+  gap: 12px;
+}
+
+.overview-page .ov-cta {
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 8px;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.overview-page .ov-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 34px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.overview-page .ov-hero-visual {
+  min-height: 560px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ov-visual-card {
+  position: relative;
+  width: min(100%, 500px);
+  aspect-ratio: 0.86;
+  border: 1px solid color-mix(in srgb, var(--border2) 74%, var(--arc));
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, transparent), color-mix(in srgb, var(--surface2) 86%, transparent)),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent 52%, color-mix(in srgb, var(--arc) 14%, transparent));
+  box-shadow: 0 32px 90px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.05);
+  overflow: hidden;
+  transform-style: preserve-3d;
+}
+
+.ov-visual-card::before {
+  content: '';
+  position: absolute;
+  inset: 18px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--border2) 80%, transparent);
+  background:
+    linear-gradient(90deg, transparent 0 48%, color-mix(in srgb, var(--arc) 26%, transparent) 50%, transparent 52%),
+    linear-gradient(0deg, transparent 0 48%, color-mix(in srgb, var(--accent) 18%, transparent) 50%, transparent 52%);
+  opacity: 0.34;
+}
+
+.ov-visual-card::after {
+  content: '';
+  position: absolute;
+  inset: -42%;
+  background: conic-gradient(from 180deg, transparent, color-mix(in srgb, var(--arc) 18%, transparent), transparent, color-mix(in srgb, var(--accent) 16%, transparent), transparent);
+  animation: visual-sweep 12s linear infinite;
+}
+
+@keyframes visual-sweep {
+  to { transform: rotate(360deg); }
+}
+
+.ov-orbit {
+  position: absolute;
+  inset: 72px;
+  z-index: 2;
+  border: 1px solid color-mix(in srgb, var(--arc) 30%, transparent);
+  border-radius: 50%;
+  transform: rotateX(64deg) rotateZ(12deg);
+  animation: orbit-turn 12s linear infinite;
+}
+
+.ov-orbit-two {
+  inset: 108px;
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  animation-duration: 16s;
+  animation-direction: reverse;
+}
+
+@keyframes orbit-turn {
+  to { transform: rotateX(64deg) rotateZ(372deg); }
+}
+
+.ov-layer-img {
+  position: absolute;
+  z-index: 3;
+  width: 58%;
+  left: 21%;
+  top: 21%;
+  filter: drop-shadow(0 28px 34px rgba(0,0,0,0.42));
+  animation: layer-float 5.6s ease-in-out infinite;
+}
+
+@keyframes layer-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-14px); }
+}
+
+.ov-flow-node {
+  position: absolute;
+  z-index: 4;
+  min-width: 126px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--border2) 76%, var(--arc));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  box-shadow: 0 18px 44px rgba(0,0,0,0.28);
+  backdrop-filter: blur(16px);
+  animation: node-rise 0.58s ease both;
+}
+
+.ov-flow-node span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.ov-flow-node strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.ov-flow-client { left: 24px; top: 82px; animation-delay: 0.1s; }
+.ov-flow-agent { right: 22px; top: 168px; animation-delay: 0.2s; }
+.ov-flow-claude { left: 42px; bottom: 128px; animation-delay: 0.3s; }
+
+@keyframes node-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ov-visual-console {
+  position: absolute;
+  z-index: 5;
+  left: 24px;
+  right: 24px;
+  bottom: 24px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--border2) 70%, var(--accent));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg) 58%, transparent);
+  backdrop-filter: blur(18px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.ov-console-top,
+.ov-console-route {
+  display: flex;
+  align-items: center;
+}
+
+.ov-console-top {
+  justify-content: space-between;
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.ov-live-pill {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  color: var(--success);
+}
+
+.ov-console-route {
+  gap: 10px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.ov-console-route svg {
+  color: var(--arc);
+}
+
+.overview-page .ov-workflow,
+.overview-page .ov-audiences,
+.overview-page .ov-arch,
+.overview-page .ov-final-cta {
+  padding: 84px 40px 0;
+}
+
+.overview-page .ov-pipeline-step,
+.overview-page .ov-audience-card {
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.overview-page .ov-pipeline-step:hover,
+.overview-page .ov-audience-card:hover {
+  transform: translateY(-4px);
+}
+
+.overview-page .ov-step-n {
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--arc) 8%, transparent);
+}
+
+.overview-page .ov-audience-grid {
+  box-shadow: 0 24px 70px rgba(0,0,0,0.18);
+}
+
+.overview-page .ov-final-inner {
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--surface) 94%, var(--accent)), color-mix(in srgb, var(--surface2) 96%, var(--arc))),
+    var(--surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ov-ambient,
+  .ov-visual-card::after,
+  .ov-orbit,
+  .ov-layer-img,
+  .ov-eyebrow::before {
+    animation: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .overview-page .ov-hero {
+    min-height: auto;
+    grid-template-columns: 1fr;
+    padding: 48px 20px 64px;
+  }
+  .overview-page .ov-h1 {
+    font-size: 58px;
+  }
+  .overview-page .ov-hero-visual {
+    display: flex;
+    min-height: 480px;
+  }
+  .ov-visual-card {
+    width: min(100%, 430px);
+  }
+  .overview-page .ov-workflow,
+  .overview-page .ov-audiences,
+  .overview-page .ov-arch,
+  .overview-page .ov-final-cta {
+    padding: 64px 20px 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .ov-metrics {
+    grid-template-columns: 1fr;
+  }
+  .overview-page .ov-h1 {
+    font-size: 42px;
+  }
+  .overview-page .ov-hero-visual {
+    min-height: 390px;
+  }
+  .ov-flow-node {
+    min-width: 108px;
+    padding: 8px 10px;
+  }
+  .ov-flow-agent {
+    top: 144px;
+  }
+  .ov-flow-claude {
+    left: 24px;
+    bottom: 108px;
+  }
+  .ov-visual-console {
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+  }
+}
+
 .cctp-direction-toggle {
   display: flex;
   gap: 6px;
