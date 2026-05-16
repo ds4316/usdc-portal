@@ -1766,6 +1766,9 @@ body {
 }
 
 .overview-page .ov-hero,
+.overview-page .ov-explain,
+.overview-page .ov-flow-section,
+.overview-page .ov-services,
 .overview-page .ov-workflow,
 .overview-page .ov-audiences,
 .overview-page .ov-arch,
@@ -2008,7 +2011,7 @@ body {
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--surface) 86%, transparent), color-mix(in srgb, var(--surface2) 74%, transparent)),
     radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 44%);
-  box-shadow: 0 18px 44px rgba(0,0,0,0.22);
+  box-shadow: 0 18px 44px rgba(0,0,0,0.18);
   backdrop-filter: blur(16px);
 }
 
@@ -2021,7 +2024,7 @@ body {
 .showcase-card span,
 .showcase-card small {
   display: block;
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--text-muted) 82%, transparent);
   font-size: 11px;
   font-weight: 700;
 }
@@ -2029,8 +2032,8 @@ body {
 .showcase-card strong {
   display: block;
   margin: 18px 0 6px;
-  color: var(--text);
-  font-size: 22px;
+  color: color-mix(in srgb, var(--text) 86%, transparent);
+  font-size: 18px;
   line-height: 1;
   letter-spacing: 0;
 }
@@ -2364,6 +2367,184 @@ body {
   color: var(--accent);
 }
 
+.ov-section-heading {
+  max-width: 720px;
+  margin-bottom: 28px;
+}
+
+.ov-section-heading h2,
+.ov-flow-copy h2 {
+  margin: 0 0 12px;
+  color: var(--text);
+  font-size: 30px;
+  line-height: 1.12;
+  letter-spacing: 0;
+}
+
+.ov-section-heading p,
+.ov-flow-copy p {
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.ov-section-heading.compact {
+  max-width: 640px;
+}
+
+.ov-explain-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.ov-explain-card,
+.ov-service-card,
+.ov-flow-box {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.ov-explain-card {
+  min-height: 210px;
+  padding: 20px;
+  border-radius: 14px;
+}
+
+.ov-explain-icon {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 28px;
+  border-radius: 10px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.ov-explain-card h3,
+.ov-service-card h3 {
+  margin: 0 0 9px;
+  color: var(--text);
+  font-size: 17px;
+}
+
+.ov-explain-card p,
+.ov-service-card p {
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.ov-flow-section {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: 34px;
+  align-items: center;
+}
+
+.ov-flow-diagram {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--surface) 92%, var(--accent)), var(--surface2)),
+    var(--surface);
+  overflow-x: auto;
+}
+
+.ov-flow-node-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 128px;
+}
+
+.ov-flow-box {
+  min-width: 128px;
+  flex: 1;
+  padding: 16px 14px;
+  border-radius: 13px;
+}
+
+.ov-flow-box strong,
+.ov-flow-box span {
+  display: block;
+}
+
+.ov-flow-box strong {
+  color: var(--text);
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.ov-flow-box span {
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.ov-flow-box.cyan { border-color: color-mix(in srgb, var(--arc) 32%, var(--border)); }
+.ov-flow-box.blue { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
+.ov-flow-box.gold { border-color: color-mix(in srgb, #d4a574 34%, var(--border)); }
+.ov-flow-box.green { border-color: color-mix(in srgb, var(--success) 34%, var(--border)); }
+
+.ov-flow-arrow {
+  color: var(--text-muted);
+  display: flex;
+}
+
+.ov-service-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.ov-service-card {
+  padding: 18px;
+  border-radius: 14px;
+}
+
+.ov-service-card span {
+  display: block;
+  margin-bottom: 26px;
+  color: var(--arc);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.reveal-section .ov-explain-card,
+.reveal-section .ov-flow-node-wrap,
+.reveal-section .ov-service-card,
+.reveal-section .ov-pipeline-step,
+.reveal-section .ov-audience-card,
+.reveal-section .ov-arch-item {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.56s ease, transform 0.56s ease, border-color 0.18s ease, background 0.18s ease;
+  transition-delay: calc(var(--step-i, 0) * 0.08s);
+}
+
+.reveal-section.in-view .ov-explain-card,
+.reveal-section.in-view .ov-flow-node-wrap,
+.reveal-section.in-view .ov-service-card,
+.reveal-section.in-view .ov-pipeline-step,
+.reveal-section.in-view .ov-audience-card,
+.reveal-section.in-view .ov-arch-item {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 @keyframes landing-copy-in {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
@@ -2564,6 +2745,9 @@ body {
   }
 }
 
+.overview-page .ov-explain,
+.overview-page .ov-flow-section,
+.overview-page .ov-services,
 .overview-page .ov-workflow,
 .overview-page .ov-audiences,
 .overview-page .ov-arch,
@@ -2611,6 +2795,16 @@ body {
   .ov-action-tile,
   .showcase-column {
     animation: none;
+  }
+  .reveal-section .ov-explain-card,
+  .reveal-section .ov-flow-node-wrap,
+  .reveal-section .ov-service-card,
+  .reveal-section .ov-pipeline-step,
+  .reveal-section .ov-audience-card,
+  .reveal-section .ov-arch-item {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 }
 
@@ -2665,6 +2859,14 @@ body {
   }
   .showcase-card strong {
     font-size: 18px;
+  }
+  .ov-explain-grid,
+  .ov-service-grid,
+  .ov-flow-section {
+    grid-template-columns: 1fr;
+  }
+  .ov-flow-diagram {
+    align-items: stretch;
   }
   .ov-flow-node {
     min-width: 108px;

@@ -2029,9 +2029,9 @@ export default function App() {
                 <div className="ov-showcase-wall" aria-hidden="true">
                   <div className="showcase-column slow">
                     {[
-                      ['Portfolio', '$12,480.42', 'Across 4 chains'],
-                      ['USDC', '8,920.00', 'Stable balance'],
-                      ['Gas', '24.1 Gwei', 'Arc native'],
+                      ['Portfolio', 'Balances', 'Across chains'],
+                      ['USDC', 'Stable asset', 'Unified view'],
+                      ['Gas', 'Network fees', 'Live estimates'],
                     ].map((item, i) => (
                       <div className="showcase-card" key={`a-${i}`}>
                         <span>{item[0]}</span>
@@ -2044,7 +2044,7 @@ export default function App() {
                     {[
                       ['CCTP V2', 'Ready', 'Sepolia recovery'],
                       ['Pay Hub', 'Live', 'Arc Testnet'],
-                      ['Claude Review', 'Approved', 'Escrow flow'],
+                      ['Claude Review', 'AI verdicts', 'Escrow flow'],
                     ].map((item, i) => (
                       <div className="showcase-card accent" key={`b-${i}`}>
                         <span>{item[0]}</span>
@@ -2055,7 +2055,7 @@ export default function App() {
                   </div>
                   <div className="showcase-column slow">
                     {[
-                      ['Bridge', '1:1 mint', 'Circle attested'],
+                      ['Bridge', 'Circle route', 'Attested mint'],
                       ['Wallets', 'Multi', 'Injected + WC'],
                       ['Activity', 'Synced', 'Recent txs'],
                     ].map((item, i) => (
@@ -2110,6 +2110,87 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+              </div>
+            </section>
+
+            {/* Product Explanation */}
+            <section className="ov-explain reveal-section">
+              <div className="ov-section-heading">
+                <div className="ov-label">What It Does</div>
+                <h2>One portal for stablecoin operations</h2>
+                <p>
+                  USDC Portal groups the daily stablecoin workflow into a single financial surface:
+                  see balances, move funds, pay contracts, and verify agent work without jumping
+                  between explorers, bridges, faucets, and wallet tabs.
+                </p>
+              </div>
+              <div className="ov-explain-grid">
+                {([
+                  { icon: <Wallet size={18} />, title: 'Monitor', desc: 'Track wallet balances, USD estimates, chain exposure, gas, and recent activity across supported networks.' },
+                  { icon: <ArrowRightLeft size={18} />, title: 'Move', desc: 'Bridge, swap, and send USDC through Circle App Kit, CCTP, and LI.FI-powered routes.' },
+                  { icon: <CircleDollarSign size={18} />, title: 'Pay', desc: 'Send USDC into an Arc Testnet payment contract with memo, status, contract balance, and explorer access.' },
+                  { icon: <Bot size={18} />, title: 'Verify', desc: 'Lock funds in escrow, submit deliverables, run Claude evaluation, and release agent payouts.' },
+                ] as const).map((item, i) => (
+                  <div className="ov-explain-card" key={item.title} style={{ '--step-i': i } as React.CSSProperties}>
+                    <div className="ov-explain-icon">{item.icon}</div>
+                    <h3>{item.title}</h3>
+                    <p>{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Money Flow Diagram */}
+            <section className="ov-flow-section reveal-section">
+              <div className="ov-flow-copy">
+                <div className="ov-label">How Funds Move</div>
+                <h2>From wallet to verified settlement</h2>
+                <p>
+                  The app separates money movement from work verification. USDC can be moved into Arc,
+                  held by a contract, checked by AI-assisted review, and released only when the workflow
+                  reaches the right state.
+                </p>
+              </div>
+              <div className="ov-flow-diagram">
+                {([
+                  { title: 'Wallet', sub: activeWalletShort, tone: 'blue' },
+                  { title: 'USDC Route', sub: 'Send · Bridge · Swap', tone: 'cyan' },
+                  { title: 'Arc Contract', sub: 'Pay Hub / Escrow', tone: 'blue' },
+                  { title: 'Verification', sub: 'Claude verdict', tone: 'gold' },
+                  { title: 'Payout', sub: 'Agent receives USDC', tone: 'green' },
+                ] as const).map((node, i) => (
+                  <div className="ov-flow-node-wrap" key={node.title} style={{ '--step-i': i } as React.CSSProperties}>
+                    <div className={`ov-flow-box ${node.tone}`}>
+                      <strong>{node.title}</strong>
+                      <span>{node.sub}</span>
+                    </div>
+                    {i < 4 && <div className="ov-flow-arrow"><ArrowRight size={16} /></div>}
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Service Modules */}
+            <section className="ov-services reveal-section">
+              <div className="ov-section-heading compact">
+                <div className="ov-label">Service Modules</div>
+                <h2>Built like a financial workspace, not a demo page</h2>
+              </div>
+              <div className="ov-service-grid">
+                {([
+                  { name: 'Portfolio Dashboard', detail: 'Balances, USD value, 24h movement, CSV export, and live prices.' },
+                  { name: 'Action Center', detail: 'Pay, send, bridge, swap, and cross-chain flows grouped by intent.' },
+                  { name: 'Network Safety', detail: 'Mainnet/testnet mode, Arc Testnet badges, and clear value disclaimers.' },
+                  { name: 'Transaction Feedback', detail: 'Loading, submitted, confirmed, already-claimed, and explorer states.' },
+                  { name: 'Developer Rails', detail: 'Vercel APIs, Circle attestation recovery, viem clients, and contract reads.' },
+                  { name: 'Agent Commerce', detail: 'Escrow jobs, deliverable submission, Claude review, payout release.' },
+                ] as const).map((service, i) => (
+                  <div className="ov-service-card" key={service.name} style={{ '--step-i': i } as React.CSSProperties}>
+                    <span>{String(i + 1).padStart(2, '0')}</span>
+                    <h3>{service.name}</h3>
+                    <p>{service.detail}</p>
+                  </div>
+                ))}
               </div>
             </section>
 
