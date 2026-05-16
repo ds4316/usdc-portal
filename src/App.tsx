@@ -1214,12 +1214,17 @@ export default function App() {
         data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
           args: [apiMessage as `0x${string}`, attestation as `0x${string}`] }),
       })
-      const mintRcpt  = await publicClients[11155111].waitForTransactionReceipt({ hash: mintHash })
-      if (mintRcpt.status === 'reverted') throw new Error('receiveMessage reverted on Sepolia')
+      try {
+        const mintRcpt = await publicClients[11155111].waitForTransactionReceipt({ hash: mintHash, timeout: 90_000 })
+        if (mintRcpt.status === 'reverted') throw new Error('receiveMessage reverted on Sepolia')
+      } catch (re: unknown) {
+        if (re instanceof Error && re.message.includes('reverted')) throw re
+        // receipt polling timed out — tx is submitted, just couldn't confirm in time
+      }
 
       setCctpStep('done')
       localStorage.removeItem('cctp_pending_bridge'); setPendingBridge(null)
-      addToast({ type: 'success', message: `${cctpAmount} USDC arrived on Sepolia!`, txHash: mintHash })
+      addToast({ type: 'success', message: `${cctpAmount} USDC bridged to Sepolia! Refresh balances in a minute.`, txHash: mintHash })
       setCctpAmount('')
 
     } catch (e: unknown) {
@@ -1262,12 +1267,17 @@ export default function App() {
       })
       removeToast(loadId)
       loadId = addToast({ type: 'loading', message: 'Confirming on destination chain...' })
-      const rcpt = await publicClients[isV2 ? 11155111 : 5042002].waitForTransactionReceipt({ hash: claimHash })
+      try {
+        const rcpt = await publicClients[isV2 ? 11155111 : 5042002].waitForTransactionReceipt({ hash: claimHash, timeout: 90_000 })
+        if (rcpt.status === 'reverted') throw new Error('receiveMessage reverted on destination chain')
+      } catch (re: unknown) {
+        if (re instanceof Error && re.message.includes('reverted')) throw re
+        // receipt polling timed out — tx is submitted
+      }
       removeToast(loadId); loadId = ''
-      if (rcpt.status === 'reverted') throw new Error('receiveMessage reverted on destination chain')
       localStorage.removeItem('cctp_pending_bridge')
       setPendingBridge(null)
-      addToast({ type: 'success', message: `✅ ${pendingBridge.amount} USDC arrived on ${isV2 ? 'Sepolia' : 'Arc'}! Refresh balances to see it.`, txHash: claimHash })
+      addToast({ type: 'success', message: `✅ ${pendingBridge.amount} USDC bridged to ${isV2 ? 'Sepolia' : 'Arc'}! Refresh balances in a minute.`, txHash: claimHash })
     } catch (e: unknown) {
       if (loadId) removeToast(loadId)
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Claim failed' })
@@ -1304,11 +1314,16 @@ export default function App() {
       })
       removeToast(loadId)
       loadId = addToast({ type: 'loading', message: 'Confirming on Sepolia...' })
-      const rcpt = await publicClients[11155111].waitForTransactionReceipt({ hash: claimHash })
+      try {
+        const rcpt = await publicClients[11155111].waitForTransactionReceipt({ hash: claimHash, timeout: 90_000 })
+        if (rcpt.status === 'reverted') throw new Error('receiveMessage reverted on Sepolia')
+      } catch (re: unknown) {
+        if (re instanceof Error && re.message.includes('reverted')) throw re
+        // receipt polling timed out — tx is submitted
+      }
       removeToast(loadId); loadId = ''
-      if (rcpt.status === 'reverted') throw new Error('receiveMessage reverted on Sepolia')
       setRecoverHash('')
-      addToast({ type: 'success', message: '✅ 10 USDC recovered on Sepolia! Refresh balances to see it.', txHash: claimHash })
+      addToast({ type: 'success', message: '✅ USDC recovered on Sepolia! Refresh balances in a minute.', txHash: claimHash })
     } catch (e: unknown) {
       if (loadId) removeToast(loadId)
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Recovery failed' })
