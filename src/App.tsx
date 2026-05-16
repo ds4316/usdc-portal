@@ -1214,8 +1214,7 @@ export default function App() {
         data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
           args: [apiMessage as `0x${string}`, attestation as `0x${string}`] }),
       })
-      const sepClient = createPublicClient({ chain: sepolia, transport: http('https://rpc.sepolia.org') })
-      const mintRcpt  = await sepClient.waitForTransactionReceipt({ hash: mintHash })
+      const mintRcpt  = await publicClients[11155111].waitForTransactionReceipt({ hash: mintHash })
       if (mintRcpt.status === 'reverted') throw new Error('receiveMessage reverted on Sepolia')
 
       setCctpStep('done')
@@ -1233,8 +1232,9 @@ export default function App() {
   async function claimPendingBridge() {
     if (!pendingBridge) return
     setClaimLoading(true)
+    let loadId = ''
     try {
-      addToast({ type: 'loading', message: 'Checking attestation...' })
+      loadId = addToast({ type: 'loading', message: 'Checking attestation...' })
       // Arc->Sepolia is CCTP V2 (query by txHash); Sepolia->Arc is V1 (query by messageHash)
       const isV2 = pendingBridge.direction === 'to-sepolia'
       const attUrl = isV2
@@ -1243,6 +1243,7 @@ export default function App() {
       const res  = await fetch(attUrl)
       const json = await res.json()
       if (json.status !== 'complete') {
+        removeToast(loadId)
         addToast({ type: 'error', message: `Circle status: "${json.status ?? 'unknown'}" — still processing. Try again in a few minutes.` })
         return
       }
@@ -1252,22 +1253,23 @@ export default function App() {
       if (!message) throw new Error('Message bytes missing from attestation response')
       const { encodeFunctionData } = await import('viem')
       await switchChain({ chainId: isV2 ? sepolia.id : arcTestnet.id })
-      addToast({ type: 'loading', message: 'Claiming — sign the receiveMessage tx...' })
+      removeToast(loadId)
+      loadId = addToast({ type: 'loading', message: 'Claiming — sign the receiveMessage tx...' })
       const claimHash = await sendTransactionAsync({
         to: ARC_MSG_TRANSMITTER,
         data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
           args: [message, attestation] }),
       })
-      const destClient = createPublicClient({
-        chain: isV2 ? sepolia : arcTestnet,
-        transport: http(isV2 ? 'https://rpc.sepolia.org' : 'https://rpc.testnet.arc.network'),
-      })
-      const rcpt = await destClient.waitForTransactionReceipt({ hash: claimHash })
+      removeToast(loadId)
+      loadId = addToast({ type: 'loading', message: 'Confirming on destination chain...' })
+      const rcpt = await publicClients[isV2 ? 11155111 : 5042002].waitForTransactionReceipt({ hash: claimHash })
+      removeToast(loadId); loadId = ''
       if (rcpt.status === 'reverted') throw new Error('receiveMessage reverted on destination chain')
       localStorage.removeItem('cctp_pending_bridge')
       setPendingBridge(null)
-      addToast({ type: 'success', message: `${pendingBridge.amount} USDC arrived on ${isV2 ? 'Sepolia' : 'Arc'}!`, txHash: claimHash })
+      addToast({ type: 'success', message: `✅ ${pendingBridge.amount} USDC arrived on ${isV2 ? 'Sepolia' : 'Arc'}! Refresh balances to see it.`, txHash: claimHash })
     } catch (e: unknown) {
+      if (loadId) removeToast(loadId)
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Claim failed' })
     } finally {
       setClaimLoading(false)
@@ -1281,28 +1283,34 @@ export default function App() {
       return addToast({ type: 'error', message: 'Enter a valid Arc burn tx hash (0x… 66 chars)' })
     }
     setClaimLoading(true)
+    let loadId = ''
     try {
-      addToast({ type: 'loading', message: 'Looking up burn tx on Circle...' })
+      loadId = addToast({ type: 'loading', message: 'Looking up burn tx on Circle...' })
       const res  = await fetch(`/api/attestation?txHash=${h}&sourceDomain=26`)
       const json = await res.json()
       if (json.status !== 'complete' || !json.message || !json.attestation) {
+        removeToast(loadId)
         addToast({ type: 'error', message: `Circle status: "${json.status ?? 'unknown'}" — not ready, try again later.` })
         return
       }
       const { encodeFunctionData } = await import('viem')
       await switchChain({ chainId: sepolia.id })
-      addToast({ type: 'loading', message: 'Claiming — sign receiveMessage on Sepolia...' })
+      removeToast(loadId)
+      loadId = addToast({ type: 'loading', message: 'Claiming — sign receiveMessage on Sepolia...' })
       const claimHash = await sendTransactionAsync({
         to: ARC_MSG_TRANSMITTER,
         data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
           args: [json.message as `0x${string}`, json.attestation as `0x${string}`] }),
       })
-      const sepClient = createPublicClient({ chain: sepolia, transport: http('https://rpc.sepolia.org') })
-      const rcpt = await sepClient.waitForTransactionReceipt({ hash: claimHash })
+      removeToast(loadId)
+      loadId = addToast({ type: 'loading', message: 'Confirming on Sepolia...' })
+      const rcpt = await publicClients[11155111].waitForTransactionReceipt({ hash: claimHash })
+      removeToast(loadId); loadId = ''
       if (rcpt.status === 'reverted') throw new Error('receiveMessage reverted on Sepolia')
       setRecoverHash('')
-      addToast({ type: 'success', message: 'USDC recovered on Sepolia!', txHash: claimHash })
+      addToast({ type: 'success', message: '✅ 10 USDC recovered on Sepolia! Refresh balances to see it.', txHash: claimHash })
     } catch (e: unknown) {
+      if (loadId) removeToast(loadId)
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Recovery failed' })
     } finally {
       setClaimLoading(false)
