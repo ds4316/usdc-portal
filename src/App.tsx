@@ -606,6 +606,7 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem('cctp_pending_bridge') ?? 'null') } catch { return null }
   })
   const [claimLoading, setClaimLoading] = useState(false)
+  const [recoverHash,  setRecoverHash]  = useState('')
 
   // ERC-8183 state
   type E8183Step = 'idle' | 'creating' | 'funding' | 'submitting' | 'completing' | 'done' | 'error'
@@ -1189,27 +1190,37 @@ export default function App() {
       setCctpStep('attesting')
       addToast({ type: 'loading', message: '3/4 Waiting Circle attestation...' })
       let attestation = ''
-      for (let i = 0; i < 60; i++) {
-        await new Promise((r) => setTimeout(r, 5000))
+      let apiMessage  = ''
+      for (let i = 0; i < 180; i++) {
+        await new Promise((r) => setTimeout(r, 10000))
         const res  = await fetch(`/api/attestation?txHash=${burnHash}&sourceDomain=26`)
         const json = await res.json()
-        if (json.status === 'complete') { attestation = json.attestation; break }
+        if (json.status === 'complete' && json.message) {
+          attestation = json.attestation; apiMessage = json.message; break
+        }
       }
-      if (!attestation) throw new Error('Attestation timeout - retry later')
+      if (!attestation || !apiMessage) {
+        addToast({ type: 'success', message: 'Burn complete! Close this tab and use Check & Claim when ready (15-20 min).' })
+        setCctpStep('idle')
+        return
+      }
 
-      // Step 6: Switch to Sepolia and receiveMessage
+      // Step 6: Switch to Sepolia and receiveMessage — use API message (CCTP V2), not event-log message
       setCctpStep('minting')
       addToast({ type: 'loading', message: '4/4 Minting USDC on Sepolia...' })
       await switchChain({ chainId: sepolia.id })
-      await sendTransactionAsync({
+      const mintHash = await sendTransactionAsync({
         to: ARC_MSG_TRANSMITTER,
         data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
-          args: [messageBytes, attestation as `0x${string}`] }),
+          args: [apiMessage as `0x${string}`, attestation as `0x${string}`] }),
       })
+      const sepClient = createPublicClient({ chain: sepolia, transport: http('https://rpc.sepolia.org') })
+      const mintRcpt  = await sepClient.waitForTransactionReceipt({ hash: mintHash })
+      if (mintRcpt.status === 'reverted') throw new Error('receiveMessage reverted on Sepolia')
 
       setCctpStep('done')
       localStorage.removeItem('cctp_pending_bridge'); setPendingBridge(null)
-      addToast({ type: 'success', message: `${cctpAmount} USDC arrived on Sepolia!`, txHash: burnHash })
+      addToast({ type: 'success', message: `${cctpAmount} USDC arrived on Sepolia!`, txHash: mintHash })
       setCctpAmount('')
 
     } catch (e: unknown) {
@@ -1224,27 +1235,75 @@ export default function App() {
     setClaimLoading(true)
     try {
       addToast({ type: 'loading', message: 'Checking attestation...' })
-      const res  = await fetch(`/api/attestation?messageHash=${pendingBridge.messageHash}`)
+      // Arc->Sepolia is CCTP V2 (query by txHash); Sepolia->Arc is V1 (query by messageHash)
+      const isV2 = pendingBridge.direction === 'to-sepolia'
+      const attUrl = isV2
+        ? `/api/attestation?txHash=${pendingBridge.burnHash}&sourceDomain=26`
+        : `/api/attestation?messageHash=${pendingBridge.messageHash}`
+      const res  = await fetch(attUrl)
       const json = await res.json()
       if (json.status !== 'complete') {
-        addToast({ type: 'error', message: `Circle status: "${json.status ?? 'unknown'}" — ${JSON.stringify(json).slice(0,200)}` })
+        addToast({ type: 'error', message: `Circle status: "${json.status ?? 'unknown'}" — still processing. Try again in a few minutes.` })
         return
       }
       const attestation = json.attestation as `0x${string}`
+      // CCTP V2 requires the message from the API; V1 uses the event-log message
+      const message = (isV2 ? json.message : pendingBridge.messageBytes) as `0x${string}`
+      if (!message) throw new Error('Message bytes missing from attestation response')
       const { encodeFunctionData } = await import('viem')
-      const destChainId = pendingBridge.direction === 'to-arc' ? arcTestnet.id : sepolia.id
-      await switchChain({ chainId: destChainId })
+      await switchChain({ chainId: isV2 ? sepolia.id : arcTestnet.id })
       addToast({ type: 'loading', message: 'Claiming — sign the receiveMessage tx...' })
       const claimHash = await sendTransactionAsync({
         to: ARC_MSG_TRANSMITTER,
         data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
-          args: [pendingBridge.messageBytes as `0x${string}`, attestation] }),
+          args: [message, attestation] }),
       })
+      const destClient = createPublicClient({
+        chain: isV2 ? sepolia : arcTestnet,
+        transport: http(isV2 ? 'https://rpc.sepolia.org' : 'https://rpc.testnet.arc.network'),
+      })
+      const rcpt = await destClient.waitForTransactionReceipt({ hash: claimHash })
+      if (rcpt.status === 'reverted') throw new Error('receiveMessage reverted on destination chain')
       localStorage.removeItem('cctp_pending_bridge')
       setPendingBridge(null)
-      addToast({ type: 'success', message: `${pendingBridge.amount} USDC arrived on ${pendingBridge.direction === 'to-arc' ? 'Arc' : 'Sepolia'}!`, txHash: claimHash })
+      addToast({ type: 'success', message: `${pendingBridge.amount} USDC arrived on ${isV2 ? 'Sepolia' : 'Arc'}!`, txHash: claimHash })
     } catch (e: unknown) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Claim failed' })
+    } finally {
+      setClaimLoading(false)
+    }
+  }
+
+  // Recover a stuck Arc->Sepolia bridge by its Arc burn tx hash
+  async function recoverStuckBridge() {
+    const h = recoverHash.trim()
+    if (!h.startsWith('0x') || h.length !== 66) {
+      return addToast({ type: 'error', message: 'Enter a valid Arc burn tx hash (0x… 66 chars)' })
+    }
+    setClaimLoading(true)
+    try {
+      addToast({ type: 'loading', message: 'Looking up burn tx on Circle...' })
+      const res  = await fetch(`/api/attestation?txHash=${h}&sourceDomain=26`)
+      const json = await res.json()
+      if (json.status !== 'complete' || !json.message || !json.attestation) {
+        addToast({ type: 'error', message: `Circle status: "${json.status ?? 'unknown'}" — not ready, try again later.` })
+        return
+      }
+      const { encodeFunctionData } = await import('viem')
+      await switchChain({ chainId: sepolia.id })
+      addToast({ type: 'loading', message: 'Claiming — sign receiveMessage on Sepolia...' })
+      const claimHash = await sendTransactionAsync({
+        to: ARC_MSG_TRANSMITTER,
+        data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
+          args: [json.message as `0x${string}`, json.attestation as `0x${string}`] }),
+      })
+      const sepClient = createPublicClient({ chain: sepolia, transport: http('https://rpc.sepolia.org') })
+      const rcpt = await sepClient.waitForTransactionReceipt({ hash: claimHash })
+      if (rcpt.status === 'reverted') throw new Error('receiveMessage reverted on Sepolia')
+      setRecoverHash('')
+      addToast({ type: 'success', message: 'USDC recovered on Sepolia!', txHash: claimHash })
+    } catch (e: unknown) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Recovery failed' })
     } finally {
       setClaimLoading(false)
     }
@@ -2451,6 +2510,22 @@ export default function App() {
                           Circle attestation takes ~15 min on testnet. Click "Check & Claim" when ready.
                         </div>
                       </div>
+                    )}
+                    {/* Recover a stuck Arc->Sepolia bridge by burn tx hash */}
+                    {cctpStep === 'idle' && (
+                      <details className="cctp-recover">
+                        <summary>Recover a stuck Arc → Sepolia bridge</summary>
+                        <div className="cctp-recover-body">
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            Paste the Arc burn tx hash. We re-fetch the Circle attestation and complete the mint on Sepolia.
+                          </div>
+                          <input className="action-input" placeholder="Arc burn tx hash (0x…)"
+                            value={recoverHash} onChange={(e) => setRecoverHash(e.target.value)} />
+                          <button className="btn-primary" onClick={recoverStuckBridge} disabled={claimLoading}>
+                            {claimLoading ? 'Working…' : 'Recover USDC'}
+                          </button>
+                        </div>
+                      </details>
                     )}
                     {/* Direction toggle */}
                     <div className="cctp-direction-toggle">

@@ -10,7 +10,11 @@ export default async function handler(req, res) {
       const j = await r.json()
       if (r.ok && j.messages?.length > 0) {
         const msg = j.messages[0]
-        return res.status(200).json({ status: msg.status, attestation: msg.attestation, _v: 2 })
+        // CCTP V2: must use the `message` from the API (Circle sets finalityThresholdExecuted),
+        // NOT the message bytes extracted from the burn event log
+        return res.status(200).json({
+          status: msg.status, attestation: msg.attestation, message: msg.message, _v: 2,
+        })
       }
       return res.status(200).json({ status: 'unknown', _v: 2, _raw: j })
     }
