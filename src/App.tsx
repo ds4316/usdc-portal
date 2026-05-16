@@ -1084,7 +1084,7 @@ export default function App() {
       let attestation = ''
       for (let i = 0; i < 60; i++) {
         await new Promise((r) => setTimeout(r, 5000))
-        const res  = await fetch(`https://iris-api-sandbox.circle.com/v1/attestations/${messageHash}`)
+        const res  = await fetch(`/api/attestation?messageHash=${messageHash}`)
         const json = await res.json()
         if (json.status === 'complete') { attestation = json.attestation; break }
       }
@@ -1170,7 +1170,7 @@ export default function App() {
       let attestation = ''
       for (let i = 0; i < 60; i++) {
         await new Promise((r) => setTimeout(r, 5000))
-        const res  = await fetch(`https://iris-api-sandbox.circle.com/v1/attestations/${messageHash}`)
+        const res  = await fetch(`/api/attestation?messageHash=${messageHash}`)
         const json = await res.json()
         if (json.status === 'complete') { attestation = json.attestation; break }
       }
