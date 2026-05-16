@@ -2117,6 +2117,317 @@ body {
   color: var(--arc);
 }
 
+.ov-status-panel {
+  position: relative;
+  width: min(100%, 460px);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.2);
+  padding: 20px;
+  backdrop-filter: blur(18px);
+}
+
+.ov-status-panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ov-status-panel-head strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 18px;
+  color: var(--text);
+}
+
+.ov-panel-kicker,
+.pay-kicker,
+.pay-muted-label {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.mode-pill,
+.testnet-page-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border2);
+  color: var(--text-sub);
+  background: var(--surface2);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mode-pill.testnet,
+.testnet-page-badge {
+  border-color: color-mix(in srgb, var(--warn) 34%, var(--border2));
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  color: var(--warn);
+}
+
+.ov-session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 8px 0 14px;
+}
+
+.ov-session-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ov-session-row span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.ov-session-row strong {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: right;
+}
+
+.testnet-notice,
+.pay-inline-warning {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--warn) 28%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.testnet-notice svg,
+.pay-inline-warning svg {
+  color: var(--warn);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.ov-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.ov-action-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 78px;
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  background: var(--surface2);
+  color: var(--text-sub);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.ov-action-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.ov-action-tile.primary {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface2));
+  color: var(--accent);
+}
+
+/* Pay page */
+.pay-header {
+  align-items: center;
+}
+
+.pay-header .testnet-page-badge {
+  margin-left: auto;
+}
+
+.pay-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 22px;
+}
+
+.pay-product-card,
+.pay-side-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.pay-product-card {
+  padding: 22px;
+}
+
+.pay-product-top,
+.pay-contract-box,
+.pay-balance-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pay-product-top {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pay-product-top h3 {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 22px;
+}
+
+.pay-contract-box,
+.pay-balance-strip {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  background: var(--surface2);
+}
+
+.pay-contract-box strong,
+.pay-balance-strip strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+.pay-contract-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.pay-form-grid {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.pay-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.pay-field > span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pay-amount-input,
+.pay-text-input {
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  background: var(--surface2);
+}
+
+.pay-amount-input {
+  display: flex;
+  align-items: center;
+  padding: 0 13px;
+}
+
+.pay-amount-input input,
+.pay-text-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+
+.pay-amount-input input {
+  height: 52px;
+  font-size: 24px;
+  font-family: var(--font-mono);
+}
+
+.pay-amount-input strong {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.pay-text-input {
+  height: 46px;
+  padding: 0 13px;
+}
+
+.pay-submit {
+  margin-top: 18px;
+  height: 46px;
+}
+
+.pay-side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pay-side-card {
+  padding: 16px;
+}
+
+.pay-side-card strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.pay-side-card small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (max-width: 900px) {
+  .pay-layout {
+    grid-template-columns: 1fr;
+  }
+  .pay-header .testnet-page-badge {
+    margin-left: 0;
+  }
+}
+
 .overview-page .ov-workflow,
 .overview-page .ov-audiences,
 .overview-page .ov-arch,

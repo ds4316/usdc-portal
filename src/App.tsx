@@ -14,7 +14,6 @@ import {
 import { QRCodeSVG } from 'qrcode.react'
 import { arcTestnet } from './wagmi.config'
 import './App.css'
-import heroLayer from './assets/hero.png'
 
 const kit = new AppKit()
 
@@ -547,7 +546,7 @@ export default function App() {
   const [transferSeg, setTransferSeg] = useState<TransferSeg>('send')
   const [defiSeg, setDefiSeg]       = useState<DefiSeg>('cross')
   const [moveFundsTab, setMoveFundsTab] = useState<'bridge' | 'cross' | 'send'>('bridge')
-  const [activePage, setActivePage] = useState<'overview' | 'escrow' | 'funds' | 'portfolio' | 'activity' | 'docs'>('overview')
+  const [activePage, setActivePage] = useState<'overview' | 'portfolio' | 'pay' | 'funds' | 'escrow' | 'activity' | 'docs'>('overview')
 
   // ?? ArcEscrow ?곹깭 ????????????????????????????????????????????????????????
   const [escrowAgent,  setEscrowAgent]  = useState('')
@@ -658,6 +657,9 @@ export default function App() {
   const allAddresses = [...new Set(connections.flatMap((c) => c.accounts))]
   const isConnected  = connections.length > 0
   const activeChainId = connections[0]?.chainId
+  const activeWallet = allAddresses[0]
+  const activeWalletShort = activeWallet ? `${activeWallet.slice(0, 6)}...${activeWallet.slice(-4)}` : 'Not connected'
+  const activeChainMeta = activeChainId ? CHAIN_META[activeChainId] : undefined
 
   // ??? Toast ?ы띁 ??????????????????????????????????????????????????????????
   function addToast(t: Omit<Toast, 'id'>): string {
@@ -1830,9 +1832,10 @@ export default function App() {
   // ??? ?뚮뜑 ?????????????????????????????????????????????????????????????????
   const NAV_ITEMS = [
     { id: 'overview'  as const, label: 'Overview',     icon: <LayoutDashboard size={13} /> },
-    { id: 'escrow'    as const, label: 'Agent Escrow', icon: <Lock size={13} /> },
-    { id: 'funds'     as const, label: 'Move Funds',   icon: <ArrowRightLeft size={13} /> },
     { id: 'portfolio' as const, label: 'Portfolio',    icon: <Wallet size={13} /> },
+    { id: 'pay'       as const, label: 'Pay',          icon: <CircleDollarSign size={13} /> },
+    { id: 'funds'     as const, label: 'Move Funds',   icon: <ArrowRightLeft size={13} /> },
+    { id: 'escrow'    as const, label: 'Agent Escrow', icon: <Lock size={13} /> },
     { id: 'activity'  as const, label: 'Activity',     icon: <Network size={13} /> },
     { id: 'docs'      as const, label: 'Docs',         icon: <BookOpen size={13} /> },
   ]
@@ -2009,8 +2012,8 @@ export default function App() {
                   )}
                 </div>
                 <div className="ov-ctas">
-                  <button className="btn-primary ov-cta" onClick={() => setActivePage('escrow')}>
-                    <Lock size={14} /> Launch Agent Escrow
+                  <button className="btn-primary ov-cta" onClick={() => setActivePage('pay')}>
+                    <CircleDollarSign size={14} /> Pay with USDC
                   </button>
                   <button className="btn-outline ov-cta" onClick={() => setActivePage('funds')}>
                     <ArrowRightLeft size={14} /> Move Funds to Arc
@@ -2023,34 +2026,47 @@ export default function App() {
                 </div>
               </div>
               <div className="ov-hero-visual">
-                <div className="ov-visual-card">
-                  <div className="ov-orbit ov-orbit-one" />
-                  <div className="ov-orbit ov-orbit-two" />
-                  <img className="ov-layer-img" src={heroLayer} alt="" />
-                  <div className="ov-flow-node ov-flow-client">
-                    <span>Client</span>
-                    <strong>10.00 USDC</strong>
-                  </div>
-                  <div className="ov-flow-node ov-flow-agent">
-                    <span>Agent</span>
-                    <strong>Ready</strong>
-                  </div>
-                  <div className="ov-flow-node ov-flow-claude">
-                    <span>Claude Review</span>
-                    <strong>Approved</strong>
-                  </div>
-                  <div className="ov-visual-console">
-                    <div className="ov-console-top">
-                      <span>Settlement route</span>
-                      <span className="ov-live-pill">Live</span>
+                <div className="ov-status-panel">
+                  <div className="ov-status-panel-head">
+                    <div>
+                      <span className="ov-panel-kicker">Active session</span>
+                      <strong>Stablecoin command center</strong>
                     </div>
-                    <div className="ov-console-route">
-                      <span>Arc</span>
-                      <ArrowRight size={14} />
-                      <span>Escrow</span>
-                      <ArrowRight size={14} />
-                      <span>Agent</span>
+                    <span className={`mode-pill ${networkMode}`}>{networkMode === 'mainnet' ? 'Mainnet' : 'Testnet'}</span>
+                  </div>
+                  <div className="ov-session-list">
+                    <div className="ov-session-row">
+                      <span>Connected wallet</span>
+                      <strong>{activeWalletShort}</strong>
                     </div>
+                    <div className="ov-session-row">
+                      <span>Active network</span>
+                      <strong>{activeChainMeta?.label ?? 'Select network'}</strong>
+                    </div>
+                    <div className="ov-session-row">
+                      <span>{networkMode === 'testnet' ? 'Testnet value' : 'Portfolio value'}</span>
+                      <strong>${parseFloat(totalUsdc).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                    </div>
+                  </div>
+                  {networkMode === 'testnet' && (
+                    <div className="testnet-notice">
+                      <AlertTriangle size={14} />
+                      <span>Testnet balances are for development and are not real USD value.</span>
+                    </div>
+                  )}
+                  <div className="ov-action-grid">
+                    <button className="ov-action-tile primary" onClick={() => setActivePage('pay')}>
+                      <CircleDollarSign size={16} />
+                      <span>Pay</span>
+                    </button>
+                    <button className="ov-action-tile" onClick={() => setActivePage('portfolio')}>
+                      <Wallet size={16} />
+                      <span>Portfolio</span>
+                    </button>
+                    <button className="ov-action-tile" onClick={() => setActivePage('funds')}>
+                      <ArrowRightLeft size={16} />
+                      <span>Move</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2158,6 +2174,99 @@ export default function App() {
         )}
 
         {/* ─── AGENT ESCROW ─── */}
+        {activePage === 'pay' && (
+          <div className="page pay-page">
+            <div className="page-header pay-header">
+              <CircleDollarSign size={20} style={{ color: 'var(--accent)' }} />
+              <div>
+                <h2 className="page-title">Pay with USDC</h2>
+                <p className="page-sub">Arc Testnet payment hub for contract-based USDC payments</p>
+              </div>
+              <span className="testnet-page-badge"><AlertTriangle size={12} /> Arc Testnet</span>
+            </div>
+
+            <div className="pay-layout">
+              <section className="pay-product-card">
+                <div className="pay-product-top">
+                  <div>
+                    <span className="pay-kicker">Recipient Contract</span>
+                    <h3>USDCPaymentHub</h3>
+                  </div>
+                  <span className="mode-pill testnet">Testnet</span>
+                </div>
+
+                <div className="pay-contract-box">
+                  <div>
+                    <span className="pay-muted-label">Contract address</span>
+                    <strong>{PAYMENT_HUB_ADDRESS.slice(0, 10)}...{PAYMENT_HUB_ADDRESS.slice(-8)}</strong>
+                  </div>
+                  <div className="pay-contract-actions">
+                    <button className="btn-icon" title="Copy contract" onClick={() => navigator.clipboard?.writeText(PAYMENT_HUB_ADDRESS)}>
+                      <Copy size={13} />
+                    </button>
+                    <a className="btn-icon" title="Open ArcScan" href={`https://testnet.arcscan.app/address/${PAYMENT_HUB_ADDRESS}`} target="_blank" rel="noreferrer">
+                      <ExternalLink size={13} />
+                    </a>
+                  </div>
+                </div>
+
+                <div className="pay-balance-strip">
+                  <div>
+                    <span className="pay-muted-label">Contract balance</span>
+                    <strong>{contractBalance ? Number(contractBalance).toFixed(4) : '0.0000'} USDC</strong>
+                  </div>
+                  <button className="btn-ghost sidebar-refresh" onClick={loadContractInfo}>
+                    <RefreshCw size={11} /> Refresh
+                  </button>
+                </div>
+
+                <div className="pay-form-grid">
+                  <label className="pay-field">
+                    <span>Amount</span>
+                    <div className="pay-amount-input">
+                      <input value={payAmount} onChange={(e) => setPayAmount(e.target.value)} inputMode="decimal" placeholder="0.00" />
+                      <strong>USDC</strong>
+                    </div>
+                  </label>
+                  <label className="pay-field">
+                    <span>Memo</span>
+                    <input className="pay-text-input" value={payNote} onChange={(e) => setPayNote(e.target.value)} placeholder="Invoice, order ID, or note" />
+                  </label>
+                </div>
+
+                <button className="btn-primary pay-submit" onClick={payToContract} disabled={txLoading || !isConnected}>
+                  {txLoading ? 'Processing payment...' : 'Pay with USDC'}
+                </button>
+
+                {!isConnected && (
+                  <div className="pay-inline-warning">
+                    <Wallet size={14} />
+                    <span>Connect a wallet before creating a payment.</span>
+                  </div>
+                )}
+              </section>
+
+              <aside className="pay-side-panel">
+                <div className="pay-side-card">
+                  <span className="pay-muted-label">Active wallet</span>
+                  <strong>{activeWalletShort}</strong>
+                  <small>{activeChainMeta?.label ?? 'No active network'}</small>
+                </div>
+                <div className="pay-side-card">
+                  <span className="pay-muted-label">Network safety</span>
+                  <strong>Arc Testnet only</strong>
+                  <small>Payments use testnet USDC and are not real-dollar transfers.</small>
+                </div>
+                <div className="pay-side-card">
+                  <span className="pay-muted-label">Owner</span>
+                  <strong>{contractOwner ? `${contractOwner.slice(0, 8)}...${contractOwner.slice(-6)}` : 'Loading'}</strong>
+                  <small>Withdrawals are restricted to the contract owner.</small>
+                </div>
+              </aside>
+            </div>
+          </div>
+        )}
+
         {activePage === 'escrow' && (
           <div className="page escrow-page">
             <div className="page-header">
