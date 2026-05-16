@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useConnect, useDisconnect, useConnections, useSwitchChain, useSendTransaction } from 'wagmi'
 import { createPublicClient, fallback, http, formatUnits, isAddress } from 'viem'
 import { mainnet, base, polygon, arbitrum, optimism, avalanche, sepolia, baseSepolia } from 'wagmi/chains'
@@ -47,6 +47,70 @@ const ARC_ONBOARDER = '0x495825fF81B048B2A6e1FE10571625496f8fF1FD' as `0x${strin
 const ARC_ESCROW = '0xc73821142DeD9Ab7f0F299389Fd3a186475676d5' as `0x${string}`
 const ARC_TESTNET_USDC = '0x3600000000000000000000000000000000000000' as `0x${string}`
 
+
+// CCTP V2 Arc TokenMessenger (Arc -> Sepolia burn) — CREATE2, same addr on both chains
+const ARC_TOKEN_MESSENGER = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA' as `0x${string}`
+
+const DEPOSIT_FOR_BURN_ABI = [
+  { name: 'depositForBurn', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'amount',            type: 'uint256' },
+      { name: 'destinationDomain', type: 'uint32'  },
+      { name: 'mintRecipient',     type: 'bytes32' },
+      { name: 'burnToken',         type: 'address' },
+    ], outputs: [{ name: '_nonce', type: 'uint64' }] },
+] as const
+
+// ERC-8183 AgenticCommerce (Arc Testnet official standard)
+const ERC8183_CONTRACT = '0x0747EEf0706327138c69792bF28Cd525089e4583' as `0x${string}`
+const ERC8183_ABI = [
+  { name: 'createJob', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'provider',    type: 'address' },
+      { name: 'evaluator',   type: 'address' },
+      { name: 'expiredAt',   type: 'uint256' },
+      { name: 'description', type: 'string'  },
+      { name: 'hook',        type: 'address' },
+    ], outputs: [{ name: 'jobId', type: 'uint256' }] },
+  { name: 'setBudget', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'jobId',     type: 'uint256' },
+      { name: 'amount',    type: 'uint256' },
+      { name: 'optParams', type: 'bytes'   },
+    ], outputs: [] },
+  { name: 'fund', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'jobId',     type: 'uint256' },
+      { name: 'optParams', type: 'bytes'   },
+    ], outputs: [] },
+  { name: 'submit', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'jobId',       type: 'uint256' },
+      { name: 'deliverable', type: 'bytes32' },
+      { name: 'optParams',   type: 'bytes'   },
+    ], outputs: [] },
+  { name: 'complete', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'jobId',     type: 'uint256' },
+      { name: 'reason',    type: 'bytes32' },
+      { name: 'optParams', type: 'bytes'   },
+    ], outputs: [] },
+  { name: 'getJob', type: 'function', stateMutability: 'view',
+    inputs: [{ name: 'jobId', type: 'uint256' }],
+    outputs: [
+      { name: 'id',          type: 'uint256'  },
+      { name: 'client',      type: 'address'  },
+      { name: 'provider',    type: 'address'  },
+      { name: 'evaluator',   type: 'address'  },
+      { name: 'description', type: 'string'   },
+      { name: 'budget',      type: 'uint256'  },
+      { name: 'expiredAt',   type: 'uint256'  },
+      { name: 'status',      type: 'uint8'    },
+      { name: 'hook',        type: 'address'  },
+    ] },
+  { name: 'nextJobId', type: 'function', stateMutability: 'view',
+    inputs: [], outputs: [{ name: '', type: 'uint256' }] },
+] as const
 const ARC_ESCROW_ABI = [
   { name: 'createJob', type: 'function', stateMutability: 'nonpayable',
     inputs: [
@@ -481,6 +545,7 @@ export default function App() {
   const [aiVerdict,          setAiVerdict]          = useState<{ verdict: 'approve' | 'reject'; reasoning: string } | null>(null)
   const [aiLoading,          setAiLoading]          = useState(false)
   const [escrowMyTab,    setEscrowMyTab]    = useState<'new' | 'jobs'>('new')
+  const [escrowProtocol, setEscrowProtocol] = useState<'arc-escrow' | 'erc8183'>('arc-escrow')
   const [recentJobIds,   setRecentJobIds]   = useState<number[]>(() => {
     try { return JSON.parse(localStorage.getItem('arc_escrow_jobs') ?? '[]') } catch { return [] }
   })
@@ -527,6 +592,23 @@ export default function App() {
   const [cctpRecipient, setCctpRecipient] = useState('')
   const [cctpStep,      setCctpStep]      = useState<CCTPStep>('idle')
   const [cctpBurnHash,  setCctpBurnHash]  = useState('')
+  const [cctpDirection, setCctpDirection] = useState<'to-arc' | 'to-sepolia'>('to-arc')
+
+  // ERC-8183 state
+  type E8183Step = 'idle' | 'creating' | 'funding' | 'submitting' | 'completing' | 'done' | 'error'
+  const [e8183Tab,       setE8183Tab]       = useState<'create' | 'lookup'>('create')
+  const [e8183Provider,  setE8183Provider]  = useState('')
+  const [e8183Amount,    setE8183Amount]    = useState('')
+  const [e8183Days,      setE8183Days]      = useState('3')
+  const [e8183Desc,      setE8183Desc]      = useState('')
+  const [e8183JobId,     setE8183JobId]     = useState('')
+  const [e8183Job,       setE8183Job]       = useState<{
+    id: bigint; client: string; provider: string; evaluator: string;
+    description: string; budget: bigint; expiredAt: bigint; status: number
+  } | null>(null)
+  const [e8183DelivUri,  setE8183DelivUri]  = useState('')
+  const [e8183Step,      setE8183Step]      = useState<E8183Step>('idle')
+  const [e8183Loading,   setE8183Loading]   = useState(false)
 
   // LI.FI
   const [lifiFromChainId, setLifiFromChainId] = useState<number>(mainnet.id)
@@ -1021,6 +1103,226 @@ export default function App() {
     } catch (e: unknown) {
       setCctpStep('error')
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Bridge failed' })
+    }
+  }
+
+  // CCTP Bridge: Arc Testnet USDC -> Sepolia USDC (reverse direction)
+  async function executeCCTPBridgeArcToSepolia() {
+    const amt = parseFloat(cctpAmount)
+    if (!amt || amt <= 0) return addToast({ type: 'error', message: 'Enter an amount' })
+    const recipientAddr = (cctpRecipient || allAddresses[0]) as `0x${string}`
+    if (!recipientAddr) return addToast({ type: 'error', message: 'Connect wallet or enter Sepolia address' })
+
+    const { encodeFunctionData, decodeEventLog, keccak256 } = await import('viem')
+    const usdcAmount = BigInt(Math.round(amt * 1e6))
+    // Sepolia recipient: EVM address -> bytes32 (right-aligned, left-zero-padded)
+    const mintRecipient = `0x${'0'.repeat(24)}${recipientAddr.replace('0x', '')}` as `0x${string}`
+
+    try {
+      // Step 1: Switch to Arc Testnet
+      await switchChain({ chainId: arcTestnet.id })
+
+      // Step 2: Approve ARC_TESTNET_USDC to ARC_TOKEN_MESSENGER
+      setCctpStep('approving')
+      addToast({ type: 'loading', message: '1/4 Approving USDC on Arc Testnet...' })
+      await sendTransactionAsync({
+        to: ARC_TESTNET_USDC,
+        data: encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve',
+          args: [ARC_TOKEN_MESSENGER, usdcAmount] }),
+      })
+
+      // Step 3: depositForBurn -> Sepolia (domain 0)
+      setCctpStep('burning')
+      addToast({ type: 'loading', message: '2/4 Burning USDC on Arc -> Sepolia...' })
+      const burnHash = await sendTransactionAsync({
+        to: ARC_TOKEN_MESSENGER,
+        data: encodeFunctionData({ abi: DEPOSIT_FOR_BURN_ABI, functionName: 'depositForBurn',
+          args: [usdcAmount, 0, mintRecipient, ARC_TESTNET_USDC] }),
+      })
+      setCctpBurnHash(burnHash)
+
+      // Step 4: Find MessageSent log from Arc MessageTransmitter
+      const arcClient = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
+      const receipt = await arcClient.waitForTransactionReceipt({ hash: burnHash })
+      const msgLog = receipt.logs.find(
+        (l) => l.address.toLowerCase() === '0xe737e5cebeeba77efe34d4aa090756590b1ce275'
+      )
+      if (!msgLog) throw new Error('MessageSent event not found in Arc receipt')
+
+      const { args } = decodeEventLog({
+        abi: MESSAGE_SENT_EVENT,
+        data: msgLog.data,
+        topics: msgLog.topics,
+      })
+      const messageBytes = args.message as `0x${string}`
+      const messageHash  = keccak256(messageBytes)
+
+      // Step 5: Poll Circle attestation
+      setCctpStep('attesting')
+      addToast({ type: 'loading', message: '3/4 Waiting Circle attestation...' })
+      let attestation = ''
+      for (let i = 0; i < 60; i++) {
+        await new Promise((r) => setTimeout(r, 5000))
+        const res  = await fetch(`https://iris-api-sandbox.circle.com/v1/attestations/${messageHash}`)
+        const json = await res.json()
+        if (json.status === 'complete') { attestation = json.attestation; break }
+      }
+      if (!attestation) throw new Error('Attestation timeout - retry later')
+
+      // Step 6: Switch to Sepolia and receiveMessage
+      setCctpStep('minting')
+      addToast({ type: 'loading', message: '4/4 Minting USDC on Sepolia...' })
+      await switchChain({ chainId: sepolia.id })
+      await sendTransactionAsync({
+        to: ARC_MSG_TRANSMITTER,
+        data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
+          args: [messageBytes, attestation as `0x${string}`] }),
+      })
+
+      setCctpStep('done')
+      addToast({ type: 'success', message: `${cctpAmount} USDC arrived on Sepolia!`, txHash: burnHash })
+      setCctpAmount('')
+
+    } catch (e: unknown) {
+      setCctpStep('error')
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Bridge failed' })
+    }
+  }
+
+  // ERC-8183 AgenticCommerce functions
+
+  async function e8183CreateAndFund() {
+    const amt = parseFloat(e8183Amount)
+    if (!isAddress(e8183Provider)) return addToast({ type: 'error', message: 'Invalid provider address' })
+    if (!amt || amt <= 0)          return addToast({ type: 'error', message: 'Enter USDC amount' })
+    if (!e8183Desc.trim())         return addToast({ type: 'error', message: 'Enter job description' })
+    const { encodeFunctionData } = await import('viem')
+    const clientAddr = allAddresses[0] as `0x${string}`
+    if (!clientAddr) return addToast({ type: 'error', message: 'Connect wallet' })
+
+    const usdcAmt  = BigInt(Math.round(amt * 1e6))
+    const expiredAt = BigInt(Math.floor(Date.now() / 1000) + parseInt(e8183Days) * 86400)
+
+    setE8183Loading(true)
+    setE8183Step('creating')
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+
+      // createJob: provider=e8183Provider, evaluator=clientAddr (so client can approve)
+      addToast({ type: 'loading', message: '1/3 Creating ERC-8183 job...' })
+      const createHash = await sendTransactionAsync({
+        to: ERC8183_CONTRACT,
+        data: encodeFunctionData({ abi: ERC8183_ABI, functionName: 'createJob',
+          args: [e8183Provider as `0x${string}`, clientAddr, expiredAt, e8183Desc, '0x0000000000000000000000000000000000000000' as `0x${string}`] }),
+      })
+
+      // Wait for receipt to get jobId from event (fallback: use nextJobId read)
+      const arcClient = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
+      await arcClient.waitForTransactionReceipt({ hash: createHash })
+      const nextId = await arcClient.readContract({
+        address: ERC8183_CONTRACT, abi: ERC8183_ABI, functionName: 'nextJobId',
+      }) as bigint
+      const jobId = nextId - 1n
+      setE8183JobId(jobId.toString())
+
+      // setBudget + approve + fund
+      setE8183Step('funding')
+      addToast({ type: 'loading', message: '2/3 Setting budget...' })
+      await sendTransactionAsync({
+        to: ERC8183_CONTRACT,
+        data: encodeFunctionData({ abi: ERC8183_ABI, functionName: 'setBudget',
+          args: [jobId, usdcAmt, '0x' as `0x${string}`] }),
+      })
+
+      addToast({ type: 'loading', message: '3/3 Approving & funding job...' })
+      await sendTransactionAsync({
+        to: ARC_TESTNET_USDC,
+        data: encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve',
+          args: [ERC8183_CONTRACT, usdcAmt] }),
+      })
+      await sendTransactionAsync({
+        to: ERC8183_CONTRACT,
+        data: encodeFunctionData({ abi: ERC8183_ABI, functionName: 'fund',
+          args: [jobId, '0x' as `0x${string}`] }),
+      })
+
+      setE8183Step('done')
+      addToast({ type: 'success', message: `Job #${jobId} funded with ${amt} USDC!` })
+      await e8183LookupJob(jobId.toString())
+
+    } catch (e: unknown) {
+      setE8183Step('error')
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'ERC-8183 create failed' })
+    } finally {
+      setE8183Loading(false)
+    }
+  }
+
+  async function e8183Submit() {
+    if (!e8183JobId) return addToast({ type: 'error', message: 'Enter job ID' })
+    if (!e8183DelivUri.trim()) return addToast({ type: 'error', message: 'Enter deliverable URI' })
+    const { encodeFunctionData, keccak256, toBytes } = await import('viem')
+    const delivHash = keccak256(toBytes(e8183DelivUri)) as `0x${string}`
+
+    setE8183Loading(true)
+    setE8183Step('submitting')
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+      addToast({ type: 'loading', message: 'Submitting deliverable on-chain...' })
+      await sendTransactionAsync({
+        to: ERC8183_CONTRACT,
+        data: encodeFunctionData({ abi: ERC8183_ABI, functionName: 'submit',
+          args: [BigInt(e8183JobId), delivHash, '0x' as `0x${string}`] }),
+      })
+      addToast({ type: 'success', message: 'Deliverable submitted!' })
+      await e8183LookupJob(e8183JobId)
+    } catch (e: unknown) {
+      setE8183Step('error')
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Submit failed' })
+    } finally {
+      setE8183Loading(false)
+    }
+  }
+
+  async function e8183Complete(approved: boolean) {
+    if (!e8183JobId) return addToast({ type: 'error', message: 'Enter job ID' })
+    const { encodeFunctionData, keccak256, toBytes } = await import('viem')
+    const reason = keccak256(toBytes(approved ? 'approved' : 'rejected')) as `0x${string}`
+
+    setE8183Loading(true)
+    setE8183Step('completing')
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+      addToast({ type: 'loading', message: approved ? 'Approving job...' : 'Rejecting job...' })
+      await sendTransactionAsync({
+        to: ERC8183_CONTRACT,
+        data: encodeFunctionData({ abi: ERC8183_ABI, functionName: 'complete',
+          args: [BigInt(e8183JobId), reason, '0x' as `0x${string}`] }),
+      })
+      addToast({ type: 'success', message: approved ? 'Job approved - provider paid!' : 'Job rejected - funds returned!' })
+      await e8183LookupJob(e8183JobId)
+    } catch (e: unknown) {
+      setE8183Step('error')
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Complete failed' })
+    } finally {
+      setE8183Loading(false)
+    }
+  }
+
+  async function e8183LookupJob(idOverride?: string) {
+    const id = idOverride ?? e8183JobId
+    if (!id) return addToast({ type: 'error', message: 'Enter job ID' })
+    setE8183Loading(true)
+    try {
+      const arcClient = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
+      const job = await arcClient.readContract({
+        address: ERC8183_CONTRACT, abi: ERC8183_ABI, functionName: 'getJob', args: [BigInt(id)],
+      }) as { id: bigint; client: string; provider: string; evaluator: string; description: string; budget: bigint; expiredAt: bigint; status: number }
+      setE8183Job(job)
+    } catch (e: unknown) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Lookup failed' })
+    } finally {
+      setE8183Loading(false)
     }
   }
 
@@ -1611,7 +1913,120 @@ export default function App() {
             <div className="section-layout">
               <div className="section-main">
                 <div className="panel">
-                  <div className="escrow-board">
+                  {/* Protocol selector */}
+                  <div className="escrow-protocol-tabs">
+                    <button
+                      className={`escrow-proto-btn ${escrowProtocol === 'arc-escrow' ? 'active' : ''}`}
+                      onClick={() => setEscrowProtocol('arc-escrow')}>
+                      ArcEscrow
+                    </button>
+                    <button
+                      className={`escrow-proto-btn ${escrowProtocol === 'erc8183' ? 'active' : ''}`}
+                      onClick={() => setEscrowProtocol('erc8183')}>
+                      ERC-8183 <span className="proto-badge">official</span>
+                    </button>
+                  </div>
+
+                  {escrowProtocol === 'erc8183' && (
+                    <div className="e8183-panel">
+                      <div className="e8183-tabs">
+                        <button className={e8183Tab === 'create' ? 'active' : ''} onClick={() => setE8183Tab('create')}>+ Create Job</button>
+                        <button className={e8183Tab === 'lookup' ? 'active' : ''} onClick={() => setE8183Tab('lookup')}>Lookup / Manage</button>
+                      </div>
+
+                      {e8183Tab === 'create' ? (
+                        <div className="e8183-form">
+                          <div className="escrow-form-group">
+                            <label>Provider Address (agent wallet)</label>
+                            <input className="action-input" placeholder="0x..." value={e8183Provider}
+                              onChange={(e) => setE8183Provider(e.target.value)} />
+                          </div>
+                          <div className="escrow-form-row">
+                            <div className="escrow-form-group">
+                              <label>Budget</label>
+                              <div className="escrow-input-suffix">
+                                <input className="action-input" inputMode="decimal" placeholder="0.00" value={e8183Amount}
+                                  onChange={(e) => setE8183Amount(e.target.value)} />
+                                <span>USDC</span>
+                              </div>
+                            </div>
+                            <div className="escrow-form-group">
+                              <label>Deadline</label>
+                              <div className="escrow-input-suffix">
+                                <input className="action-input" inputMode="numeric" placeholder="3" value={e8183Days}
+                                  onChange={(e) => setE8183Days(e.target.value)} />
+                                <span>days</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="escrow-form-group">
+                            <label>Job Description</label>
+                            <input className="action-input" placeholder="Describe the task..." value={e8183Desc}
+                              onChange={(e) => setE8183Desc(e.target.value)} />
+                          </div>
+                          <button className="btn-primary escrow-submit-btn" onClick={e8183CreateAndFund} disabled={e8183Loading}>
+                            <Lock size={13} /> {e8183Loading ? (e8183Step === 'creating' ? 'Creating...' : 'Funding...') : 'Create & Fund Job'}
+                          </button>
+                          <div className="escrow-hint">
+                            Uses Arc's official ERC-8183 standard. You (client) are set as the evaluator — you approve or reject the deliverable.
+                          </div>
+                          {e8183JobId && (
+                            <div className="e8183-job-id-pill">Job ID: <strong>#{e8183JobId}</strong></div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="e8183-lookup">
+                          <div className="escrow-form-group">
+                            <label>Job ID</label>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <input className="action-input" placeholder="e.g. 0" value={e8183JobId}
+                                onChange={(e) => setE8183JobId(e.target.value)} style={{ flex: 1 }} />
+                              <button className="btn-ghost" onClick={() => e8183LookupJob()} disabled={e8183Loading}>
+                                {e8183Loading ? '...' : 'Fetch'}
+                              </button>
+                            </div>
+                          </div>
+                          {e8183Job && (
+                            <div className="e8183-job-card">
+                              <div className="e8183-job-row"><span>Status</span><span className={`e8183-status s${e8183Job.status}`}>
+                                {['Created','Funded','Submitted','Completed','Rejected','Expired'][e8183Job.status] ?? e8183Job.status}
+                              </span></div>
+                              <div className="e8183-job-row"><span>Client</span><span className="addr-mono">{e8183Job.client.slice(0,10)}…</span></div>
+                              <div className="e8183-job-row"><span>Provider</span><span className="addr-mono">{e8183Job.provider.slice(0,10)}…</span></div>
+                              <div className="e8183-job-row"><span>Budget</span><span>{(Number(e8183Job.budget) / 1e6).toFixed(2)} USDC</span></div>
+                              <div className="e8183-job-row"><span>Description</span><span style={{ maxWidth: 220, textAlign: 'right', wordBreak: 'break-word' }}>{e8183Job.description}</span></div>
+                              {/* Provider: submit deliverable */}
+                              {e8183Job.status === 1 && (
+                                <div className="e8183-action-block">
+                                  <label className="input-label">Deliverable URI (hashed on-chain)</label>
+                                  <input className="action-input" placeholder="https://... or ipfs://..." value={e8183DelivUri}
+                                    onChange={(e) => setE8183DelivUri(e.target.value)} />
+                                  <button className="btn-primary escrow-submit-btn" onClick={e8183Submit} disabled={e8183Loading}>
+                                    {e8183Loading && e8183Step === 'submitting' ? 'Submitting...' : 'Submit Deliverable'}
+                                  </button>
+                                </div>
+                              )}
+                              {/* Evaluator (client): approve or reject */}
+                              {e8183Job.status === 2 && (
+                                <div className="e8183-action-block">
+                                  <div style={{ display: 'flex', gap: 8 }}>
+                                    <button className="btn-primary" style={{ flex: 1 }} onClick={() => e8183Complete(true)} disabled={e8183Loading}>
+                                      {e8183Loading && e8183Step === 'completing' ? '...' : '✓ Approve & Pay'}
+                                    </button>
+                                    <button className="btn-ghost" style={{ flex: 1, color: 'var(--error)' }} onClick={() => e8183Complete(false)} disabled={e8183Loading}>
+                                      ✕ Reject
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {escrowProtocol === 'arc-escrow' && <div className="escrow-board">
                     <div className="escrow-board-tabs">
                       <button className={escrowMyTab === 'new' ? 'active' : ''} onClick={() => setEscrowMyTab('new')}>
                         + New Job
@@ -1819,6 +2234,7 @@ export default function App() {
                       </div>
                     )}
                   </div>
+                  }
                 </div>
               </div>
 
@@ -1950,11 +2366,30 @@ export default function App() {
                         })}
                       </div>
                     )}
+                    {/* Direction toggle */}
+                    <div className="cctp-direction-toggle">
+                      <button
+                        className={`cctp-dir-btn ${cctpDirection === 'to-arc' ? 'active' : ''}`}
+                        onClick={() => { setCctpDirection('to-arc'); setCctpStep('idle'); setCctpBurnHash('') }}
+                        disabled={cctpStep !== 'idle' && cctpStep !== 'error' && cctpStep !== 'done'}>
+                        Sepolia → Arc
+                      </button>
+                      <button
+                        className={`cctp-dir-btn ${cctpDirection === 'to-sepolia' ? 'active' : ''}`}
+                        onClick={() => { setCctpDirection('to-sepolia'); setCctpStep('idle'); setCctpBurnHash('') }}
+                        disabled={cctpStep !== 'idle' && cctpStep !== 'error' && cctpStep !== 'done'}>
+                        Arc → Sepolia
+                      </button>
+                    </div>
                     {cctpStep === 'done' ? (
                       <div className="cctp-done">
                         <div style={{ fontSize: 24, marginBottom: 6 }}>✅</div>
-                        <div style={{ fontWeight: 600, marginBottom: 2 }}>Bridged to Arc!</div>
-                        <div style={{ opacity: 0.5, fontSize: 'var(--text-xs)' }}>{cctpAmount} USDC → Arc Testnet</div>
+                        <div style={{ fontWeight: 600, marginBottom: 2 }}>
+                          {cctpDirection === 'to-arc' ? 'Bridged to Arc!' : 'Bridged to Sepolia!'}
+                        </div>
+                        <div style={{ opacity: 0.5, fontSize: 'var(--text-xs)' }}>
+                          {cctpAmount} USDC → {cctpDirection === 'to-arc' ? 'Arc Testnet' : 'Sepolia'}
+                        </div>
                         <button className="btn-ghost" style={{ marginTop: 10 }} onClick={() => { setCctpStep('idle'); setCctpBurnHash('') }}>
                           Bridge again
                         </button>
@@ -1963,19 +2398,25 @@ export default function App() {
                       <div className="cctp-balance-row">
                         <div className="cctp-bal-item">
                           <span className="cctp-bal-chain">
-                            <span className="arc-dot" style={{ background: '#627eea' }} /> Sepolia
+                            <span className="arc-dot" style={{ background: cctpDirection === 'to-arc' ? '#627eea' : '#00c2ff' }} />
+                            {cctpDirection === 'to-arc' ? 'Sepolia' : 'Arc Testnet'}
                           </span>
                           <span className="cctp-bal-val">
-                            {cctpBalances.sepolia !== '—' ? `${cctpBalances.sepolia} USDC` : '—'}
+                            {cctpDirection === 'to-arc'
+                              ? (cctpBalances.sepolia !== '—' ? `${cctpBalances.sepolia} USDC` : '—')
+                              : (cctpBalances.arc !== '—' ? `${cctpBalances.arc} USDC` : '—')}
                           </span>
                         </div>
                         <div className="cctp-bal-arrow">→</div>
                         <div className="cctp-bal-item">
                           <span className="cctp-bal-chain">
-                            <span className="arc-dot" style={{ background: '#00c2ff' }} /> Arc Testnet
+                            <span className="arc-dot" style={{ background: cctpDirection === 'to-arc' ? '#00c2ff' : '#627eea' }} />
+                            {cctpDirection === 'to-arc' ? 'Arc Testnet' : 'Sepolia'}
                           </span>
                           <span className="cctp-bal-val">
-                            {cctpBalances.arc !== '—' ? `${cctpBalances.arc} USDC` : '—'}
+                            {cctpDirection === 'to-arc'
+                              ? (cctpBalances.arc !== '—' ? `${cctpBalances.arc} USDC` : '—')
+                              : (cctpBalances.sepolia !== '—' ? `${cctpBalances.sepolia} USDC` : '—')}
                           </span>
                         </div>
                         {cctpBalances.loading
@@ -1987,18 +2428,18 @@ export default function App() {
                       <input className="action-input" type="number" placeholder="0.0"
                         value={cctpAmount} onChange={(e) => setCctpAmount(e.target.value)}
                         disabled={cctpStep !== 'idle'} />
-                      <label className="input-label">Arc recipient (optional)</label>
-                      <input className="action-input" placeholder="0x… (default: your wallet)"
+                      <label className="input-label">Recipient (optional — default: your wallet)</label>
+                      <input className="action-input" placeholder="0x…"
                         value={cctpRecipient} onChange={(e) => setCctpRecipient(e.target.value)}
                         disabled={cctpStep !== 'idle'} />
                       <button className="btn-primary" style={{ marginTop: 4 }}
-                        onClick={executeCCTPBridge}
+                        onClick={cctpDirection === 'to-arc' ? executeCCTPBridge : executeCCTPBridgeArcToSepolia}
                         disabled={cctpStep !== 'idle' && cctpStep !== 'error'}>
-                        {cctpStep === 'idle'      ? 'Bridge to Arc'          :
+                        {cctpStep === 'idle'      ? (cctpDirection === 'to-arc' ? 'Bridge to Arc' : 'Bridge to Sepolia') :
                          cctpStep === 'approving' ? 'Approving USDC...'      :
-                         cctpStep === 'burning'   ? 'Burning on Sepolia...'  :
+                         cctpStep === 'burning'   ? (cctpDirection === 'to-arc' ? 'Burning on Sepolia...' : 'Burning on Arc...') :
                          cctpStep === 'attesting' ? 'Waiting Circle attestation...' :
-                         cctpStep === 'minting'   ? 'Minting on Arc...'      :
+                         cctpStep === 'minting'   ? (cctpDirection === 'to-arc' ? 'Minting on Arc...' : 'Minting on Sepolia...') :
                          cctpStep === 'error'     ? 'Retry Bridge'           : '...'}
                       </button>
                       {cctpStep === 'attesting' && (
@@ -2009,10 +2450,14 @@ export default function App() {
                       )}
                       <div className="coming-soon" style={{ marginTop: 6 }}>
                         <span className="coming-soon-label">CCTP V2</span>
-                        Official Circle bridge · 0 slippage · 1:1 mint
+                        Official Circle bridge · 0 slippage · 1:1 mint · bidirectional
                       </div>
                       {cctpBurnHash && (
-                        <a className="cctp-tx-link" href={`https://sepolia.etherscan.io/tx/${cctpBurnHash}`} target="_blank" rel="noreferrer">
+                        <a className="cctp-tx-link"
+                          href={cctpDirection === 'to-arc'
+                            ? `https://sepolia.etherscan.io/tx/${cctpBurnHash}`
+                            : `https://explorer.testnet.arc.network/tx/${cctpBurnHash}`}
+                          target="_blank" rel="noreferrer">
                           Burn tx ↗
                         </a>
                       )}
