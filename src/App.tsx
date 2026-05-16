@@ -2017,23 +2017,23 @@ export default function App() {
               <div className="ov-ambient ov-ambient-two" />
               <div className="ov-hero-text">
                 <div className="ov-eyebrow">Circle + Arc · Agentic Economy Track</div>
-                <h1 className="ov-h1">USDC rails for<br />autonomous work</h1>
+                <h1 className="ov-h1">USDC Portal for agentic settlement</h1>
                 <p className="ov-lead">
-                  A polished settlement console for AI agents: bridge testnet USDC, lock funds
-                  in escrow, verify deliverables with Claude, and release payouts on Arc.
+                  A finance-grade workspace for moving testnet USDC, funding Arc contracts,
+                  verifying agent work, and releasing payouts through a clean operational flow.
                 </p>
                 <div className="ov-metrics">
                   <div className="ov-metric">
-                    <span className="ov-metric-value">CCTP V2</span>
-                    <span className="ov-metric-label">Arc to Sepolia recovery</span>
-                  </div>
-                  <div className="ov-metric">
-                    <span className="ov-metric-value">Claude</span>
-                    <span className="ov-metric-label">AI verdict workflow</span>
+                    <span className="ov-metric-value">9 chains</span>
+                    <span className="ov-metric-label">Wallet, balance, and route coverage</span>
                   </div>
                   <div className="ov-metric">
                     <span className="ov-metric-value">USDC</span>
-                    <span className="ov-metric-label">native settlement asset</span>
+                    <span className="ov-metric-label">Stablecoin payments and settlement</span>
+                  </div>
+                  <div className="ov-metric">
+                    <span className="ov-metric-value">Arc</span>
+                    <span className="ov-metric-label">Contract payments and agent escrow</span>
                   </div>
                 </div>
                 <div className="ov-status-row">
@@ -2065,9 +2065,9 @@ export default function App() {
                 <div className="ov-showcase-wall" aria-hidden="true">
                   <div className="showcase-column slow">
                     {[
-                      ['Portfolio', 'Balances', 'Across chains'],
-                      ['USDC', 'Stable asset', 'Unified view'],
-                      ['Gas', 'Network fees', 'Live estimates'],
+                      ['Discover', 'Wallet state', 'Balances and networks'],
+                      ['Prepare', 'USDC source', 'Faucet, bridge, swap'],
+                      ['Monitor', 'Live signals', 'Gas, price, history'],
                     ].map((item, i) => (
                       <div className="showcase-card" key={`a-${i}`}>
                         <span>{item[0]}</span>
@@ -2078,9 +2078,9 @@ export default function App() {
                   </div>
                   <div className="showcase-column reverse">
                     {[
-                      ['CCTP V2', 'Ready', 'Sepolia recovery'],
-                      ['Pay Hub', 'Live', 'Arc Testnet'],
-                      ['Claude Review', 'AI verdicts', 'Escrow flow'],
+                      ['Move', 'Circle rails', 'CCTP and App Kit'],
+                      ['Fund', 'Arc contract', 'Pay Hub and escrow'],
+                      ['Review', 'AI verdict', 'Claude evaluation'],
                     ].map((item, i) => (
                       <div className="showcase-card accent" key={`b-${i}`}>
                         <span>{item[0]}</span>
@@ -2091,9 +2091,9 @@ export default function App() {
                   </div>
                   <div className="showcase-column slow">
                     {[
-                      ['Bridge', 'Circle route', 'Attested mint'],
-                      ['Wallets', 'Multi', 'Injected + WC'],
-                      ['Activity', 'Synced', 'Recent txs'],
+                      ['Settle', 'USDC payout', 'Contract release'],
+                      ['Verify', 'Explorer proof', 'ArcScan links'],
+                      ['Operate', 'Workspace', 'Dashboard modules'],
                     ].map((item, i) => (
                       <div className="showcase-card" key={`c-${i}`}>
                         <span>{item[0]}</span>
@@ -2147,6 +2147,20 @@ export default function App() {
                   </div>
                 </div>
               </div>
+            </section>
+
+            <section className="ov-grant-strip reveal-section">
+              {([
+                { label: 'Use case', title: 'Stablecoin operations', copy: 'One clean surface for balances, routes, contract payment, faucet links, and activity.' },
+                { label: 'Settlement', title: 'Arc-native contract flow', copy: 'Move USDC into Arc, pay a contract, hold escrow, and release funds with clear transaction states.' },
+                { label: 'Verification', title: 'AI-assisted review', copy: 'Claude evaluation turns submitted work into a structured verdict before payout.' },
+              ] as const).map((item, i) => (
+                <div className="ov-grant-card" key={item.title} style={{ '--step-i': i } as React.CSSProperties}>
+                  <span>{item.label}</span>
+                  <strong>{item.title}</strong>
+                  <p>{item.copy}</p>
+                </div>
+              ))}
             </section>
 
             {/* Product Explanation */}

@@ -1811,6 +1811,7 @@ body {
 }
 
 .overview-page .ov-hero,
+.overview-page .ov-grant-strip,
 .overview-page .ov-explain,
 .overview-page .ov-flow-section,
 .overview-page .ov-services,
@@ -1913,7 +1914,7 @@ body {
 }
 
 .overview-page .ov-eyebrow::after {
-  content: 'Circle + Arc agentic payment infrastructure';
+  content: 'Circle + Arc payment infrastructure';
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0;
@@ -1927,8 +1928,8 @@ body {
 .overview-page .ov-h1 {
   max-width: 760px;
   margin-bottom: 22px;
-  font-size: 76px;
-  line-height: 0.98;
+  font-size: 72px;
+  line-height: 1;
   letter-spacing: 0;
   font-weight: 800;
   background: linear-gradient(180deg, var(--text) 0%, color-mix(in srgb, var(--text) 62%, var(--arc)) 100%);
@@ -1959,7 +1960,7 @@ body {
 
 .ov-metric {
   min-width: 0;
-  padding: 14px 16px;
+  padding: 16px 18px;
   background: color-mix(in srgb, var(--surface) 88%, transparent);
   animation: landing-card-in 0.55s ease both;
 }
@@ -1977,15 +1978,15 @@ body {
   margin-bottom: 3px;
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
 }
 
 .ov-metric-label {
   display: block;
   color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.35;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .overview-page .ov-status-row {
@@ -2410,6 +2411,67 @@ body {
 .ov-action-tile.primary {
   background: color-mix(in srgb, var(--accent) 12%, var(--surface2));
   color: var(--accent);
+}
+
+.ov-grant-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin-top: -34px;
+  margin-bottom: 86px;
+  padding: 0 40px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--surface) 92%, transparent), color-mix(in srgb, var(--surface2) 86%, transparent)),
+    var(--surface);
+}
+
+.ov-grant-card {
+  min-height: 190px;
+  padding: 28px 28px 30px;
+  border-right: 1px solid var(--border);
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 0.72s ease, transform 0.72s cubic-bezier(.2,.8,.2,1), background 0.18s ease;
+  transition-delay: calc(var(--step-i, 0) * 0.12s + 0.12s);
+}
+
+.ov-grant-card:last-child {
+  border-right: 0;
+}
+
+.ov-grant-card:hover {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.ov-grant-card span {
+  display: block;
+  margin-bottom: 34px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.ov-grant-card strong {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.ov-grant-card p {
+  margin: 0;
+  color: var(--text-sub);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.reveal-section.in-view .ov-grant-card {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .ov-section-heading {
@@ -2865,6 +2927,10 @@ body {
   padding: 84px 40px 0;
 }
 
+.overview-page .ov-explain {
+  padding-top: 0;
+}
+
 .overview-page .ov-pipeline-step,
 .overview-page .ov-audience-card {
   transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
@@ -2901,6 +2967,7 @@ body {
   .overview-page .ov-hero-text,
   .overview-page .ov-hero::after,
   .ov-metric,
+  .ov-grant-card,
   .ov-status-panel,
   .ov-action-tile,
   .showcase-column {
@@ -2928,6 +2995,19 @@ body {
     min-height: auto;
     grid-template-columns: 1fr;
     padding: 48px 20px 64px;
+  }
+  .ov-grant-strip {
+    grid-template-columns: 1fr;
+    margin: -28px 20px 64px;
+    padding: 0;
+  }
+  .ov-grant-card {
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .ov-grant-card:last-child {
+    border-bottom: 0;
   }
   .overview-page .ov-h1 {
     font-size: 58px;
@@ -2960,6 +3040,12 @@ body {
   }
   .overview-page .ov-h1 {
     font-size: 42px;
+  }
+  .ov-grant-card {
+    padding: 22px;
+  }
+  .ov-grant-card span {
+    margin-bottom: 18px;
   }
   .overview-page .ov-hero-visual {
     min-height: 460px;
