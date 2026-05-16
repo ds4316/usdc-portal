@@ -1141,13 +1141,15 @@ export default function App() {
       })
       setCctpBurnHash(burnHash)
 
-      // Step 4: Find MessageSent log from Arc MessageTransmitter
+      // Step 4: Find MessageSent log — filter by topic hash, not address (Arc MessageTransmitter may differ)
       const arcClient = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
       const receipt = await arcClient.waitForTransactionReceipt({ hash: burnHash })
+      // keccak256('MessageSent(bytes)') = 0x8c5261...
+      const MSG_SENT_TOPIC = '0x8c5261668696ce22758910d05bab8f186d6eb247ceac2af2e82c7dc17669b036'
       const msgLog = receipt.logs.find(
-        (l) => l.address.toLowerCase() === '0xe737e5cebeeba77efe34d4aa090756590b1ce275'
+        (l) => l.topics[0]?.toLowerCase() === MSG_SENT_TOPIC
       )
-      if (!msgLog) throw new Error('MessageSent event not found in Arc receipt')
+      if (!msgLog) throw new Error(`MessageSent event not found. Logs: ${receipt.logs.map(l => l.address).join(', ')}`)
 
       const { args } = decodeEventLog({
         abi: MESSAGE_SENT_EVENT,
