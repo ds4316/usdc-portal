@@ -1605,13 +1605,53 @@ body {
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   SCROLL REVEAL ANIMATIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: 
+    opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.reveal-item {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: 
+    opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-item--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal-item {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    SETTLEMENT DIAGRAM - Technical Infrastructure Visual
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .arc-diagram {
   position: relative;
-  width: 400px;
-  height: 400px;
+  width: 380px;
+  height: 380px;
   color: var(--text-muted);
 }
 
@@ -1640,6 +1680,7 @@ body {
   height: 140px;
   border: 1px solid var(--border2);
   border-radius: 50%;
+  animation: ring-pulse 4s ease-in-out infinite;
 }
 
 .arc-center-ring-2 {
@@ -1647,6 +1688,12 @@ body {
   height: 180px;
   border-color: var(--border);
   opacity: 0.5;
+  animation-delay: 0.5s;
+}
+
+@keyframes ring-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50%      { opacity: 0.6; transform: scale(1.02); }
 }
 
 .arc-center-core {
@@ -1661,6 +1708,7 @@ body {
   justify-content: center;
   gap: 2px;
   z-index: 2;
+  box-shadow: 0 0 40px var(--arc-dim);
 }
 
 .arc-center-label {
@@ -1697,11 +1745,13 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  transition: border-color 0.2s;
+  transition: all 0.25s ease;
 }
 
 .arc-module-content:hover {
-  border-color: var(--border3);
+  border-color: var(--arc);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px var(--arc-dim);
 }
 
 .arc-module-tag {
@@ -1721,7 +1771,7 @@ body {
 /* Connector lines */
 .arc-module-line {
   position: absolute;
-  background: var(--border);
+  background: linear-gradient(to bottom, var(--border2), var(--arc-dim));
   z-index: 0;
 }
 
@@ -1779,35 +1829,108 @@ body {
   height: 6px;
   border-radius: 50%;
   background: var(--success);
+  box-shadow: 0 0 8px var(--success);
+  animation: status-pulse 2s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   OVERVIEW PAGE - Editorial Infrastructure Design
+   OVERVIEW PAGE - Scroll-Driven Product Story
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .ov {
   max-width: none !important;
   padding: 0 !important;
+  position: relative;
+  overflow-x: hidden;
 }
 
-/* Hero */
-.ov-hero {
-  position: relative;
-  padding: 100px 48px 120px;
+/* ─── ATMOSPHERE ─── */
+.ov-atmosphere {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
   overflow: hidden;
 }
 
-.ov-hero-bg {
+.ov-atmos-gradient {
   position: absolute;
   inset: 0;
   background: 
-    radial-gradient(ellipse 80% 60% at 70% 30%, rgba(0,191,255,0.04) 0%, transparent 50%);
-  pointer-events: none;
+    radial-gradient(ellipse 100% 80% at 70% 0%, var(--arc-dim) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 50% at 30% 100%, rgba(0,119,204,0.04) 0%, transparent 50%);
+}
+
+.ov-atmos-grid {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 80px 80px;
+  opacity: 0.3;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black, transparent);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black, transparent);
+}
+
+.ov-atmos-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.4;
+}
+
+.ov-atmos-glow-1 {
+  width: 600px;
+  height: 600px;
+  top: -200px;
+  right: -100px;
+  background: var(--arc-dim);
+}
+
+.ov-atmos-glow-2 {
+  width: 400px;
+  height: 400px;
+  bottom: 20%;
+  left: -100px;
+  background: rgba(0,119,204,0.08);
+}
+
+/* ─── SECTION DIVIDER ─── */
+.ov-divider {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 48px;
+  position: relative;
+  z-index: 1;
+}
+
+.ov-divider::after {
+  content: '';
+  display: block;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--border2) 20%, var(--border2) 80%, transparent 100%);
+}
+
+/* ─── HERO ─── */
+.ov-hero {
+  position: relative;
+  z-index: 1;
+  padding: 100px 48px 80px;
+}
+
+.ov-hero-inner {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .ov-hero-header {
-  max-width: 1200px;
-  margin: 0 auto 48px;
+  margin-bottom: 48px;
 }
 
 .ov-meta {
@@ -1820,6 +1943,15 @@ body {
   color: var(--text-muted);
 }
 
+.ov-meta-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 8px var(--success);
+  animation: status-pulse 2s ease-in-out infinite;
+}
+
 .ov-meta-sep {
   width: 3px;
   height: 3px;
@@ -1829,11 +1961,9 @@ body {
 
 .ov-hero-main {
   display: grid;
-  grid-template-columns: 1fr 420px;
+  grid-template-columns: 1fr 400px;
   gap: 80px;
   align-items: center;
-  max-width: 1200px;
-  margin: 0 auto;
 }
 
 .ov-hero-copy {
@@ -1841,12 +1971,16 @@ body {
 }
 
 .ov-title {
-  font-size: 64px;
+  font-size: 60px;
   font-weight: 600;
   line-height: 1.02;
   letter-spacing: -0.03em;
   color: var(--text);
   margin: 0 0 24px;
+}
+
+.ov-title-accent {
+  color: var(--arc);
 }
 
 .ov-subtitle {
@@ -1866,8 +2000,8 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 44px;
-  padding: 0 24px;
+  height: 46px;
+  padding: 0 26px;
   background: var(--text);
   border: none;
   border-radius: 8px;
@@ -1875,19 +2009,20 @@ body {
   font-weight: 500;
   color: var(--bg);
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: all 0.2s ease;
 }
 
 .ov-cta-primary:hover {
-  opacity: 0.85;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
 }
 
 .ov-cta-secondary {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 44px;
-  padding: 0 20px;
+  height: 46px;
+  padding: 0 22px;
   background: transparent;
   border: 1px solid var(--border2);
   border-radius: 8px;
@@ -1895,20 +2030,21 @@ body {
   font-weight: 500;
   color: var(--text-sub);
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  transition: all 0.2s ease;
 }
 
 .ov-cta-secondary:hover {
   border-color: var(--text-muted);
   color: var(--text);
+  transform: translateY(-1px);
 }
 
 .ov-cta-tertiary {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 44px;
-  padding: 0 16px;
+  height: 46px;
+  padding: 0 18px;
   background: transparent;
   border: none;
   font-size: 14px;
@@ -1927,7 +2063,7 @@ body {
   justify-content: center;
 }
 
-/* Section headers */
+/* ─── SECTION HEADERS ─── */
 .ov-section-head {
   margin-bottom: 40px;
 }
@@ -1938,7 +2074,7 @@ body {
   font-weight: 600;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--arc);
   margin-bottom: 12px;
 }
 
@@ -1956,8 +2092,10 @@ body {
   margin: 0;
 }
 
-/* Process / Pipeline */
+/* ─── PROCESS / PIPELINE ─── */
 .ov-process {
+  position: relative;
+  z-index: 1;
   padding: 80px 48px;
   max-width: 1200px;
   margin: 0 auto;
@@ -1965,9 +2103,6 @@ body {
 
 .ov-pipeline {
   position: relative;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
 }
 
 .ov-pipeline-track {
@@ -1976,7 +2111,27 @@ body {
   left: 40px;
   right: 40px;
   height: 1px;
-  background: linear-gradient(90deg, var(--border2) 0%, var(--border) 100%);
+  background: var(--border);
+  overflow: hidden;
+}
+
+.ov-pipeline-track-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--arc), var(--arc-dim));
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: track-fill 2s ease-out 0.5s forwards;
+}
+
+@keyframes track-fill {
+  to { transform: scaleX(1); }
+}
+
+.ov-pipeline-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
 }
 
 .ov-step {
@@ -1997,6 +2152,13 @@ body {
   font-weight: 600;
   color: var(--text-sub);
   margin-bottom: 20px;
+  transition: all 0.25s ease;
+}
+
+.ov-step:hover .ov-step-num {
+  border-color: var(--arc);
+  color: var(--arc);
+  box-shadow: 0 0 20px var(--arc-dim);
 }
 
 .ov-step-body {
@@ -2004,16 +2166,23 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  transition: border-color 0.15s;
+  transition: all 0.25s ease;
 }
 
 .ov-step-body:hover {
   border-color: var(--border2);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
 }
 
 .ov-step-icon {
   color: var(--text-muted);
   margin-bottom: 12px;
+  transition: color 0.2s;
+}
+
+.ov-step-body:hover .ov-step-icon {
+  color: var(--arc);
 }
 
 .ov-step-title {
@@ -2030,8 +2199,10 @@ body {
   margin: 0;
 }
 
-/* Bento Grid */
+/* ─── BENTO GRID ─── */
 .ov-capabilities {
+  position: relative;
+  z-index: 1;
   padding: 80px 48px;
   max-width: 1200px;
   margin: 0 auto;
@@ -2039,19 +2210,47 @@ body {
 
 .ov-bento {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr;
-  grid-template-rows: auto auto;
+  grid-template-columns: 1.4fr 1fr;
   gap: 16px;
 }
 
-.ov-bento-main {
+.ov-bento-main-wrap {
   grid-row: span 2;
+}
+
+.ov-bento-main {
+  height: 100%;
   padding: 32px;
-  background: var(--surface);
+  background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
   border: 1px solid var(--border);
   border-radius: 16px;
   display: flex;
   flex-direction: column;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.ov-bento-main::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--arc), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.ov-bento-main:hover {
+  border-color: var(--border2);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+
+.ov-bento-main:hover::before {
+  opacity: 1;
 }
 
 .ov-bento-label {
@@ -2059,7 +2258,7 @@ body {
   font-weight: 600;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--arc);
   margin-bottom: 16px;
 }
 
@@ -2076,6 +2275,33 @@ body {
   line-height: 1.7;
   color: var(--text-sub);
   margin: 0;
+  flex: 1;
+}
+
+.ov-bento-visual {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.ov-bento-flow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.ov-bento-flow svg {
+  color: var(--arc);
+}
+
+.ov-bento-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto 1fr;
+  gap: 16px;
 }
 
 .ov-bento-card {
@@ -2083,11 +2309,13 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  transition: border-color 0.15s;
+  transition: all 0.25s ease;
 }
 
 .ov-bento-card:hover {
   border-color: var(--border2);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
 }
 
 .ov-bento-card-title {
@@ -2108,8 +2336,16 @@ body {
   padding: 20px;
 }
 
-/* Architecture Flow */
+/* Small cards in a row at bottom */
+.ov-bento-cards > .ov-bento-sm:nth-last-child(-n+2) {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── ARCHITECTURE FLOW ─── */
 .ov-arch {
+  position: relative;
+  z-index: 1;
   padding: 80px 48px;
   max-width: 1200px;
   margin: 0 auto;
@@ -2125,38 +2361,65 @@ body {
 
 .ov-flow-node {
   flex-shrink: 0;
-  padding: 16px 24px;
+  padding: 18px 24px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  transition: border-color 0.15s;
+  border-radius: 10px;
+  text-align: center;
+  transition: all 0.25s ease;
 }
 
 .ov-flow-node:hover {
   border-color: var(--border2);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
 }
 
 .ov-flow-node-end {
-  background: var(--surface2);
-  border-color: var(--border2);
+  background: linear-gradient(135deg, var(--surface) 0%, var(--arc-dim) 100%);
+  border-color: rgba(0,191,255,0.2);
+}
+
+.ov-flow-node-end:hover {
+  border-color: var(--arc);
+  box-shadow: 0 4px 20px var(--arc-dim);
 }
 
 .ov-flow-node-label {
-  font-size: 12px;
+  display: block;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--text-sub);
+  color: var(--text);
   white-space: nowrap;
 }
 
-.ov-flow-connector {
-  width: 32px;
-  height: 1px;
-  background: var(--border2);
-  flex-shrink: 0;
+.ov-flow-node-sub {
+  display: block;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
-/* Stack */
+.ov-flow-connector {
+  width: 40px;
+  height: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.ov-flow-connector-line {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border2), var(--arc-dim));
+}
+
+/* ─── STACK ─── */
 .ov-stack {
+  position: relative;
+  z-index: 1;
   padding: 60px 48px;
   max-width: 1200px;
   margin: 0 auto;
@@ -2176,8 +2439,13 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: 18px 22px;
   background: var(--surface);
+  transition: background 0.15s;
+}
+
+.ov-stack-row:hover {
+  background: var(--surface2);
 }
 
 .ov-stack-name {
@@ -2191,14 +2459,42 @@ body {
   color: var(--text-muted);
 }
 
-/* Final CTA */
+/* ─── FINAL CTA ─── */
 .ov-cta {
-  padding: 100px 48px;
+  position: relative;
+  z-index: 1;
+  padding: 100px 48px 120px;
+}
+
+.ov-cta-inner {
+  max-width: 640px;
+  margin: 0 auto;
   text-align: center;
+  padding: 60px;
+  background: linear-gradient(135deg, var(--surface2) 0%, var(--surface) 100%);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.ov-cta-inner::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(135deg, var(--arc-dim), transparent, var(--arc-dim));
+  border-radius: 20px;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.ov-cta-inner:hover::before {
+  opacity: 1;
 }
 
 .ov-cta-title {
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--text);
@@ -2215,9 +2511,10 @@ body {
   display: flex;
   gap: 12px;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
-/* Responsive */
+/* ─── RESPONSIVE ─── */
 @media (max-width: 1100px) {
   .ov-hero-main {
     grid-template-columns: 1fr;
@@ -2240,7 +2537,7 @@ body {
     justify-content: center;
   }
   
-  .ov-pipeline {
+  .ov-pipeline-steps {
     grid-template-columns: repeat(2, 1fr);
   }
   
@@ -2252,8 +2549,12 @@ body {
     grid-template-columns: 1fr;
   }
   
-  .ov-bento-main {
+  .ov-bento-main-wrap {
     grid-row: span 1;
+  }
+  
+  .ov-bento-cards {
+    grid-template-columns: repeat(2, 1fr);
   }
   
   .arc-diagram {
@@ -2264,11 +2565,15 @@ body {
 
 @media (max-width: 768px) {
   .ov-hero {
-    padding: 60px 24px 80px;
+    padding: 60px 24px 60px;
   }
   
   .ov-title {
     font-size: 40px;
+  }
+  
+  .ov-divider {
+    padding: 0 24px;
   }
   
   .ov-process,
@@ -2280,18 +2585,30 @@ body {
     padding-right: 24px;
   }
   
-  .ov-pipeline {
+  .ov-pipeline-steps {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .ov-bento-cards {
     grid-template-columns: 1fr;
   }
   
   .ov-flow {
     flex-direction: column;
-    gap: 8px;
+    align-items: stretch;
+    gap: 0;
   }
   
   .ov-flow-connector {
+    width: 24px;
+    height: 32px;
+  }
+  
+  .ov-flow-connector-line {
     width: 1px;
-    height: 20px;
+    height: 100%;
+    background: linear-gradient(180deg, var(--border2), var(--arc-dim));
   }
   
   .ov-stack-list {
@@ -2303,6 +2620,10 @@ body {
     align-items: center;
   }
   
+  .ov-cta-inner {
+    padding: 40px 24px;
+  }
+  
   .arc-diagram {
     width: 280px;
     height: 280px;
@@ -2312,6 +2633,10 @@ body {
   .arc-module-bl, .arc-module-br { bottom: 20px; }
   .arc-module-tl, .arc-module-bl { left: 10px; }
   .arc-module-tr, .arc-module-br { right: 10px; }
+  
+  .ov-atmos-grid {
+    display: none;
+  }
 }
 
 /* ─── ACTIVITY PAGE ──────────────────────────────────────────────────────── */
