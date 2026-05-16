@@ -739,7 +739,7 @@ export default function App() {
                 symbol: isArc ? 'USDC (gas)' : isPoly ? 'POL' : isAvax ? 'AVAX' : 'ETH',
                 balance: parseFloat(formatUnits(bal, 18)).toFixed(6),
                 usdcValue: '0',
-                coingeckoId: isArc ? 'usd-coin' : isPoly ? 'matic-network' : isAvax ? 'avalanche-2' : 'ethereum',
+                coingeckoId: isArc ? 'usd-coin' : isPoly ? 'polygon-ecosystem-token' : isAvax ? 'avalanche-2' : 'ethereum',
               } as AssetRow
             }).catch(() => null)
           )
@@ -760,7 +760,7 @@ export default function App() {
       }
       // Price fetch runs in parallel with all balance queries
       const allCgIds = ['ethereum', 'usd-coin', 'tether', 'weth', 'dai',
-        'matic-network', 'arbitrum', 'optimism', 'avalanche-2']
+        'polygon-ecosystem-token', 'arbitrum', 'optimism', 'avalanche-2']
       const [settled, priceMap] = await Promise.all([
         Promise.allSettled(balanceTasks),
         fetchPrices(allCgIds),
@@ -3230,11 +3230,11 @@ export default function App() {
                       <div className="in-app-faucet-card">
                         <div className="in-app-faucet-head">
                           <div>
-                            <span className="faucet-card-chain">In-app faucet</span>
-                            <p className="faucet-step-title">Get Circle testnet USDC with active-wallet tracking</p>
+                            <span className="faucet-card-chain">Circle faucet link</span>
+                            <p className="faucet-step-title">Open the official faucet with your active wallet ready</p>
                             <p className="faucet-step-sub">{IN_APP_FAUCETS[inAppFaucetChain].desc}</p>
                           </div>
-                          <span className="arc-badge"><span className="arc-dot" /> Circle public faucet</span>
+                          <span className="arc-badge"><span className="arc-dot" /> Official link</span>
                         </div>
                         <div className="in-app-faucet-controls">
                           <select className="action-input" value={inAppFaucetChain}
@@ -3346,7 +3346,7 @@ export default function App() {
                       {[
                         { id: 'ethereum',      label: 'ETH'  },
                         { id: 'usd-coin',      label: 'USDC' },
-                        { id: 'matic-network', label: 'POL'  },
+                        { id: 'polygon-ecosystem-token', label: 'POL'  },
                         { id: 'avalanche-2',   label: 'AVAX' },
                       ].filter((p) => prices[p.id]).map((p) => (
                         <div key={p.id} className="price-item">
