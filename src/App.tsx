@@ -342,8 +342,8 @@ interface FaucetInfo {
 }
 
 const FAUCETS: FaucetInfo[] = [
-  { chain: 'Arc Testnet', chainId: arcTestnet.id, name: 'Circle Faucet', url: 'https://faucet.circle.com',
-    tokens: ['USDC'], desc: 'Official Circle faucet ??Arc Testnet USDC', cooldownHours: 24,
+  { chain: 'Arc Testnet', chainId: arcTestnet.id, name: 'Circle Faucet', url: 'https://faucet.circle.com/?allow=true',
+    tokens: ['USDC'], desc: 'Official Circle faucet - 20 USDC every 2 hours', cooldownHours: 2,
     pollToken: { address: '0x3600000000000000000000000000000000000000', decimals: 6 } },
   { chain: 'Ethereum Sepolia', chainId: sepolia.id, name: 'Alchemy Faucet', url: 'https://sepoliafaucet.com',
     tokens: ['ETH'], desc: 'Sepolia test ETH ??0.5 ETH/day', cooldownHours: 24, pollToken: 'native' },
@@ -355,10 +355,10 @@ const FAUCETS: FaucetInfo[] = [
     tokens: ['ETH'], desc: 'Coinbase official Base faucet', cooldownHours: 24, pollToken: 'native' },
 ]
 
-const IN_APP_FAUCETS: Record<InAppFaucetChain, { label: string; chainId: number; token: string; desc: string }> = {
-  'ARC-TESTNET':  { label: 'Arc Testnet',      chainId: arcTestnet.id,   token: 'USDC', desc: 'Native testnet USDC for gas, payments, bridge tests, and escrow demos.' },
-  'ETH-SEPOLIA':  { label: 'Ethereum Sepolia', chainId: sepolia.id,      token: 'USDC', desc: 'Sepolia USDC for CCTP bridge testing into Arc.' },
-  'BASE-SEPOLIA': { label: 'Base Sepolia',     chainId: baseSepolia.id,  token: 'USDC', desc: 'Base Sepolia USDC for wallet and route testing.' },
+const IN_APP_FAUCETS: Record<InAppFaucetChain, { label: string; chainId: number; token: string; url: string; desc: string }> = {
+  'ARC-TESTNET':  { label: 'Arc Testnet',      chainId: arcTestnet.id,   token: 'USDC', url: 'https://faucet.circle.com/?allow=true', desc: 'Official Circle public faucet. Open it, paste the active wallet, and this portal will watch for the incoming USDC.' },
+  'ETH-SEPOLIA':  { label: 'Ethereum Sepolia', chainId: sepolia.id,      token: 'USDC', url: 'https://faucet.circle.com/?allow=true', desc: 'Use Circle public faucet for Sepolia USDC before CCTP bridge testing into Arc.' },
+  'BASE-SEPOLIA': { label: 'Base Sepolia',     chainId: baseSepolia.id,  token: 'USDC', url: 'https://faucet.circle.com/?allow=true', desc: 'Use Circle public faucet for Base Sepolia USDC before route testing.' },
 }
 
 // ??? Public clients ???????????????????????????????????????????????????????
@@ -872,34 +872,22 @@ export default function App() {
     }, 180000)
   }
 
-  async function requestInAppFaucet() {
+  function requestInAppFaucet() {
     const addr = allAddresses[0]
     if (!addr) return addToast({ type: 'error', message: 'Connect a wallet first' })
 
     setInAppFaucetLoading(true)
     setInAppFaucetMessage('')
-    const loadId = addToast({ type: 'loading', message: `Requesting ${IN_APP_FAUCETS[inAppFaucetChain].token} from Circle faucet...` })
+    const selected = IN_APP_FAUCETS[inAppFaucetChain]
+    const loadId = addToast({ type: 'loading', message: 'Opening Circle public faucet and watching your wallet...' })
     try {
-      const res = await fetch('/api/faucet', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          address: addr,
-          blockchain: inAppFaucetChain,
-          native: false,
-          usdc: true,
-          eurc: false,
-        }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || 'Faucet request failed')
-
+      navigator.clipboard?.writeText(addr).catch(() => undefined)
+      window.open(selected.url, '_blank', 'noopener,noreferrer')
       removeToast(loadId)
-      setInAppFaucetMessage('Request sent. Balance will refresh when tokens arrive.')
-      addToast({ type: 'success', message: `${IN_APP_FAUCETS[inAppFaucetChain].token} faucet request submitted` })
-      const faucetIdx = FAUCETS.findIndex((f) => f.chainId === IN_APP_FAUCETS[inAppFaucetChain].chainId && f.tokens.includes('USDC'))
+      setInAppFaucetMessage(`Active wallet copied: ${addr.slice(0, 6)}...${addr.slice(-4)}. Complete the Circle faucet tab, then this portal will detect the incoming ${selected.token}.`)
+      addToast({ type: 'success', message: 'Circle faucet opened. Wallet address copied.' })
+      const faucetIdx = FAUCETS.findIndex((f) => f.chainId === selected.chainId && f.tokens.includes('USDC'))
       if (faucetIdx >= 0) startFaucetPoll(faucetIdx)
-      setTimeout(loadAssets, 8000)
     } catch (e) {
       removeToast(loadId)
       const msg = e instanceof Error ? e.message : 'Faucet request failed'
@@ -3243,10 +3231,10 @@ export default function App() {
                         <div className="in-app-faucet-head">
                           <div>
                             <span className="faucet-card-chain">In-app faucet</span>
-                            <p className="faucet-step-title">Request testnet USDC without leaving the portal</p>
+                            <p className="faucet-step-title">Get Circle testnet USDC with active-wallet tracking</p>
                             <p className="faucet-step-sub">{IN_APP_FAUCETS[inAppFaucetChain].desc}</p>
                           </div>
-                          <span className="arc-badge"><span className="arc-dot" /> Circle API</span>
+                          <span className="arc-badge"><span className="arc-dot" /> Circle public faucet</span>
                         </div>
                         <div className="in-app-faucet-controls">
                           <select className="action-input" value={inAppFaucetChain}
@@ -3256,7 +3244,7 @@ export default function App() {
                             ))}
                           </select>
                           <button className="btn-primary" onClick={requestInAppFaucet} disabled={!isConnected || inAppFaucetLoading}>
-                            {inAppFaucetLoading ? 'Requesting...' : `Request ${IN_APP_FAUCETS[inAppFaucetChain].token}`}
+                            {inAppFaucetLoading ? 'Opening...' : 'Open Circle Faucet'}
                           </button>
                         </div>
                         {inAppFaucetMessage && (
@@ -3265,7 +3253,7 @@ export default function App() {
                           </div>
                         )}
                         {!isConnected && (
-                          <div className="in-app-faucet-message">Connect a wallet to request tokens directly in the app.</div>
+                          <div className="in-app-faucet-message">Connect a wallet to copy the active address and watch for incoming faucet funds.</div>
                         )}
                       </div>
                       <div className="faucet-step-card">

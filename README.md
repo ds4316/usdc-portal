@@ -4,7 +4,7 @@
 
 Set these in Vercel project settings when using server-side features:
 
-- `CIRCLE_API_KEY`: required for the in-app testnet faucet (`/api/faucet`). Circle's faucet API requires a Circle API key and a mainnet-upgraded Circle developer account.
+- `CIRCLE_API_KEY`: optional only for the server-side Circle faucet API route. The default UI uses Circle's public faucet flow, copies the connected wallet address, and watches the balance for incoming testnet USDC.
 
 A cross-chain USDC management portal built on [Arc Network](https://arc.network) using Circle's [App Kit](https://docs.arc.network/app-kit).
 
