@@ -1227,7 +1227,7 @@ export default function App() {
       const res  = await fetch(`/api/attestation?messageHash=${pendingBridge.messageHash}`)
       const json = await res.json()
       if (json.status !== 'complete') {
-        addToast({ type: 'error', message: 'Attestation not ready yet — Circle is still processing. Try again in a few minutes.' })
+        addToast({ type: 'error', message: `Circle status: "${json.status ?? 'unknown'}" — ${JSON.stringify(json).slice(0,200)}` })
         return
       }
       const attestation = json.attestation as `0x${string}`
