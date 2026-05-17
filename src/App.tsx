@@ -315,6 +315,9 @@ interface MarketRequest {
   category: string
   budget: string
   deadlineDays: string
+  listingDays?: string
+  listingFee?: string
+  expiresAt?: string
   description: string
   deliverable: string
   client: string
@@ -337,6 +340,18 @@ function loadMarketRequests(): MarketRequest[] {
 }
 function saveMarketRequests(requests: MarketRequest[]) {
   localStorage.setItem(REQUESTS_KEY, JSON.stringify(requests))
+}
+function getListingFee(days: string | number) {
+  const d = Math.max(1, Math.min(7, Number(days) || 3))
+  return d <= 3 ? '0.00' : ((d - 3) * 0.05).toFixed(2)
+}
+function formatTimeLeft(expiresAt?: string) {
+  if (!expiresAt) return 'No expiry'
+  const ms = new Date(expiresAt).getTime() - Date.now()
+  if (ms <= 0) return 'Expired'
+  const days = Math.floor(ms / 86400_000)
+  const hours = Math.ceil((ms % 86400_000) / 3600_000)
+  return days > 0 ? `${days}d ${hours}h left` : `${hours}h left`
 }
 
 // LI.FI
@@ -608,6 +623,7 @@ export default function App() {
   const [requestCategory, setRequestCategory] = useState('AI Work')
   const [requestBudget, setRequestBudget] = useState('')
   const [requestDays, setRequestDays] = useState('3')
+  const [requestListingDays, setRequestListingDays] = useState('3')
   const [requestDescription, setRequestDescription] = useState('')
   const [requestDeliverable, setRequestDeliverable] = useState('')
   const [sortBy, setSortBy]         = useState<'value' | 'symbol' | 'chain'>('value')
@@ -903,6 +919,7 @@ export default function App() {
           category: requestCategory,
           budget,
           deadlineDays: requestDays,
+          listingDays: requestListingDays,
           description: requestDescription,
           deliverable: requestDeliverable,
           client: activeWallet,
@@ -912,7 +929,7 @@ export default function App() {
       if (!res.ok) throw new Error(json.error || 'Could not post request')
       if (Array.isArray(json.requests)) setMarketRequests(json.requests)
       setRequestTitle(''); setRequestBudget(''); setRequestDays('3')
-      setRequestDescription(''); setRequestDeliverable(''); setRequestCategory('AI Work')
+      setRequestListingDays('3'); setRequestDescription(''); setRequestDeliverable(''); setRequestCategory('AI Work')
       setMarketTab('browse')
       addToast({ type: 'success', message: 'Request posted to the shared board' })
     } catch (e) {
@@ -2524,6 +2541,18 @@ export default function App() {
                       <strong>days</strong>
                     </div>
                   </label>
+                  <label className="pay-field">
+                    <span>Visible for</span>
+                    <div className="pay-amount-input">
+                      <input value={requestListingDays} onChange={(e) => setRequestListingDays(e.target.value)} inputMode="numeric" placeholder="3" min="1" max="7" />
+                      <strong>days</strong>
+                    </div>
+                  </label>
+                </div>
+                <div className="market-fee-note">
+                  <span>Listing fee</span>
+                  <strong>{getListingFee(requestListingDays)} USDC</strong>
+                  <small>1-3 days free. 4-7 days add 0.05 USDC per extra day. Max 7 days.</small>
                 </div>
                 <label className="pay-field">
                   <span>Description</span>
@@ -2568,6 +2597,14 @@ export default function App() {
                       <div className="market-meta-row">
                         <span>Client {request.client.startsWith('0x') ? `${request.client.slice(0, 6)}...${request.client.slice(-4)}` : request.client}</span>
                         <span>{request.deadlineDays} days</span>
+                      </div>
+                      <div className="market-meta-row">
+                        <span>Visible {request.listingDays ?? '3'} days</span>
+                        <span>{formatTimeLeft(request.expiresAt)}</span>
+                      </div>
+                      <div className="market-meta-row">
+                        <span>Listing fee</span>
+                        <strong>{request.listingFee ?? getListingFee(request.listingDays ?? '3')} USDC</strong>
                       </div>
                       {request.agent && (
                         <div className="market-meta-row agent">
