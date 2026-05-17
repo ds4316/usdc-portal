@@ -2051,10 +2051,9 @@ export default function App() {
   const NAV_ITEMS = [
     { id: 'overview'  as const, label: 'Overview',     icon: <LayoutDashboard size={13} /> },
     { id: 'marketplace' as const, label: 'Requests',    icon: <BookUser size={13} /> },
-    { id: 'portfolio' as const, label: 'Portfolio',    icon: <Wallet size={13} /> },
-    { id: 'pay'       as const, label: 'Hub Pay',      icon: <CircleDollarSign size={13} /> },
+    { id: 'escrow'    as const, label: 'Escrow',       icon: <Lock size={13} /> },
     { id: 'funds'     as const, label: 'Move Funds',   icon: <ArrowRightLeft size={13} /> },
-    { id: 'escrow'    as const, label: 'Agent Escrow', icon: <Lock size={13} /> },
+    { id: 'portfolio' as const, label: 'Portfolio',    icon: <Wallet size={13} /> },
     { id: 'activity'  as const, label: 'Activity',     icon: <Network size={13} /> },
     { id: 'docs'      as const, label: 'Docs',         icon: <BookOpen size={13} /> },
   ]
@@ -2131,7 +2130,7 @@ export default function App() {
         <div className="nav-left">
           <span className="nav-logo">
             <CircleDollarSign size={16} style={{ verticalAlign: 'middle', marginRight: 6, color: 'var(--accent)' }} />
-            USDC Portal
+            ArcEscrow Market
           </span>
           <div className="nav-links">
             {NAV_ITEMS.map((item) => (
@@ -2199,24 +2198,24 @@ export default function App() {
               <div className="ov-ambient ov-ambient-one" />
               <div className="ov-ambient ov-ambient-two" />
               <div className="ov-hero-text">
-                <div className="ov-eyebrow">Circle + Arc payment infrastructure</div>
-                <h1 className="ov-h1">USDC Portal for agentic settlement</h1>
+                <div className="ov-eyebrow">Circle + Arc agentic settlement</div>
+                <h1 className="ov-h1">USDC escrow for work requests on Arc</h1>
                 <p className="ov-lead">
-                  A finance-grade workspace for moving testnet USDC, funding Arc contracts,
-                  verifying agent work, and releasing payouts through a clean operational flow.
+                  Clients post work, workers accept requests, USDC is locked in Arc escrow,
+                  deliverables are reviewed with AI assistance, and approved work settles in USDC.
                 </p>
                 <div className="ov-metrics">
                   <div className="ov-metric">
-                    <span className="ov-metric-value">9 chains</span>
-                    <span className="ov-metric-label">Wallet, balance, and route coverage</span>
+                    <span className="ov-metric-value">Requests</span>
+                    <span className="ov-metric-label">Post work with budget, deadline, and deliverable</span>
                   </div>
                   <div className="ov-metric">
-                    <span className="ov-metric-value">USDC</span>
-                    <span className="ov-metric-label">Stablecoin payments and settlement</span>
+                    <span className="ov-metric-value">Escrow</span>
+                    <span className="ov-metric-label">Client-funded Arc USDC settlement</span>
                   </div>
                   <div className="ov-metric">
-                    <span className="ov-metric-value">Arc</span>
-                    <span className="ov-metric-label">Contract payments and agent escrow</span>
+                    <span className="ov-metric-value">AI Review</span>
+                    <span className="ov-metric-label">Claude-assisted quality check before payout</span>
                   </div>
                 </div>
                 <div className="ov-status-row">
@@ -2248,9 +2247,9 @@ export default function App() {
                 <div className="ov-showcase-wall" aria-hidden="true">
                   <div className="showcase-column slow">
                     {[
-                      ['Discover', 'Wallet state', 'Balances and networks'],
-                      ['Prepare', 'USDC source', 'Faucet, bridge, swap'],
-                      ['Monitor', 'Live signals', 'Gas, price, history'],
+                      ['Post', 'Request terms', 'Budget and deadline'],
+                      ['Match', 'Worker accepts', 'No upfront worker payment'],
+                      ['Fund', 'Client escrow', 'USDC locked on Arc'],
                     ].map((item, i) => (
                       <div className="showcase-card" key={`a-${i}`}>
                         <span>{item[0]}</span>
@@ -2261,9 +2260,9 @@ export default function App() {
                   </div>
                   <div className="showcase-column reverse">
                     {[
-                      ['Move', 'Circle rails', 'CCTP and App Kit'],
-                      ['Fund', 'Arc contract', 'Pay Hub and escrow'],
+                      ['Submit', 'Deliverable', 'Text, file, or link'],
                       ['Review', 'AI verdict', 'Claude evaluation'],
+                      ['Release', 'USDC payout', 'Client approval'],
                     ].map((item, i) => (
                       <div className="showcase-card accent" key={`b-${i}`}>
                         <span>{item[0]}</span>
@@ -2274,9 +2273,9 @@ export default function App() {
                   </div>
                   <div className="showcase-column slow">
                     {[
-                      ['Settle', 'USDC payout', 'Contract release'],
-                      ['Verify', 'Explorer proof', 'ArcScan links'],
-                      ['Operate', 'Workspace', 'Dashboard modules'],
+                      ['Route', 'Circle rails', 'CCTP and App Kit'],
+                      ['Track', 'Explorer proof', 'ArcScan links'],
+                      ['Operate', 'Portfolio', 'Balances as support'],
                     ].map((item, i) => (
                       <div className="showcase-card" key={`c-${i}`}>
                         <span>{item[0]}</span>
@@ -2350,19 +2349,19 @@ export default function App() {
             <section className="ov-explain reveal-section">
               <div className="ov-section-heading">
                 <div className="ov-label">What It Does</div>
-                <h2>One portal for stablecoin operations</h2>
+                <h2>A request marketplace with USDC escrow</h2>
                 <p>
-                  USDC Portal groups the daily stablecoin workflow into a single financial surface:
-                  see balances, move funds, pay contracts, and verify agent work without jumping
-                  between explorers, bridges, faucets, and wallet tabs.
+                  ArcEscrow Market focuses on one clear workflow: post a request, match with a worker,
+                  lock USDC on Arc, submit the result, use AI-assisted review, and release payment.
+                  Portfolio and routing tools support the settlement flow without becoming the product.
                 </p>
               </div>
               <div className="ov-explain-grid">
                 {([
-                  { icon: <Wallet size={18} />, title: 'Monitor', desc: 'Track wallet balances, USD estimates, chain exposure, gas, and recent activity across supported networks.' },
-                  { icon: <ArrowRightLeft size={18} />, title: 'Move', desc: 'Bridge, swap, and send USDC through Circle App Kit, CCTP, and LI.FI-powered routes.' },
-                  { icon: <CircleDollarSign size={18} />, title: 'Pay', desc: 'Send USDC into an Arc Testnet payment contract with memo, status, contract balance, and explorer access.' },
-                  { icon: <Bot size={18} />, title: 'Verify', desc: 'Lock funds in escrow, submit deliverables, run Claude evaluation, and release agent payouts.' },
+                  { icon: <BookUser size={18} />, title: 'Request', desc: 'Clients publish work with a budget, deadline, expected deliverable, and visibility window.' },
+                  { icon: <Lock size={18} />, title: 'Escrow', desc: 'After a worker accepts, the client locks USDC in ArcEscrow for that worker address.' },
+                  { icon: <Upload size={18} />, title: 'Submit', desc: 'Workers submit text or files as proof of completion once escrow is funded.' },
+                  { icon: <Bot size={18} />, title: 'Review', desc: 'Claude summarizes the deliverable, flags risk, and recommends whether the client should release payment.' },
                 ] as const).map((item, i) => (
                   <div className="ov-explain-card" key={item.title} style={{ '--step-i': i } as React.CSSProperties}>
                     <div className="ov-explain-icon">{item.icon}</div>
@@ -2377,20 +2376,19 @@ export default function App() {
             <section className="ov-flow-section reveal-section">
               <div className="ov-flow-copy">
                 <div className="ov-label">How Funds Move</div>
-                <h2>From wallet to verified settlement</h2>
+                <h2>From request to verified payout</h2>
                 <p>
-                  The app separates money movement from work verification. USDC can be moved into Arc,
-                  held by a contract, checked by AI-assisted review, and released only when the workflow
-                  reaches the right state.
+                  The app separates roles clearly. Workers never fund jobs. Clients lock USDC only after
+                  a match, workers submit deliverables, and AI review helps the client decide whether to release.
                 </p>
               </div>
               <div className="ov-flow-diagram">
                 {([
-                  { title: 'Wallet', sub: activeWalletShort, tone: 'blue' },
-                  { title: 'USDC Route', sub: 'Send / Bridge / Swap', tone: 'cyan' },
-                  { title: 'Arc Contract', sub: 'Pay Hub / Escrow', tone: 'blue' },
-                  { title: 'Verification', sub: 'Claude verdict', tone: 'gold' },
-                  { title: 'Payout', sub: 'Agent receives USDC', tone: 'green' },
+                  { title: 'Request', sub: 'Budget + deliverable', tone: 'blue' },
+                  { title: 'Worker', sub: 'Accepts job', tone: 'cyan' },
+                  { title: 'ArcEscrow', sub: 'Client locks USDC', tone: 'blue' },
+                  { title: 'AI Review', sub: 'Claude verdict', tone: 'gold' },
+                  { title: 'Payout', sub: 'Worker receives USDC', tone: 'green' },
                 ] as const).map((node, i) => (
                   <div className="ov-flow-node-wrap" key={node.title} style={{ '--step-i': i } as React.CSSProperties}>
                     <div className={`ov-flow-box ${node.tone}`}>
@@ -2411,12 +2409,12 @@ export default function App() {
               </div>
               <div className="ov-service-grid">
                 {([
-                  { name: 'Portfolio Dashboard', detail: 'Balances, USD value, 24h movement, CSV export, and live prices.' },
-                  { name: 'Action Center', detail: 'Pay, send, bridge, swap, and cross-chain flows grouped by intent.' },
-                  { name: 'Network Safety', detail: 'Mainnet/testnet mode, Arc Testnet badges, and clear value disclaimers.' },
-                  { name: 'Transaction Feedback', detail: 'Loading, submitted, confirmed, already-claimed, and explorer states.' },
-                  { name: 'Developer Rails', detail: 'Vercel APIs, Circle attestation recovery, viem clients, and contract reads.' },
-                  { name: 'Agent Marketplace', detail: 'Post requests, match with agents, convert agreements into escrow jobs.' },
+                  { name: 'Requests Board', detail: 'Public work posts with budgets, deadlines, expiration, and role-aware actions.' },
+                  { name: 'ArcEscrow Settlement', detail: 'Client-funded USDC escrow, worker submission, release, and refund paths.' },
+                  { name: 'AI Review Layer', detail: 'Claude-assisted evaluation before payout, with the client keeping final control.' },
+                  { name: 'Circle Funding Rails', detail: 'Move USDC toward Arc through App Kit, CCTP, swap, bridge, and send flows.' },
+                  { name: 'Portfolio Support', detail: 'Balances and gas context stay available without distracting from the core workflow.' },
+                  { name: 'Grant-Ready Docs', detail: 'Architecture and contract links make the Circle/Arc integration easy to understand.' },
                 ] as const).map((service, i) => (
                   <div className="ov-service-card" key={service.name} style={{ '--step-i': i } as React.CSSProperties}>
                     <span>{String(i + 1).padStart(2, '0')}</span>
@@ -2432,10 +2430,10 @@ export default function App() {
               <div className="ov-label">Settlement Workflow</div>
               <div className="ov-pipeline">
                 {([
-                  { n: '01', title: 'Lock USDC',      sub: 'ArcEscrow.createJob()',   desc: 'Client deposits USDC into the ArcEscrow contract with agent address, deadline, and deliverable spec.' },
-                  { n: '02', title: 'Submit Work',     sub: 'ArcEscrow.submitWork()',  desc: 'Agent completes the task and submits a result URI on-chain through Vercel Blob, IPFS, or Arweave.' },
-                  { n: '03', title: 'Claude Review',   sub: 'POST /api/evaluate',      desc: 'Claude Haiku reads the deliverable and returns a structured verdict: approved or rejected with reasoning.' },
-                  { n: '04', title: 'Release Payout',  sub: 'ArcEscrow.approveWork()', desc: 'Client confirms verdict. USDC transfers trustlessly from escrow to agent wallet on Arc Testnet.' },
+                  { n: '01', title: 'Post + Match',    sub: 'Requests board',          desc: 'Client posts work. Worker accepts without paying anything, then waits for the client to fund escrow.' },
+                  { n: '02', title: 'Fund Escrow',     sub: 'ArcEscrow.createJob()',   desc: 'Client deposits USDC into ArcEscrow with worker address, deadline, and deliverable spec.' },
+                  { n: '03', title: 'Submit + Review', sub: 'submitWork + /api/evaluate', desc: 'Worker submits the result. Claude evaluates the deliverable and returns a structured recommendation.' },
+                  { n: '04', title: 'Release Payout',  sub: 'ArcEscrow.approveWork()', desc: 'Client confirms the recommendation. USDC transfers from escrow to the worker wallet on Arc Testnet.' },
                 ] as const).map((s, i) => (
                   <div key={i} className="ov-pipeline-step" style={{ '--step-i': i } as React.CSSProperties}>
                     <div className="ov-step-n">{s.n}</div>
@@ -2458,9 +2456,9 @@ export default function App() {
                     items: ['Define escrow terms', 'Review Claude verdict', 'One-click payout release'],
                   },
                   {
-                    role: 'Agents', tag: 'Work + Earn',
+                    role: 'Workers', tag: 'Work + Earn',
                     desc: 'Submit proof of work and receive Arc USDC after approval — no trust required from either party.',
-                    items: ['Submit result URI on-chain', 'Get AI-verified payment', 'Zero counterparty risk'],
+                    items: ['Submit result on-chain', 'Get AI-assisted review', 'Receive USDC payout'],
                   },
                   {
                     role: 'Protocols', tag: 'Build + Scale',
@@ -2627,6 +2625,20 @@ export default function App() {
                 {marketRequests.map((request) => {
                   const isOwner = activeWallet?.toLowerCase() === request.client.toLowerCase()
                   const isAgent = activeWallet && request.agent?.toLowerCase() === activeWallet.toLowerCase()
+                  const isEscrowFunded = Boolean(request.escrowJobId)
+                  const cardRole = isOwner ? 'Client' : isAgent ? 'Worker' : 'Observer'
+                  const nextStep = request.status === 'open'
+                    ? (isOwner ? 'Waiting for a worker' : 'Accept this request')
+                    : !isEscrowFunded
+                      ? (isOwner ? 'Fund escrow' : isAgent ? 'Waiting for client funding' : 'Matched')
+                      : (isAgent ? 'Submit result' : isOwner ? 'Wait for worker result' : 'Escrow funded')
+                  const flowSteps = [
+                    { label: 'Post', done: true },
+                    { label: 'Match', done: Boolean(request.agent) },
+                    { label: 'Fund', done: isEscrowFunded },
+                    { label: 'Submit', done: false },
+                    { label: 'Release', done: false },
+                  ]
                   return (
                     <article className="market-request-card" key={request.id}>
                       <div className="market-card-top">
@@ -2639,6 +2651,24 @@ export default function App() {
                       <div className="market-deliverable">
                         <span>Deliverable</span>
                         <strong>{request.deliverable}</strong>
+                      </div>
+                      <div className="market-role-next">
+                        <div>
+                          <span>Your role</span>
+                          <strong>{cardRole}</strong>
+                        </div>
+                        <div>
+                          <span>Next action</span>
+                          <strong>{nextStep}</strong>
+                        </div>
+                      </div>
+                      <div className="market-card-progress" aria-label="Request workflow progress">
+                        {flowSteps.map((step, i) => (
+                          <div className={`market-progress-step ${step.done ? 'done' : ''}`} key={step.label}>
+                            <span>{i + 1}</span>
+                            <strong>{step.label}</strong>
+                          </div>
+                        ))}
                       </div>
                       <div className="market-meta-row">
                         <span>Client {request.client.startsWith('0x') ? `${request.client.slice(0, 6)}...${request.client.slice(-4)}` : request.client}</span>
@@ -3084,6 +3114,21 @@ export default function App() {
                               <div className="escrow-detail-addrs">
                                 <div><span>Client</span><code>{escrowJob.client.slice(0,8)}…{escrowJob.client.slice(-6)}</code></div>
                                 <div><span>Worker</span><code>{escrowJob.agent.slice(0,8)}…{escrowJob.agent.slice(-6)}</code></div>
+                              </div>
+
+                              <div className={`escrow-role-banner ${isClient ? 'client' : isAgent ? 'worker' : 'observer'}`}>
+                                <span>{isClient ? 'Client action' : isAgent ? 'Worker action' : 'Observer view'}</span>
+                                <strong>
+                                  {isClient
+                                    ? escrowJob.status === 1 ? 'Review the submitted result, run AI review, then release or wait.'
+                                      : escrowJob.status === 0 ? 'Escrow is funded. Wait for the worker to submit a result.'
+                                      : 'This escrow is no longer waiting for client action.'
+                                    : isAgent
+                                      ? escrowJob.status === 0 ? 'Submit your completed work to request payment.'
+                                        : escrowJob.status === 1 ? 'Result submitted. Wait for client review.'
+                                        : 'This escrow is no longer waiting for worker action.'
+                                      : 'Connect the client or worker wallet to take action on this escrow.'}
+                                </strong>
                               </div>
 
                               {escrowJob.resultUri && (
@@ -3951,7 +3996,7 @@ export default function App() {
           <div className="footer-left">
             <span className="footer-logo">
               <CircleDollarSign size={14} style={{ verticalAlign: 'middle', marginRight: 4, color: 'var(--accent)' }} />
-              USDC Portal
+              ArcEscrow Market
             </span>
             <span className="footer-tag">Circle + Arc Stablecoin Commerce Hackathon · Agentic Economy Track</span>
           </div>

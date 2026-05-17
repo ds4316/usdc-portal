@@ -1297,6 +1297,41 @@ body {
 .escrow-detail-addrs span { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
 .escrow-detail-addrs code { font-size: var(--text-xs); font-family: var(--font-mono); color: var(--text-sub); }
 
+.escrow-role-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 13px 14px;
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  background: var(--surface3);
+}
+
+.escrow-role-banner span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.escrow-role-banner strong {
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.escrow-role-banner.client {
+  border-color: rgba(39,117,202,0.22);
+  background: rgba(39,117,202,0.06);
+}
+
+.escrow-role-banner.worker {
+  border-color: rgba(22,163,74,0.22);
+  background: rgba(22,163,74,0.07);
+}
+
 .escrow-result-link {
   font-size: var(--text-xs); color: var(--accent); text-decoration: none;
   padding: 6px 10px; border: 1px solid var(--accent-dim); border-radius: 6px;
@@ -3238,6 +3273,81 @@ body {
   color: var(--text);
   font-size: 14px;
   line-height: 1.55;
+}
+
+.market-role-next {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: 10px;
+}
+
+.market-role-next div {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface3);
+}
+
+.market-role-next span,
+.market-progress-step span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.market-role-next strong {
+  display: block;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-card-progress {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--border);
+}
+
+.market-progress-step {
+  min-width: 0;
+  padding: 9px 8px;
+  background: var(--surface3);
+}
+
+.market-progress-step.done {
+  background: rgba(39,117,202,0.08);
+}
+
+.market-progress-step.done span {
+  color: var(--accent);
+}
+
+.market-progress-step strong {
+  display: block;
+  overflow: hidden;
+  color: var(--text-sub);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-progress-step.done strong {
+  color: var(--text);
 }
 
 .market-meta-row {
