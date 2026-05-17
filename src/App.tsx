@@ -2052,7 +2052,7 @@ export default function App() {
     { id: 'overview'  as const, label: 'Overview',     icon: <LayoutDashboard size={13} /> },
     { id: 'marketplace' as const, label: 'Requests',    icon: <BookUser size={13} /> },
     { id: 'portfolio' as const, label: 'Portfolio',    icon: <Wallet size={13} /> },
-    { id: 'pay'       as const, label: 'Pay',          icon: <CircleDollarSign size={13} /> },
+    { id: 'pay'       as const, label: 'Hub Pay',      icon: <CircleDollarSign size={13} /> },
     { id: 'funds'     as const, label: 'Move Funds',   icon: <ArrowRightLeft size={13} /> },
     { id: 'escrow'    as const, label: 'Agent Escrow', icon: <Lock size={13} /> },
     { id: 'activity'  as const, label: 'Activity',     icon: <Network size={13} /> },
@@ -2691,8 +2691,8 @@ export default function App() {
             <div className="page-header pay-header">
               <CircleDollarSign size={20} style={{ color: 'var(--accent)' }} />
               <div>
-                <h2 className="page-title">Pay with USDC</h2>
-                <p className="page-sub">Arc Testnet payment hub for contract-based USDC payments</p>
+                <h2 className="page-title">Hub Pay Demo</h2>
+                <p className="page-sub">A separate contract-payment demo. This is not the request escrow flow.</p>
               </div>
               <span className="testnet-page-badge"><AlertTriangle size={12} /> Arc Testnet</span>
             </div>
@@ -2701,7 +2701,7 @@ export default function App() {
               <section className="pay-product-card">
                 <div className="pay-product-top">
                   <div>
-                    <span className="pay-kicker">Recipient Contract</span>
+                    <span className="pay-kicker">Demo recipient contract</span>
                     <h3>USDCPaymentHub</h3>
                   </div>
                   <span className="mode-pill testnet">Testnet</span>
@@ -2747,7 +2747,7 @@ export default function App() {
                 </div>
 
                 <button className="btn-primary pay-submit" onClick={payToContract} disabled={txLoading || !isConnected}>
-                  {txLoading ? 'Processing payment...' : 'Pay with USDC'}
+                  {txLoading ? 'Processing payment...' : 'Send USDC to Hub'}
                 </button>
 
                 {!isConnected && (
@@ -2763,6 +2763,11 @@ export default function App() {
                   <span className="pay-muted-label">Active wallet</span>
                   <strong>{activeWalletShort}</strong>
                   <small>{activeChainMeta?.label ?? 'No active network'}</small>
+                </div>
+                <div className="pay-side-card">
+                  <span className="pay-muted-label">What this does</span>
+                  <strong>Contract payment demo</strong>
+                  <small>This sends USDC into USDCPaymentHub so the contract owner can withdraw. Use Requests + Escrow for client-worker jobs.</small>
                 </div>
                 <div className="pay-side-card">
                   <span className="pay-muted-label">Network safety</span>
@@ -3071,14 +3076,14 @@ export default function App() {
                                 <div className="escrow-meta-item">
                                   <span className="escrow-meta-label">Role</span>
                                   <span className="escrow-meta-value">
-                                    {isClient ? 'Client' : isAgent ? 'Agent' : 'Observer'}
+                                    {isClient ? 'Client' : isAgent ? 'Worker' : 'Observer'}
                                   </span>
                                 </div>
                               </div>
 
                               <div className="escrow-detail-addrs">
                                 <div><span>Client</span><code>{escrowJob.client.slice(0,8)}…{escrowJob.client.slice(-6)}</code></div>
-                                <div><span>Agent</span><code>{escrowJob.agent.slice(0,8)}…{escrowJob.agent.slice(-6)}</code></div>
+                                <div><span>Worker</span><code>{escrowJob.agent.slice(0,8)}…{escrowJob.agent.slice(-6)}</code></div>
                               </div>
 
                               {escrowJob.resultUri && (
@@ -3088,6 +3093,21 @@ export default function App() {
                               )}
 
                               <div className="escrow-actions">
+                                {escrowJob.status === 0 && !expired && !isAgent && (
+                                  <div className="escrow-action-group escrow-waiting-panel">
+                                    <div className="escrow-submit-label">Waiting for worker result</div>
+                                    <p>
+                                      The submit form is only shown to the worker wallet:
+                                      <code>{escrowJob.agent.slice(0, 8)}...{escrowJob.agent.slice(-6)}</code>
+                                    </p>
+                                    {isClient ? (
+                                      <small>You are connected as the client. The client funds escrow and releases payment after review, but cannot submit the worker result.</small>
+                                    ) : (
+                                      <small>Connect the matched worker wallet to submit the deliverable for this job.</small>
+                                    )}
+                                  </div>
+                                )}
+
                                 {isAgent && escrowJob.status === 0 && !expired && (
                                   <div className="escrow-action-group">
                                     <div className="escrow-submit-label">Submit Work Result</div>

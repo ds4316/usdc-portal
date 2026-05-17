@@ -1307,6 +1307,33 @@ body {
 .escrow-actions { display: flex; flex-direction: column; gap: 6px; }
 .escrow-action-group { display: flex; flex-direction: column; gap: 6px; }
 
+.escrow-waiting-panel {
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 12px;
+  background: rgba(245, 158, 11, 0.08);
+}
+.escrow-waiting-panel p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  color: var(--text-sub);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+.escrow-waiting-panel code {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-weight: 800;
+}
+.escrow-waiting-panel small {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
 .escrow-ai-btn {
   width: 100%; padding: 9px; border-radius: 8px; cursor: pointer;
   background: linear-gradient(135deg, rgba(108,68,255,0.12), rgba(0,194,255,0.12));
