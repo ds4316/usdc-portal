@@ -329,39 +329,11 @@ function loadContacts(): Contact[] {
   try { return JSON.parse(localStorage.getItem(CONTACTS_KEY) ?? '[]') } catch { return [] }
 }
 function saveContacts(c: Contact[]) { localStorage.setItem(CONTACTS_KEY, JSON.stringify(c)) }
-function seedMarketRequests(): MarketRequest[] {
-  return [
-    {
-      id: 'req-demo-1',
-      title: 'Audit landing page copy and UX flow',
-      category: 'Design Review',
-      budget: '25',
-      deadlineDays: '3',
-      description: 'Review the USDC Portal landing page, identify confusing sections, and propose clearer copy for marketplace users.',
-      deliverable: 'A short UX critique with rewritten hero, workflow, and CTA copy.',
-      client: 'Demo client',
-      status: 'open',
-      createdAt: new Date(Date.now() - 3600_000).toISOString(),
-    },
-    {
-      id: 'req-demo-2',
-      title: 'Build an Arc escrow explainer diagram',
-      category: 'Visual Design',
-      budget: '40',
-      deadlineDays: '5',
-      description: 'Create a clean diagram that explains Wallet -> USDC Route -> Arc Contract -> Verification -> Payout.',
-      deliverable: 'SVG or image-ready diagram plus short implementation notes.',
-      client: 'Demo client',
-      status: 'open',
-      createdAt: new Date(Date.now() - 7200_000).toISOString(),
-    },
-  ]
-}
 function loadMarketRequests(): MarketRequest[] {
   try {
     const stored = JSON.parse(localStorage.getItem(REQUESTS_KEY) ?? '[]')
-    return Array.isArray(stored) && stored.length ? stored : seedMarketRequests()
-  } catch { return seedMarketRequests() }
+    return Array.isArray(stored) ? stored : []
+  } catch { return [] }
 }
 function saveMarketRequests(requests: MarketRequest[]) {
   localStorage.setItem(REQUESTS_KEY, JSON.stringify(requests))
@@ -2569,6 +2541,14 @@ export default function App() {
             ) : (
               <section className="market-request-grid">
                 {marketLoading && <div className="market-loading">Syncing shared request board...</div>}
+                {!marketLoading && marketRequests.length === 0 && (
+                  <div className="market-empty">
+                    <BookUser size={24} />
+                    <h3>No requests yet</h3>
+                    <p>Post the first request to test the shared board. Anyone visiting the same deployed site will be able to see it.</p>
+                    <button className="btn-primary" onClick={() => setMarketTab('create')}>Create the first request</button>
+                  </div>
+                )}
                 {marketRequests.map((request) => {
                   const isOwner = activeWallet?.toLowerCase() === request.client.toLowerCase()
                   const isAgent = activeWallet && request.agent?.toLowerCase() === activeWallet.toLowerCase()

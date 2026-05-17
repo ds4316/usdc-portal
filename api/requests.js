@@ -2,35 +2,6 @@ import { get, put } from '@vercel/blob'
 
 const PATH = 'marketplace/requests.json'
 
-function seedRequests() {
-  return [
-    {
-      id: 'req-demo-1',
-      title: 'Audit landing page copy and UX flow',
-      category: 'Design Review',
-      budget: '25.00',
-      deadlineDays: '3',
-      description: 'Review the USDC Portal landing page, identify confusing sections, and propose clearer copy for marketplace users.',
-      deliverable: 'A short UX critique with rewritten hero, workflow, and CTA copy.',
-      client: 'Demo client',
-      status: 'open',
-      createdAt: new Date(Date.now() - 3600_000).toISOString(),
-    },
-    {
-      id: 'req-demo-2',
-      title: 'Build an Arc escrow explainer diagram',
-      category: 'Visual Design',
-      budget: '40.00',
-      deadlineDays: '5',
-      description: 'Create a clean diagram that explains Wallet -> USDC Route -> Arc Contract -> Verification -> Payout.',
-      deliverable: 'SVG or image-ready diagram plus short implementation notes.',
-      client: 'Demo client',
-      status: 'open',
-      createdAt: new Date(Date.now() - 7200_000).toISOString(),
-    },
-  ]
-}
-
 function isAddress(value) {
   return typeof value === 'string' && /^0x[a-fA-F0-9]{40}$/.test(value)
 }
@@ -54,12 +25,12 @@ async function streamToText(stream) {
 async function readRequests(token) {
   try {
     const result = await get(PATH, { access: 'public', token })
-    if (!result || result.statusCode !== 200) return seedRequests()
+    if (!result || result.statusCode !== 200) return []
     const text = await streamToText(result.stream)
     const data = JSON.parse(text)
-    return Array.isArray(data.requests) ? data.requests : seedRequests()
+    return Array.isArray(data.requests) ? data.requests : []
   } catch {
-    return seedRequests()
+    return []
   }
 }
 
