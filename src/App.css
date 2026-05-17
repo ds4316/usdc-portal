@@ -1148,6 +1148,79 @@ body {
   line-height: 1.45;
 }
 
+.wallet-receive-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.wallet-receive-toggle button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-sub);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 750;
+  transition: background 0.16s, color 0.16s, box-shadow 0.16s;
+}
+
+.wallet-receive-toggle button.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.connected-wallet-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 12px 14px;
+  border: 1px solid rgba(39,117,202,0.22);
+  border-radius: 12px;
+  background: rgba(39,117,202,0.06);
+  color: var(--text);
+}
+
+.connected-wallet-card.empty {
+  border-color: var(--border2);
+  background: var(--surface3);
+}
+
+.connected-wallet-card svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.connected-wallet-card div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.connected-wallet-card strong {
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connected-wallet-card span {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
 /* Jobs Panel */
 .escrow-jobs-panel { display: flex; flex-direction: column; gap: 8px; }
 

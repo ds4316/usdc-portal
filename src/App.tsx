@@ -600,6 +600,7 @@ export default function App() {
   const [escrowAmount, setEscrowAmount] = useState('')
   const [escrowDays,   setEscrowDays]   = useState('3')
   const [escrowDesc,   setEscrowDesc]   = useState('')
+  const [escrowPayoutMode, setEscrowPayoutMode] = useState<'connected' | 'custom'>('connected')
   const [escrowJobId,  setEscrowJobId]  = useState('')
   const [escrowJob,    setEscrowJob]    = useState<{
     client: string; agent: string; amount: bigint; deadline: bigint;
@@ -684,6 +685,7 @@ export default function App() {
   type E8183Step = 'idle' | 'creating' | 'funding' | 'submitting' | 'completing' | 'done' | 'error'
   const [e8183Tab,       setE8183Tab]       = useState<'create' | 'lookup'>('create')
   const [e8183Provider,  setE8183Provider]  = useState('')
+  const [e8183PayoutMode, setE8183PayoutMode] = useState<'connected' | 'custom'>('connected')
   const [e8183Amount,    setE8183Amount]    = useState('')
   const [e8183Days,      setE8183Days]      = useState('3')
   const [e8183Desc,      setE8183Desc]      = useState('')
@@ -720,6 +722,8 @@ export default function App() {
   const activeWallet = allAddresses[0]
   const activeWalletShort = activeWallet ? `${activeWallet.slice(0, 6)}...${activeWallet.slice(-4)}` : 'Not connected'
   const activeChainMeta = activeChainId ? CHAIN_META[activeChainId] : undefined
+  const escrowWorkerAddress = escrowPayoutMode === 'connected' ? (activeWallet ?? '') : escrowAgent
+  const e8183WorkerAddress = e8183PayoutMode === 'connected' ? (activeWallet ?? '') : e8183Provider
 
   // ??? Toast ?ы띁 ??????????????????????????????????????????????????????????
   function addToast(t: Omit<Toast, 'id'>): string {
@@ -1578,7 +1582,9 @@ export default function App() {
 
   async function e8183CreateAndFund() {
     const amt = parseFloat(e8183Amount)
-    if (!isAddress(e8183Provider)) return addToast({ type: 'error', message: 'Invalid provider address' })
+    const workerAddress = e8183WorkerAddress
+    if (!workerAddress) return addToast({ type: 'error', message: 'Connect wallet or enter worker wallet address' })
+    if (!isAddress(workerAddress)) return addToast({ type: 'error', message: 'Invalid worker wallet address' })
     if (!amt || amt <= 0)          return addToast({ type: 'error', message: 'Enter USDC amount' })
     if (!e8183Desc.trim())         return addToast({ type: 'error', message: 'Enter job description' })
     const { encodeFunctionData } = await import('viem')
@@ -1598,7 +1604,7 @@ export default function App() {
       const createHash = await sendTransactionAsync({
         to: ERC8183_CONTRACT,
         data: encodeFunctionData({ abi: ERC8183_ABI, functionName: 'createJob',
-          args: [e8183Provider as `0x${string}`, clientAddr, expiredAt, e8183Desc, '0x0000000000000000000000000000000000000000' as `0x${string}`] }),
+          args: [workerAddress as `0x${string}`, clientAddr, expiredAt, e8183Desc, '0x0000000000000000000000000000000000000000' as `0x${string}`] }),
       })
 
       // Wait for receipt to get jobId from event (fallback: use nextJobId read)
@@ -1717,7 +1723,9 @@ export default function App() {
   async function escrowCreateJob() {
     const { encodeFunctionData } = await import('viem')
     const amt = parseFloat(escrowAmount)
-    if (!isAddress(escrowAgent)) return addToast({ type: 'error', message: 'Invalid agent address' })
+    const workerAddress = escrowWorkerAddress
+    if (!workerAddress) return addToast({ type: 'error', message: 'Connect wallet or enter worker wallet address' })
+    if (!isAddress(workerAddress)) return addToast({ type: 'error', message: 'Invalid worker wallet address' })
     if (!amt || amt <= 0)        return addToast({ type: 'error', message: 'Enter USDC amount' })
     if (!escrowDesc.trim())      return addToast({ type: 'error', message: 'Enter job description' })
 
@@ -1739,7 +1747,7 @@ export default function App() {
       await sendTransactionAsync({
         to: ARC_ESCROW,
         data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'createJob',
-          args: [escrowAgent as `0x${string}`, usdcAmt, deadline, escrowDesc] }),
+          args: [workerAddress as `0x${string}`, usdcAmt, deadline, escrowDesc] }),
       })
 
       // read nextJobId to get the new job's ID
@@ -2763,10 +2771,28 @@ export default function App() {
                       {e8183Tab === 'create' ? (
                         <div className="e8183-form">
                           <div className="escrow-form-group">
-                            <label>Worker wallet address</label>
-                            <small className="field-helper">The person who completes the request and receives USDC after approval.</small>
-                            <input className="action-input" placeholder="0x..." value={e8183Provider}
-                              onChange={(e) => setE8183Provider(e.target.value)} />
+                            <label>Receive payment to</label>
+                            <small className="field-helper">Choose where the worker payout should go after the client approves the result.</small>
+                            <div className="wallet-receive-toggle">
+                              <button className={e8183PayoutMode === 'connected' ? 'active' : ''} onClick={() => setE8183PayoutMode('connected')}>
+                                Connected wallet
+                              </button>
+                              <button className={e8183PayoutMode === 'custom' ? 'active' : ''} onClick={() => setE8183PayoutMode('custom')}>
+                                Different wallet
+                              </button>
+                            </div>
+                            {e8183PayoutMode === 'connected' ? (
+                              <div className={`connected-wallet-card ${activeWallet ? '' : 'empty'}`}>
+                                <Wallet size={15} />
+                                <div>
+                                  <strong>{activeWallet ? activeWalletShort : 'No wallet connected'}</strong>
+                                  <span>{activeWallet ? 'This connected wallet will receive USDC.' : 'Connect a wallet first, or choose a different wallet.'}</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <input className="action-input" placeholder="0x..." value={e8183Provider}
+                                onChange={(e) => setE8183Provider(e.target.value)} />
+                            )}
                           </div>
                           <div className="escrow-form-row">
                             <div className="escrow-form-group">
@@ -2866,10 +2892,28 @@ export default function App() {
                     {escrowMyTab === 'new' ? (
                       <div className="escrow-form">
                         <div className="escrow-form-group">
-                          <label>Worker wallet address</label>
-                          <small className="field-helper">Paste the wallet address of the person doing the work. This is where USDC will be paid after you approve the result.</small>
-                          <input className="action-input" placeholder="0x..." value={escrowAgent}
-                            onChange={(e) => setEscrowAgent(e.target.value)} />
+                          <label>Receive payment to</label>
+                          <small className="field-helper">If you accepted this request, use your connected wallet. Choose a different wallet only when you want the payout sent elsewhere.</small>
+                          <div className="wallet-receive-toggle">
+                            <button className={escrowPayoutMode === 'connected' ? 'active' : ''} onClick={() => setEscrowPayoutMode('connected')}>
+                              Connected wallet
+                            </button>
+                            <button className={escrowPayoutMode === 'custom' ? 'active' : ''} onClick={() => setEscrowPayoutMode('custom')}>
+                              Different wallet
+                            </button>
+                          </div>
+                          {escrowPayoutMode === 'connected' ? (
+                            <div className={`connected-wallet-card ${activeWallet ? '' : 'empty'}`}>
+                              <Wallet size={15} />
+                              <div>
+                                <strong>{activeWallet ? activeWalletShort : 'No wallet connected'}</strong>
+                                <span>{activeWallet ? 'This connected wallet will receive USDC.' : 'Connect a wallet first, or choose a different wallet.'}</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <input className="action-input" placeholder="0x..." value={escrowAgent}
+                              onChange={(e) => setEscrowAgent(e.target.value)} />
+                          )}
                         </div>
                         <div className="escrow-form-row">
                           <div className="escrow-form-group">
@@ -3107,7 +3151,7 @@ export default function App() {
                   <div className="demo-checklist">
                     {[
                       { label: 'Connect wallet on Arc Testnet', done: isConnected && activeChainId === arcTestnet.id },
-                      { label: 'Paste worker wallet address', done: Boolean(escrowAgent || e8183Provider) },
+                      { label: 'Choose payout wallet', done: Boolean(escrowWorkerAddress || e8183WorkerAddress) },
                       { label: 'Lock USDC in escrow', done: recentJobIds.length > 0 },
                       { label: 'Worker submits result', done: escrowJob?.status === 1 || escrowJob?.status === 2 },
                       { label: 'Review and release payment', done: escrowJob?.status === 2 },
