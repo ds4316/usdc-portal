@@ -964,6 +964,15 @@ export default function App() {
   }
 
   function useRequestForEscrow(request: MarketRequest) {
+    if (!activeWallet || activeWallet.toLowerCase() !== request.client.toLowerCase()) {
+      addToast({ type: 'error', message: 'Only the request owner can fund escrow' })
+      return
+    }
+    if (!request.agent) {
+      addToast({ type: 'error', message: 'Wait for a worker to accept this request first' })
+      return
+    }
+    setEscrowPayoutMode('custom')
     setEscrowAgent(request.agent ?? '')
     setEscrowAmount(request.budget)
     setEscrowDays(request.deadlineDays)
@@ -2510,7 +2519,7 @@ export default function App() {
               <div>
                 <span className="market-kicker">USDC-powered service board</span>
                 <h3>From request to escrow in one flow</h3>
-                <p>Clients post requests with a budget and deadline. Builders browse the public board and accept work. The app turns the match into an Arc escrow job with USDC locked until delivery is approved.</p>
+                <p>Clients post requests with a budget and deadline. Builders accept work without paying anything. After a match, the client funds escrow, the builder submits the result, and AI-assisted review helps decide whether to release USDC.</p>
               </div>
               <div className="market-flow-mini">
                 {['Post', 'Match', 'Escrow', 'Deliver', 'Release'].map((step, i) => (
@@ -2624,8 +2633,8 @@ export default function App() {
                         <button className="btn-outline" onClick={() => acceptMarketRequest(request.id)} disabled={!isConnected || marketLoading || request.status !== 'open' || isOwner}>
                           {request.status === 'open' ? 'Accept Request' : 'Matched'}
                         </button>
-                        <button className="btn-primary" onClick={() => useRequestForEscrow(request)} disabled={!isConnected || (!request.agent && !isAgent && !isOwner)}>
-                          Start Escrow
+                        <button className="btn-primary" onClick={() => useRequestForEscrow(request)} disabled={!isConnected || !isOwner || !request.agent}>
+                          {isOwner ? (request.agent ? 'Fund Escrow' : 'Waiting for worker') : (isAgent ? 'Accepted - waiting for client' : 'Client funds escrow')}
                         </button>
                       </div>
                     </article>
@@ -2755,10 +2764,10 @@ export default function App() {
                     </button>
                   </div>
                   <div className="escrow-flow-note">
-                    <div><span>01</span><strong>Client locks USDC</strong></div>
+                    <div><span>01</span><strong>Client funds escrow</strong></div>
                     <div><span>02</span><strong>Worker submits result</strong></div>
-                    <div><span>03</span><strong>Client reviews</strong></div>
-                    <div><span>04</span><strong>USDC is released</strong></div>
+                    <div><span>03</span><strong>AI helps review</strong></div>
+                    <div><span>04</span><strong>Client releases USDC</strong></div>
                   </div>
 
                   {escrowProtocol === 'erc8183' && (
@@ -2893,7 +2902,7 @@ export default function App() {
                       <div className="escrow-form">
                         <div className="escrow-form-group">
                           <label>Receive payment to</label>
-                          <small className="field-helper">If you accepted this request, use your connected wallet. Choose a different wallet only when you want the payout sent elsewhere.</small>
+                          <small className="field-helper">The client locks USDC for this worker wallet. If this came from a request, the accepted worker address is filled in automatically.</small>
                           <div className="wallet-receive-toggle">
                             <button className={escrowPayoutMode === 'connected' ? 'active' : ''} onClick={() => setEscrowPayoutMode('connected')}>
                               Connected wallet
@@ -3152,9 +3161,9 @@ export default function App() {
                     {[
                       { label: 'Connect wallet on Arc Testnet', done: isConnected && activeChainId === arcTestnet.id },
                       { label: 'Choose payout wallet', done: Boolean(escrowWorkerAddress || e8183WorkerAddress) },
-                      { label: 'Lock USDC in escrow', done: recentJobIds.length > 0 },
+                      { label: 'Client locks USDC in escrow', done: recentJobIds.length > 0 },
                       { label: 'Worker submits result', done: escrowJob?.status === 1 || escrowJob?.status === 2 },
-                      { label: 'Review and release payment', done: escrowJob?.status === 2 },
+                      { label: 'AI review, then client releases', done: escrowJob?.status === 2 },
                     ].map((item, i) => (
                       <div key={i} className={`checklist-item ${item.done ? 'done' : ''}`}>
                         <span className="checklist-icon">{item.done ? '✓' : ''}</span>
