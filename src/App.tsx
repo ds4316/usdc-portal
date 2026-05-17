@@ -283,7 +283,7 @@ interface AssetRow {
 }
 
 interface TxRecord {
-  type: 'swap' | 'bridge' | 'send' | 'cross'
+  type: 'swap' | 'bridge' | 'send' | 'cross' | 'escrow'
   summary: string; txHash: string; timestamp: number; status: 'success' | 'fail'
 }
 
@@ -613,7 +613,7 @@ export default function App() {
   const [escrowLoading,      setEscrowLoading]      = useState(false)
   const [aiVerdict,          setAiVerdict]          = useState<{ verdict: 'approve' | 'reject'; reasoning: string } | null>(null)
   const [aiLoading,          setAiLoading]          = useState(false)
-  const [escrowMyTab,    setEscrowMyTab]    = useState<'new' | 'jobs'>('new')
+  const [escrowMyTab,    setEscrowMyTab]    = useState<'new' | 'jobs'>('jobs')
   const [escrowProtocol, setEscrowProtocol] = useState<'arc-escrow' | 'erc8183'>('arc-escrow')
   const [recentJobIds,   setRecentJobIds]   = useState<number[]>(() => {
     try { return JSON.parse(localStorage.getItem('arc_escrow_jobs') ?? '[]') } catch { return [] }
@@ -726,6 +726,8 @@ export default function App() {
   const activeChainMeta = activeChainId ? CHAIN_META[activeChainId] : undefined
   const escrowWorkerAddress = escrowPayoutMode === 'connected' ? (activeWallet ?? '') : escrowAgent
   const e8183WorkerAddress = e8183PayoutMode === 'connected' ? (activeWallet ?? '') : e8183Provider
+  const settlementHistory = history.filter((h) => h.type === 'escrow')
+  const completedSettlementCount = settlementHistory.filter((h) => h.status === 'success' && /released|approved|refund/i.test(h.summary)).length
 
   // ??? Toast ?ы띁 ??????????????????????????????????????????????????????????
   function addToast(t: Omit<Toast, 'id'>): string {
@@ -1261,6 +1263,11 @@ export default function App() {
     const usdcAmount = BigInt(Math.round(amt * 1e6)) // USDC 6 decimals
     // Arc recipient: EVM address ??bytes32 (right-aligned, left-zero-padded)
     const mintRecipient = `0x${'0'.repeat(24)}${recipientAddr.replace('0x', '')}` as `0x${string}`
+    let loadId = ''
+    const showBridgeStep = (message: string) => {
+      if (loadId) removeToast(loadId)
+      loadId = addToast({ type: 'loading', message })
+    }
 
     try {
       // ?? Step 1: Sepolia濡?泥댁씤 ?꾪솚 ?????????????????????????????????
@@ -1268,7 +1275,7 @@ export default function App() {
 
       // ?? Step 2: USDC approve ??ArcOnboarder ?????????????????????????
       setCctpStep('approving')
-      addToast({ type: 'loading', message: '1/4 Approving USDC on Sepolia...' })
+      showBridgeStep('1/4 Approving USDC on Sepolia...')
       await sendTransactionAsync({
         to: SEPOLIA_USDC,
         data: encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve',
@@ -1277,7 +1284,7 @@ export default function App() {
 
       // ?? Step 3: ArcOnboarder.bridgeUSDCToArc ?????????????????????????
       setCctpStep('burning')
-      addToast({ type: 'loading', message: '2/4 Bridging USDC ??Arc via ArcOnboarder...' })
+      showBridgeStep('2/4 Bridging USDC to Arc via ArcOnboarder...')
       const burnHash = await sendTransactionAsync({
         to: ARC_ONBOARDER,
         data: encodeFunctionData({ abi: ARC_ONBOARDER_ABI, functionName: 'bridgeUSDCToArc',
@@ -1311,7 +1318,7 @@ export default function App() {
 
       // ?? Step 5: Circle Attestation API ?대쭅 ?????????????????????????
       setCctpStep('attesting')
-      addToast({ type: 'loading', message: '3/4 Waiting Circle attestation...' })
+      showBridgeStep('3/4 Waiting Circle attestation...')
       let attestation = ''
       for (let i = 0; i < 60; i++) {
         await new Promise((r) => setTimeout(r, 5000))
@@ -1323,7 +1330,7 @@ export default function App() {
 
       // ?? Step 6: Arc Testnet?먯꽌 receiveMessage ???????????????????????
       setCctpStep('minting')
-      addToast({ type: 'loading', message: '4/4 Minting USDC on Arc Testnet...' })
+      showBridgeStep('4/4 Minting USDC on Arc Testnet...')
       await switchChain({ chainId: arcTestnet.id })
       await sendTransactionAsync({
         to: ARC_MSG_TRANSMITTER,
@@ -1332,11 +1339,14 @@ export default function App() {
       })
 
       setCctpStep('done')
+      if (loadId) removeToast(loadId)
       localStorage.removeItem('cctp_pending_bridge'); setPendingBridge(null)
       addToast({ type: 'success', message: `${cctpAmount} USDC arrived on Arc!`, txHash: burnHash })
       setCctpAmount('')
+      setTimeout(() => setCctpStep('idle'), 2500)
 
     } catch (e: unknown) {
+      if (loadId) removeToast(loadId)
       setCctpStep('error')
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Bridge failed' })
     }
@@ -1353,6 +1363,11 @@ export default function App() {
     const usdcAmount = BigInt(Math.round(amt * 1e6))
     // Sepolia recipient: EVM address -> bytes32 (right-aligned, left-zero-padded)
     const mintRecipient = `0x${'0'.repeat(24)}${recipientAddr.replace('0x', '')}` as `0x${string}`
+    let loadId = ''
+    const showBridgeStep = (message: string) => {
+      if (loadId) removeToast(loadId)
+      loadId = addToast({ type: 'loading', message })
+    }
 
     try {
       // Step 1: Switch to Arc Testnet
@@ -1360,7 +1375,7 @@ export default function App() {
 
       // Step 2: Approve ARC_TESTNET_USDC to ARC_TOKEN_MESSENGER
       setCctpStep('approving')
-      addToast({ type: 'loading', message: '1/4 Approving USDC on Arc Testnet...' })
+      showBridgeStep('1/4 Approving USDC on Arc Testnet...')
       await sendTransactionAsync({
         to: ARC_TESTNET_USDC,
         data: encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve',
@@ -1369,7 +1384,7 @@ export default function App() {
 
       // Step 3: depositForBurn -> Sepolia (domain 0)
       setCctpStep('burning')
-      addToast({ type: 'loading', message: '2/4 Burning USDC on Arc -> Sepolia...' })
+      showBridgeStep('2/4 Burning USDC on Arc to Sepolia...')
       const burnHash = await sendTransactionAsync({
         to: ARC_TOKEN_MESSENGER,
         data: encodeFunctionData({ abi: DEPOSIT_FOR_BURN_ABI, functionName: 'depositForBurn',
@@ -1403,7 +1418,7 @@ export default function App() {
 
       // Step 5: Poll Circle attestation
       setCctpStep('attesting')
-      addToast({ type: 'loading', message: '3/4 Waiting Circle attestation...' })
+      showBridgeStep('3/4 Waiting Circle attestation...')
       let attestation = ''
       let apiMessage  = ''
       for (let i = 0; i < 180; i++) {
@@ -1415,6 +1430,7 @@ export default function App() {
         }
       }
       if (!attestation || !apiMessage) {
+        if (loadId) removeToast(loadId)
         addToast({ type: 'success', message: 'Burn complete! Close this tab and use Check & Claim when ready (15-20 min).' })
         setCctpStep('idle')
         return
@@ -1422,7 +1438,7 @@ export default function App() {
 
       // Step 6: Switch to Sepolia and receiveMessage — use API message (CCTP V2), not event-log message
       setCctpStep('minting')
-      addToast({ type: 'loading', message: '4/4 Minting USDC on Sepolia...' })
+      showBridgeStep('4/4 Minting USDC on Sepolia...')
       await switchChain({ chainId: sepolia.id })
       let mintHash: `0x${string}` | undefined
       try {
@@ -1434,9 +1450,11 @@ export default function App() {
       } catch (sendError: unknown) {
         if (isNonceAlreadyUsedError(sendError)) {
           setCctpStep('done')
+          if (loadId) removeToast(loadId)
           localStorage.removeItem('cctp_pending_bridge'); setPendingBridge(null)
           addToast({ type: 'success', message: `${cctpAmount} USDC was already bridged to Sepolia. Refresh balances in a minute.` })
           setCctpAmount('')
+          setTimeout(() => setCctpStep('idle'), 2500)
           return
         }
         throw sendError
@@ -1446,9 +1464,11 @@ export default function App() {
         const mintRcpt = await publicClients[11155111].waitForTransactionReceipt({ hash: mintHash, timeout: 90_000 })
         if (mintRcpt.status === 'reverted') {
           setCctpStep('done')
+          if (loadId) removeToast(loadId)
           localStorage.removeItem('cctp_pending_bridge'); setPendingBridge(null)
           addToast({ type: 'success', message: `${cctpAmount} USDC appears already claimed or relayed on Sepolia. Refresh balances to confirm.`, txHash: mintHash })
           setCctpAmount('')
+          setTimeout(() => setCctpStep('idle'), 2500)
           return
         }
       } catch (re: unknown) {
@@ -1457,11 +1477,14 @@ export default function App() {
       }
 
       setCctpStep('done')
+      if (loadId) removeToast(loadId)
       localStorage.removeItem('cctp_pending_bridge'); setPendingBridge(null)
       addToast({ type: 'success', message: `${cctpAmount} USDC bridged to Sepolia! Refresh balances in a minute.`, txHash: mintHash })
       setCctpAmount('')
+      setTimeout(() => setCctpStep('idle'), 2500)
 
     } catch (e: unknown) {
+      if (loadId) removeToast(loadId)
       setCctpStep('error')
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Bridge failed' })
     }
@@ -1800,6 +1823,7 @@ export default function App() {
         }
       }
       addToast({ type: 'success', message: `Job #${newJobId} created! ${amt} USDC locked in escrow.` })
+      setHistory((prev) => addHistory(prev, { type: 'escrow', summary: `Escrow funded: Job #${newJobId} · ${amt.toFixed(2)} USDC`, txHash: '', timestamp: Date.now(), status: 'success' }))
       setEscrowAgent(''); setEscrowAmount(''); setEscrowDesc('')
     } catch (e: unknown) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Transaction failed' })
@@ -1915,6 +1939,7 @@ export default function App() {
           args: [BigInt(parseInt(escrowJobId)), resultUrl] }),
       })
       addToast({ type: 'success', message: 'Work submitted! Claude will read the actual content.' })
+      setHistory((prev) => addHistory(prev, { type: 'escrow', summary: `Result submitted: Job #${escrowJobId}`, txHash: '', timestamp: Date.now(), status: 'success' }))
       setEscrowWorkText('')
       setEscrowWorkFile(null)
       await escrowLookupJob()
@@ -1931,12 +1956,13 @@ export default function App() {
     setEscrowLoading(true)
     try {
       await switchChain({ chainId: arcTestnet.id })
-      await sendTransactionAsync({
+      const hash = await sendTransactionAsync({
         to: ARC_ESCROW,
         data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'approveWork',
           args: [BigInt(parseInt(escrowJobId))] }),
       })
-      addToast({ type: 'success', message: 'Work approved ??USDC sent to agent!' })
+      addToast({ type: 'success', message: 'Work approved - USDC released to worker!', txHash: hash, explorerBase: 'https://testnet.arcscan.app' })
+      setHistory((prev) => addHistory(prev, { type: 'escrow', summary: `Payment released: Job #${escrowJobId}`, txHash: hash, timestamp: Date.now(), status: 'success' }))
       await escrowLookupJob()
     } catch (e: unknown) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Transaction failed' })
@@ -1950,12 +1976,13 @@ export default function App() {
     setEscrowLoading(true)
     try {
       await switchChain({ chainId: arcTestnet.id })
-      await sendTransactionAsync({
+      const hash = await sendTransactionAsync({
         to: ARC_ESCROW,
         data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'claimRefund',
           args: [BigInt(parseInt(escrowJobId))] }),
       })
-      addToast({ type: 'success', message: 'Refund claimed!' })
+      addToast({ type: 'success', message: 'Refund claimed!', txHash: hash, explorerBase: 'https://testnet.arcscan.app' })
+      setHistory((prev) => addHistory(prev, { type: 'escrow', summary: `Refund claimed: Job #${escrowJobId}`, txHash: hash, timestamp: Date.now(), status: 'success' }))
       await escrowLookupJob()
     } catch (e: unknown) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Transaction failed' })
@@ -2826,17 +2853,13 @@ export default function App() {
             <div className="section-layout">
               <div className="section-main">
                 <div className="panel">
-                  {/* Protocol selector */}
-                  <div className="escrow-protocol-tabs">
-                    <button
-                      className={`escrow-proto-btn ${escrowProtocol === 'arc-escrow' ? 'active' : ''}`}
-                      onClick={() => setEscrowProtocol('arc-escrow')}>
-                      <span>ArcEscrow <small className="escrow-mode-copy">Simple escrow for this demo</small></span>
-                    </button>
-                    <button
-                      className={`escrow-proto-btn ${escrowProtocol === 'erc8183' ? 'active' : ''}`}
-                      onClick={() => setEscrowProtocol('erc8183')}>
-                      <span>ERC-8183 <span className="proto-badge">advanced</span><small className="escrow-mode-copy">Agent commerce standard</small></span>
+                  <div className="escrow-workspace-head">
+                    <div>
+                      <span>Escrow Workspace</span>
+                      <strong>Use Requests for new work. Use this page to manage funded jobs.</strong>
+                    </div>
+                    <button className="btn-outline" onClick={() => setActivePage('marketplace')}>
+                      <BookUser size={13} /> Open Requests
                     </button>
                   </div>
                   <div className="escrow-flow-note">
@@ -2966,16 +2989,20 @@ export default function App() {
 
                   {escrowProtocol === 'arc-escrow' && <div className="escrow-board">
                     <div className="escrow-board-tabs">
-                      <button className={escrowMyTab === 'new' ? 'active' : ''} onClick={() => setEscrowMyTab('new')}>
-                        + New Job
-                      </button>
                       <button className={escrowMyTab === 'jobs' ? 'active' : ''} onClick={() => setEscrowMyTab('jobs')}>
                         My Jobs {recentJobIds.length > 0 && <span className="escrow-badge-count">{recentJobIds.length}</span>}
+                      </button>
+                      <button className={escrowMyTab === 'new' ? 'active' : ''} onClick={() => setEscrowMyTab('new')}>
+                        Advanced Manual Escrow
                       </button>
                     </div>
 
                     {escrowMyTab === 'new' ? (
                       <div className="escrow-form">
+                        <div className="manual-escrow-note">
+                          <strong>Manual mode</strong>
+                          <span>This is mainly for testing a raw ArcEscrow job. Normal users should start from Requests so the worker match, escrow job, submission, and activity stay connected.</span>
+                        </div>
                         <div className="escrow-form-group">
                           <label>Receive payment to</label>
                           <small className="field-helper">The client locks USDC for this worker wallet. If this came from a request, the accepted worker address is filled in automatically.</small>
@@ -3839,24 +3866,49 @@ export default function App() {
             <div className="page-header">
               <Network size={20} style={{ color: 'var(--accent)' }} />
               <div>
-                <h2 className="page-title">Activity</h2>
-                <p className="page-sub">Recent transactions across all chains</p>
+                <h2 className="page-title">Settlement Activity</h2>
+                <p className="page-sub">Escrow funding, submissions, releases, refunds, and supporting USDC movement.</p>
               </div>
             </div>
-            <div className="panel">
+            <div className="activity-summary-grid">
+              <div className="activity-summary-card primary">
+                <span>Completed settlements</span>
+                <strong>{completedSettlementCount}</strong>
+                <small>Released payments or refunds recorded locally</small>
+              </div>
+              <div className="activity-summary-card">
+                <span>Escrow events</span>
+                <strong>{settlementHistory.length}</strong>
+                <small>Funding, submission, release, and refund actions</small>
+              </div>
+              <div className="activity-summary-card">
+                <span>All movement</span>
+                <strong>{history.length}</strong>
+                <small>Bridge, send, swap, cross-chain, and escrow actions</small>
+              </div>
+            </div>
+            <div className="activity-ledger">
+              <div className="activity-ledger-head">
+                <div>
+                  <span>Primary ledger</span>
+                  <strong>Escrow settlement history</strong>
+                </div>
+                <button className="btn-outline" onClick={() => setActivePage('marketplace')}>
+                  <BookUser size={13} /> Open Requests
+                </button>
+              </div>
               <div className="history-list">
-                {history.length === 0 ? (
+                {settlementHistory.length === 0 ? (
                   <div className="activity-empty">
-                    <Network size={36} strokeWidth={1.2} style={{ opacity: 0.3 }} />
-                    <p>No transactions yet</p>
-                    <p style={{ opacity: 0.5, fontSize: 'var(--text-xs)' }}>Transactions will appear here after you bridge, swap, or send.</p>
+                    <ShieldCheck size={36} strokeWidth={1.2} style={{ opacity: 0.35 }} />
+                    <p>No escrow settlements yet</p>
+                    <p style={{ opacity: 0.6, fontSize: 'var(--text-xs)' }}>Fund an escrow, submit work, release payment, or claim a refund to build the settlement ledger.</p>
                   </div>
-                ) : history.map((h, i) => {
-                  const iconMap = { swap: <Repeat2 size={14} />, bridge: <Layers size={14} />, send: <ArrowUpRight size={14} />, cross: <Zap size={14} /> }
+                ) : settlementHistory.map((h, i) => {
                   return (
                     <div key={i} className={`history-row ${h.status}`}>
                       <div className="history-left">
-                        <span className={`history-icon ${h.type}`}>{iconMap[h.type]}</span>
+                        <span className={`history-icon ${h.type}`}><Lock size={14} /></span>
                         <div className="history-info">
                           <span className="history-summary">{h.summary}</span>
                           <span className="history-time">{new Date(h.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
@@ -3875,6 +3927,40 @@ export default function App() {
                 })}
               </div>
             </div>
+            {history.some((h) => h.type !== 'escrow') && (
+              <div className="activity-supporting">
+                <div className="activity-ledger-head compact">
+                  <div>
+                    <span>Supporting movement</span>
+                    <strong>Bridge, swap, send, and route history</strong>
+                  </div>
+                </div>
+                <div className="history-list">
+                  {history.filter((h) => h.type !== 'escrow').map((h, i) => {
+                    const iconMap = { swap: <Repeat2 size={14} />, bridge: <Layers size={14} />, send: <ArrowUpRight size={14} />, cross: <Zap size={14} />, escrow: <Lock size={14} /> }
+                    return (
+                      <div key={i} className={`history-row ${h.status}`}>
+                        <div className="history-left">
+                          <span className={`history-icon ${h.type}`}>{iconMap[h.type]}</span>
+                          <div className="history-info">
+                            <span className="history-summary">{h.summary}</span>
+                            <span className="history-time">{new Date(h.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        </div>
+                        <div className="history-right">
+                          {h.txHash && (
+                            <a className="history-link" href={`https://testnet.arcscan.app/tx/${h.txHash}`} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink size={13} />
+                            </a>
+                          )}
+                          <span className={`history-dot ${h.status}`} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
