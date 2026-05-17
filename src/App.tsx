@@ -752,6 +752,9 @@ export default function App() {
   useEffect(() => { saveMarketRequests(marketRequests) }, [marketRequests])
   useEffect(() => { loadMarketRequestsFromApi() }, [])
   useEffect(() => { if (allAddresses.length) loadAssets() }, [connections.length, allAddresses.join(',')])
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [activePage])
 
   // 60珥??먮룞 ?덈줈怨좎묠
   useEffect(() => {
@@ -905,12 +908,13 @@ export default function App() {
     setMarketLoading(true)
     try {
       const res = await fetch('/api/requests')
+      const contentType = res.headers.get('content-type') ?? ''
+      if (!contentType.includes('application/json')) return
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Could not load requests')
       if (Array.isArray(json.requests)) setMarketRequests(json.requests)
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Could not load shared requests'
-      addToast({ type: 'error', message: `${msg}. Showing local fallback.` })
+    } catch {
+      // Local Vite dev does not serve Vercel API routes; keep the local fallback quiet.
     } finally {
       setMarketLoading(false)
     }
@@ -2932,7 +2936,7 @@ export default function App() {
                       {e8183Tab === 'create' ? (
                         <div className="e8183-form">
                           <div className="escrow-form-group">
-                            <label>Receive payment to</label>
+                            <label>Worker payout wallet</label>
                             <small className="field-helper">Choose where the worker payout should go after the client approves the result.</small>
                             <div className="wallet-receive-toggle">
                               <button className={e8183PayoutMode === 'connected' ? 'active' : ''} onClick={() => setE8183PayoutMode('connected')}>
@@ -3057,8 +3061,8 @@ export default function App() {
                           <span>This is mainly for testing a raw ArcEscrow job. Normal users should start from Requests so the worker match, escrow job, submission, and activity stay connected.</span>
                         </div>
                         <div className="escrow-form-group">
-                          <label>Receive payment to</label>
-                          <small className="field-helper">The client locks USDC for this worker wallet. If this came from a request, the accepted worker address is filled in automatically.</small>
+                          <label>Worker payout wallet</label>
+                          <small className="field-helper">Enter the wallet address of the person who should receive USDC after approval. In normal Requests flow, this is filled from the accepted worker.</small>
                           <div className="wallet-receive-toggle">
                             <button className={escrowPayoutMode === 'connected' ? 'active' : ''} onClick={() => setEscrowPayoutMode('connected')}>
                               Connected wallet
