@@ -728,6 +728,12 @@ export default function App() {
   const e8183WorkerAddress = e8183PayoutMode === 'connected' ? (activeWallet ?? '') : e8183Provider
   const settlementHistory = history.filter((h) => h.type === 'escrow')
   const completedSettlementCount = settlementHistory.filter((h) => h.status === 'success' && /released|approved|refund/i.test(h.summary)).length
+  const requestStats = {
+    open: marketRequests.filter((r) => r.status === 'open').length,
+    matched: marketRequests.filter((r) => r.agent && !r.escrowJobId).length,
+    funded: marketRequests.filter((r) => r.escrowJobId).length,
+    mine: marketRequests.filter((r) => activeWallet && (r.client.toLowerCase() === activeWallet.toLowerCase() || r.agent?.toLowerCase() === activeWallet.toLowerCase())).length,
+  }
 
   // ??? Toast ?ы띁 ??????????????????????????????????????????????????????????
   function addToast(t: Omit<Toast, 'id'>): string {
@@ -2340,6 +2346,14 @@ export default function App() {
                       <span>Testnet balances are for development and are not real USD value.</span>
                     </div>
                   )}
+                  <div className="ov-product-path">
+                    {['Request', 'Worker', 'Escrow', 'AI Review', 'Payout'].map((item, i) => (
+                      <div key={item}>
+                        <span>{String(i + 1).padStart(2, '0')}</span>
+                        <strong>{item}</strong>
+                      </div>
+                    ))}
+                  </div>
                   <div className="ov-action-grid">
                     <button className="ov-action-tile primary" onClick={() => setActivePage('marketplace')}>
                       <BookUser size={16} />
@@ -2574,19 +2588,57 @@ export default function App() {
                 <span className="market-kicker">USDC-powered service board</span>
                 <h3>From request to escrow in one flow</h3>
                 <p>Clients post requests with a budget and deadline. Builders accept work without paying anything. After a match, the client funds escrow, the builder submits the result, and AI-assisted review helps decide whether to release USDC.</p>
+                <div className="market-hero-actions">
+                  <button className="btn-primary" onClick={() => setMarketTab('create')}>
+                    <Plus size={14} /> Post Request
+                  </button>
+                  <button className="btn-outline" onClick={() => setActivePage('escrow')}>
+                    <Lock size={14} /> Manage Escrow
+                  </button>
+                </div>
               </div>
-              <div className="market-flow-mini">
-                {['Post', 'Match', 'Escrow', 'Deliver', 'Release'].map((step, i) => (
-                  <div className="market-flow-step" key={step}>
-                    <span>{String(i + 1).padStart(2, '0')}</span>
-                    <strong>{step}</strong>
-                  </div>
-                ))}
+              <div className="market-command-panel">
+                <div className="market-command-head">
+                  <span>Live board</span>
+                  <strong>{marketRequests.length} requests</strong>
+                </div>
+                <div className="market-stat-grid">
+                  <div><span>Open</span><strong>{requestStats.open}</strong></div>
+                  <div><span>Matched</span><strong>{requestStats.matched}</strong></div>
+                  <div><span>Funded</span><strong>{requestStats.funded}</strong></div>
+                  <div><span>Mine</span><strong>{requestStats.mine}</strong></div>
+                </div>
+                <div className="market-flow-mini">
+                  {['Post', 'Match', 'Fund', 'Submit', 'Release'].map((step, i) => (
+                    <div className="market-flow-step" key={step}>
+                      <span>{String(i + 1).padStart(2, '0')}</span>
+                      <strong>{step}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="market-role-strip">
+              <div>
+                <span>Client path</span>
+                <strong>Post a request, wait for a worker, fund escrow, review with AI, release USDC.</strong>
+              </div>
+              <div>
+                <span>Worker path</span>
+                <strong>Accept open work, wait for client funding, submit result, receive USDC after approval.</strong>
               </div>
             </div>
 
             {marketTab === 'create' ? (
               <section className="market-create-card">
+                <div className="market-form-head">
+                  <div>
+                    <span>Create request</span>
+                    <strong>Describe the outcome, not just the task.</strong>
+                  </div>
+                  <small>Clear deliverables make AI review and client approval easier.</small>
+                </div>
                 <div className="market-form-grid">
                   <label className="pay-field">
                     <span>Request title</span>
@@ -2654,6 +2706,7 @@ export default function App() {
                   const isAgent = activeWallet && request.agent?.toLowerCase() === activeWallet.toLowerCase()
                   const isEscrowFunded = Boolean(request.escrowJobId)
                   const cardRole = isOwner ? 'Client' : isAgent ? 'Worker' : 'Observer'
+                  const roleClass = isOwner ? 'client' : isAgent ? 'worker' : 'observer'
                   const nextStep = request.status === 'open'
                     ? (isOwner ? 'Waiting for a worker' : 'Accept this request')
                     : !isEscrowFunded
@@ -2667,7 +2720,7 @@ export default function App() {
                     { label: 'Release', done: false },
                   ]
                   return (
-                    <article className="market-request-card" key={request.id}>
+                    <article className={`market-request-card ${roleClass}`} key={request.id}>
                       <div className="market-card-top">
                         <span className={`market-status ${request.status}`}>{request.status.replace('-', ' ')}</span>
                         <span className="market-budget">{request.budget} USDC</span>
