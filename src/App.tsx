@@ -630,6 +630,7 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem('arc_escrow_jobs') ?? '[]') } catch { return [] }
   })
   const [marketRequests, setMarketRequests] = useState<MarketRequest[]>(loadMarketRequests)
+  const [marketLoading, setMarketLoading] = useState(false)
   const [marketTab, setMarketTab] = useState<'browse' | 'create'>('browse')
   const [requestTitle, setRequestTitle] = useState('')
   const [requestCategory, setRequestCategory] = useState('AI Work')
@@ -747,6 +748,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('theme', theme) }, [theme])
   useEffect(() => { localStorage.setItem('networkMode', networkMode) }, [networkMode])
   useEffect(() => { saveMarketRequests(marketRequests) }, [marketRequests])
+  useEffect(() => { loadMarketRequestsFromApi() }, [])
   useEffect(() => { if (allAddresses.length) loadAssets() }, [connections.length, allAddresses.join(',')])
 
   // 60珥??먮룞 ?덈줈怨좎묠
@@ -897,36 +899,75 @@ export default function App() {
     setContacts(next); saveContacts(next)
   }
 
-  function createMarketRequest() {
+  async function loadMarketRequestsFromApi() {
+    setMarketLoading(true)
+    try {
+      const res = await fetch('/api/requests')
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not load requests')
+      if (Array.isArray(json.requests)) setMarketRequests(json.requests)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Could not load shared requests'
+      addToast({ type: 'error', message: `${msg}. Showing local fallback.` })
+    } finally {
+      setMarketLoading(false)
+    }
+  }
+
+  async function createMarketRequest() {
     if (!isConnected || !activeWallet) return addToast({ type: 'error', message: 'Connect a wallet first' })
     if (!requestTitle.trim()) return addToast({ type: 'error', message: 'Enter a request title' })
     if (!requestDescription.trim()) return addToast({ type: 'error', message: 'Describe the work request' })
     if (!requestDeliverable.trim()) return addToast({ type: 'error', message: 'Define the expected deliverable' })
     const budget = parseFloat(requestBudget)
     if (!budget || budget <= 0) return addToast({ type: 'error', message: 'Enter a USDC budget' })
-    const next: MarketRequest = {
-      id: `req-${Date.now()}`,
-      title: requestTitle.trim(),
-      category: requestCategory.trim() || 'AI Work',
-      budget: budget.toFixed(2),
-      deadlineDays: requestDays || '3',
-      description: requestDescription.trim(),
-      deliverable: requestDeliverable.trim(),
-      client: activeWallet,
-      status: 'open',
-      createdAt: new Date().toISOString(),
+    setMarketLoading(true)
+    try {
+      const res = await fetch('/api/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: requestTitle,
+          category: requestCategory,
+          budget,
+          deadlineDays: requestDays,
+          description: requestDescription,
+          deliverable: requestDeliverable,
+          client: activeWallet,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not post request')
+      if (Array.isArray(json.requests)) setMarketRequests(json.requests)
+      setRequestTitle(''); setRequestBudget(''); setRequestDays('3')
+      setRequestDescription(''); setRequestDeliverable(''); setRequestCategory('AI Work')
+      setMarketTab('browse')
+      addToast({ type: 'success', message: 'Request posted to the shared board' })
+    } catch (e) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Could not post request' })
+    } finally {
+      setMarketLoading(false)
     }
-    setMarketRequests((prev) => [next, ...prev])
-    setRequestTitle(''); setRequestBudget(''); setRequestDays('3')
-    setRequestDescription(''); setRequestDeliverable(''); setRequestCategory('AI Work')
-    setMarketTab('browse')
-    addToast({ type: 'success', message: 'Request posted to marketplace' })
   }
 
-  function acceptMarketRequest(id: string) {
+  async function acceptMarketRequest(id: string) {
     if (!isConnected || !activeWallet) return addToast({ type: 'error', message: 'Connect a wallet first' })
-    setMarketRequests((prev) => prev.map((r) => r.id === id ? { ...r, agent: activeWallet, status: 'matched' } : r))
-    addToast({ type: 'success', message: 'Request matched. Ready to create escrow.' })
+    setMarketLoading(true)
+    try {
+      const res = await fetch('/api/requests', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'accept', agent: activeWallet }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not accept request')
+      if (Array.isArray(json.requests)) setMarketRequests(json.requests)
+      addToast({ type: 'success', message: 'Request accepted on the shared board' })
+    } catch (e) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Could not accept request' })
+    } finally {
+      setMarketLoading(false)
+    }
   }
 
   function useRequestForEscrow(request: MarketRequest) {
@@ -2459,11 +2500,12 @@ export default function App() {
               <BookUser size={20} style={{ color: 'var(--accent)' }} />
               <div>
                 <h2 className="page-title">Requests Marketplace</h2>
-                <p className="page-sub">Post work, match with an agent, then lock USDC in escrow.</p>
+                <p className="page-sub">A shared request board where anyone can post work, accept jobs, and settle through USDC escrow.</p>
               </div>
               <div className="marketplace-tabs">
                 <button className={marketTab === 'browse' ? 'active' : ''} onClick={() => setMarketTab('browse')}>Browse</button>
                 <button className={marketTab === 'create' ? 'active' : ''} onClick={() => setMarketTab('create')}>Create Request</button>
+                <button onClick={loadMarketRequestsFromApi} disabled={marketLoading}>{marketLoading ? 'Syncing' : 'Refresh'}</button>
               </div>
             </div>
 
@@ -2471,7 +2513,7 @@ export default function App() {
               <div>
                 <span className="market-kicker">USDC-powered service board</span>
                 <h3>From request to escrow in one flow</h3>
-                <p>Clients define work and budget. Agents accept a request. The app turns that agreement into an Arc escrow job with USDC locked until delivery is approved.</p>
+                <p>Clients post requests with a budget and deadline. Builders browse the public board and accept work. The app turns the match into an Arc escrow job with USDC locked until delivery is approved.</p>
               </div>
               <div className="market-flow-mini">
                 {['Post', 'Match', 'Escrow', 'Deliver', 'Release'].map((step, i) => (
@@ -2519,13 +2561,14 @@ export default function App() {
                   <span>Expected deliverable</span>
                   <textarea className="market-textarea small" value={requestDeliverable} onChange={(e) => setRequestDeliverable(e.target.value)} placeholder="Define exactly what the agent should submit before payment is released." />
                 </label>
-                <button className="btn-primary market-submit" onClick={createMarketRequest} disabled={!isConnected}>
-                  <Plus size={14} /> Post Request
+                <button className="btn-primary market-submit" onClick={createMarketRequest} disabled={!isConnected || marketLoading}>
+                  <Plus size={14} /> {marketLoading ? 'Posting...' : 'Post to Shared Board'}
                 </button>
                 {!isConnected && <div className="pay-inline-warning"><Wallet size={14} /> Connect a wallet to post as the request owner.</div>}
               </section>
             ) : (
               <section className="market-request-grid">
+                {marketLoading && <div className="market-loading">Syncing shared request board...</div>}
                 {marketRequests.map((request) => {
                   const isOwner = activeWallet?.toLowerCase() === request.client.toLowerCase()
                   const isAgent = activeWallet && request.agent?.toLowerCase() === activeWallet.toLowerCase()
@@ -2553,7 +2596,7 @@ export default function App() {
                         </div>
                       )}
                       <div className="market-card-actions">
-                        <button className="btn-outline" onClick={() => acceptMarketRequest(request.id)} disabled={!isConnected || request.status !== 'open' || isOwner}>
+                        <button className="btn-outline" onClick={() => acceptMarketRequest(request.id)} disabled={!isConnected || marketLoading || request.status !== 'open' || isOwner}>
                           {request.status === 'open' ? 'Accept Request' : 'Matched'}
                         </button>
                         <button className="btn-primary" onClick={() => useRequestForEscrow(request)} disabled={!isConnected || (!request.agent && !isAgent && !isOwner)}>
