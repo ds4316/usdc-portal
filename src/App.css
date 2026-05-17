@@ -3172,7 +3172,8 @@ body {
 }
 
 .market-status.matched,
-.market-status.escrow-ready {
+.market-status.escrow-ready,
+.market-status.escrow-funded {
   color: var(--accent);
   background: var(--accent-dim);
 }

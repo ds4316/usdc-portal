@@ -98,18 +98,34 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'PATCH') {
-      const { id, action, agent } = req.body ?? {}
-      if (action !== 'accept') return res.status(400).json({ error: 'Unsupported action' })
-      if (!isAddress(agent)) return res.status(400).json({ error: 'Valid agent wallet required' })
+      const { id, action, agent, client, escrowJobId } = req.body ?? {}
       const target = requests.find((request) => request.id === id)
       if (!target) return res.status(404).json({ error: 'Request not found' })
       if (isExpired(target)) return res.status(410).json({ error: 'Request has expired' })
-      if (target.status !== 'open') return res.status(409).json({ error: 'Request is already matched' })
-      if (target.client.toLowerCase?.() === agent.toLowerCase()) return res.status(400).json({ error: 'Client cannot accept their own request' })
 
-      const updated = requests.map((request) => request.id === id
-        ? { ...request, agent, status: 'matched', acceptedAt: new Date().toISOString() }
-        : request)
+      let updated
+      if (action === 'accept') {
+        if (!isAddress(agent)) return res.status(400).json({ error: 'Valid agent wallet required' })
+        if (target.status !== 'open') return res.status(409).json({ error: 'Request is already matched' })
+        if (target.client.toLowerCase?.() === agent.toLowerCase()) return res.status(400).json({ error: 'Client cannot accept their own request' })
+        updated = requests.map((request) => request.id === id
+          ? { ...request, agent, status: 'matched', acceptedAt: new Date().toISOString() }
+          : request)
+      } else if (action === 'fund') {
+        if (!isAddress(client) || target.client.toLowerCase() !== client.toLowerCase()) {
+          return res.status(403).json({ error: 'Only the request owner can attach escrow' })
+        }
+        if (!target.agent) return res.status(409).json({ error: 'Request has no matched worker' })
+        if (!Number.isInteger(Number(escrowJobId)) || Number(escrowJobId) < 0) {
+          return res.status(400).json({ error: 'Valid escrow job id required' })
+        }
+        updated = requests.map((request) => request.id === id
+          ? { ...request, status: 'escrow-funded', escrowJobId: String(escrowJobId), escrowFundedAt: new Date().toISOString() }
+          : request)
+      } else {
+        return res.status(400).json({ error: 'Unsupported action' })
+      }
+
       await writeRequests(updated, token)
       return res.status(200).json({ request: updated.find((request) => request.id === id), requests: updated })
     }

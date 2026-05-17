@@ -306,7 +306,7 @@ type NetworkMode = 'mainnet' | 'testnet'
 type MainTab     = 'assets' | 'history' | 'faucet'
 type Theme       = 'dark' | 'light'
 type InAppFaucetChain = 'ARC-TESTNET' | 'ETH-SEPOLIA' | 'BASE-SEPOLIA'
-type MarketRequestStatus = 'open' | 'matched' | 'escrow-ready'
+type MarketRequestStatus = 'open' | 'matched' | 'escrow-ready' | 'escrow-funded'
 
 interface Contact { id: string; name: string; address: string }
 interface MarketRequest {
@@ -322,6 +322,7 @@ interface MarketRequest {
   deliverable: string
   client: string
   agent?: string
+  escrowJobId?: string
   status: MarketRequestStatus
   createdAt: string
 }
@@ -620,6 +621,7 @@ export default function App() {
   const [marketRequests, setMarketRequests] = useState<MarketRequest[]>(loadMarketRequests)
   const [marketLoading, setMarketLoading] = useState(false)
   const [marketTab, setMarketTab] = useState<'browse' | 'create'>('browse')
+  const [activeEscrowRequestId, setActiveEscrowRequestId] = useState<string | null>(null)
   const [requestTitle, setRequestTitle] = useState('')
   const [requestCategory, setRequestCategory] = useState('AI Work')
   const [requestBudget, setRequestBudget] = useState('')
@@ -973,6 +975,7 @@ export default function App() {
       return
     }
     setEscrowPayoutMode('custom')
+    setActiveEscrowRequestId(request.id)
     setEscrowAgent(request.agent ?? '')
     setEscrowAmount(request.budget)
     setEscrowDays(request.deadlineDays)
@@ -982,6 +985,18 @@ export default function App() {
     setActivePage('escrow')
     setMarketRequests((prev) => prev.map((r) => r.id === request.id ? { ...r, status: 'escrow-ready' } : r))
     addToast({ type: 'success', message: 'Escrow form prepared from request' })
+  }
+
+  function openEscrowSubmission(request: MarketRequest) {
+    if (!request.escrowJobId) {
+      addToast({ type: 'error', message: 'The client has not funded escrow yet' })
+      return
+    }
+    setEscrowProtocol('arc-escrow')
+    setEscrowMyTab('jobs')
+    setEscrowJobId(request.escrowJobId)
+    setActivePage('escrow')
+    void escrowLookupJob(Number(request.escrowJobId))
   }
 
   // ??? ?뚯슦???대쭅 ?????????????????????????????????????????????????????????
@@ -1770,6 +1785,20 @@ export default function App() {
       })
       setEscrowJobId(String(newJobId))
       setEscrowMyTab('jobs')
+      if (activeEscrowRequestId && activeWallet) {
+        try {
+          const res = await fetch('/api/requests', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: activeEscrowRequestId, action: 'fund', client: activeWallet, escrowJobId: newJobId }),
+          })
+          const json = await res.json()
+          if (res.ok && Array.isArray(json.requests)) setMarketRequests(json.requests)
+          setActiveEscrowRequestId(null)
+        } catch {
+          addToast({ type: 'error', message: 'Escrow created, but request board was not updated' })
+        }
+      }
       addToast({ type: 'success', message: `Job #${newJobId} created! ${amt} USDC locked in escrow.` })
       setEscrowAgent(''); setEscrowAmount(''); setEscrowDesc('')
     } catch (e: unknown) {
@@ -2629,13 +2658,25 @@ export default function App() {
                           <strong>{request.agent.slice(0, 6)}...{request.agent.slice(-4)}</strong>
                         </div>
                       )}
+                      {request.escrowJobId && (
+                        <div className="market-meta-row agent">
+                          <span>Escrow job</span>
+                          <strong>#{request.escrowJobId}</strong>
+                        </div>
+                      )}
                       <div className="market-card-actions">
                         <button className="btn-outline" onClick={() => acceptMarketRequest(request.id)} disabled={!isConnected || marketLoading || request.status !== 'open' || isOwner}>
                           {request.status === 'open' ? 'Accept Request' : 'Matched'}
                         </button>
-                        <button className="btn-primary" onClick={() => useRequestForEscrow(request)} disabled={!isConnected || !isOwner || !request.agent}>
-                          {isOwner ? (request.agent ? 'Fund Escrow' : 'Waiting for worker') : (isAgent ? 'Accepted - waiting for client' : 'Client funds escrow')}
-                        </button>
+                        {isAgent && request.escrowJobId ? (
+                          <button className="btn-primary" onClick={() => openEscrowSubmission(request)}>
+                            Submit Result
+                          </button>
+                        ) : (
+                          <button className="btn-primary" onClick={() => useRequestForEscrow(request)} disabled={!isConnected || !isOwner || !request.agent || Boolean(request.escrowJobId)}>
+                            {isOwner ? (request.escrowJobId ? 'Escrow funded' : request.agent ? 'Fund Escrow' : 'Waiting for worker') : (isAgent ? 'Accepted - waiting for client' : 'Client funds escrow')}
+                          </button>
+                        )}
                       </div>
                     </article>
                   )
