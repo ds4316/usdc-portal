@@ -2726,8 +2726,8 @@ export default function App() {
             <div className="page-header">
               <Bot size={20} style={{ color: 'var(--accent)' }} />
               <div>
-                <h2 className="page-title">Agent Escrow</h2>
-                <p className="page-sub">Trustless USDC payment channel for AI agents — deployed on Arc Testnet</p>
+                <h2 className="page-title">Escrow Payment</h2>
+                <p className="page-sub">Lock USDC for a worker, review the result, then release payment on Arc Testnet.</p>
               </div>
             </div>
             <div className="section-layout">
@@ -2738,13 +2738,19 @@ export default function App() {
                     <button
                       className={`escrow-proto-btn ${escrowProtocol === 'arc-escrow' ? 'active' : ''}`}
                       onClick={() => setEscrowProtocol('arc-escrow')}>
-                      ArcEscrow
+                      <span>ArcEscrow <small className="escrow-mode-copy">Simple escrow for this demo</small></span>
                     </button>
                     <button
                       className={`escrow-proto-btn ${escrowProtocol === 'erc8183' ? 'active' : ''}`}
                       onClick={() => setEscrowProtocol('erc8183')}>
-                      ERC-8183 <span className="proto-badge">official</span>
+                      <span>ERC-8183 <span className="proto-badge">advanced</span><small className="escrow-mode-copy">Agent commerce standard</small></span>
                     </button>
+                  </div>
+                  <div className="escrow-flow-note">
+                    <div><span>01</span><strong>Client locks USDC</strong></div>
+                    <div><span>02</span><strong>Worker submits result</strong></div>
+                    <div><span>03</span><strong>Client reviews</strong></div>
+                    <div><span>04</span><strong>USDC is released</strong></div>
                   </div>
 
                   {escrowProtocol === 'erc8183' && (
@@ -2757,7 +2763,8 @@ export default function App() {
                       {e8183Tab === 'create' ? (
                         <div className="e8183-form">
                           <div className="escrow-form-group">
-                            <label>Provider Address (agent wallet)</label>
+                            <label>Worker wallet address</label>
+                            <small className="field-helper">The person who completes the request and receives USDC after approval.</small>
                             <input className="action-input" placeholder="0x..." value={e8183Provider}
                               onChange={(e) => setE8183Provider(e.target.value)} />
                           </div>
@@ -2788,7 +2795,7 @@ export default function App() {
                             <Lock size={13} /> {e8183Loading ? (e8183Step === 'creating' ? 'Creating...' : 'Funding...') : 'Create & Fund Job'}
                           </button>
                           <div className="escrow-hint">
-                            Uses Arc's official ERC-8183 standard. You (client) are set as the evaluator — you approve or reject the deliverable.
+                            ERC-8183 is the advanced agent-commerce standard. For normal testing, use ArcEscrow; use this tab only when you want to test the standard interface.
                           </div>
                           {e8183JobId && (
                             <div className="e8183-job-id-pill">Job ID: <strong>#{e8183JobId}</strong></div>
@@ -2859,7 +2866,8 @@ export default function App() {
                     {escrowMyTab === 'new' ? (
                       <div className="escrow-form">
                         <div className="escrow-form-group">
-                          <label>Agent Wallet Address</label>
+                          <label>Worker wallet address</label>
+                          <small className="field-helper">Paste the wallet address of the person doing the work. This is where USDC will be paid after you approve the result.</small>
                           <input className="action-input" placeholder="0x..." value={escrowAgent}
                             onChange={(e) => setEscrowAgent(e.target.value)} />
                         </div>
@@ -2889,7 +2897,7 @@ export default function App() {
                         <button className="btn-primary escrow-submit-btn" onClick={escrowCreateJob} disabled={escrowLoading}>
                           <Lock size={13} /> {escrowLoading ? 'Processing...' : 'Lock USDC & Post Job'}
                         </button>
-                        <div className="escrow-hint">USDC is held in the ArcEscrow contract until you approve the result.</div>
+                        <div className="escrow-hint">USDC stays in the ArcEscrow contract. The worker cannot receive it until you approve the submitted result.</div>
                       </div>
                     ) : (
                       <div className="escrow-jobs-panel">
@@ -3095,17 +3103,17 @@ export default function App() {
                 </div>
 
                 <div className="sidebar-card">
-                  <div className="sidebar-card-title"><Check size={13} /> Demo Checklist</div>
+                  <div className="sidebar-card-title"><Check size={13} /> Escrow Steps</div>
                   <div className="demo-checklist">
                     {[
                       { label: 'Connect wallet on Arc Testnet', done: isConnected && activeChainId === arcTestnet.id },
+                      { label: 'Paste worker wallet address', done: Boolean(escrowAgent || e8183Provider) },
                       { label: 'Lock USDC in escrow', done: recentJobIds.length > 0 },
-                      { label: 'Submit work as agent', done: escrowJob?.status === 1 || escrowJob?.status === 2 },
-                      { label: 'Run Claude Review', done: aiVerdict !== null },
-                      { label: 'Release payment', done: escrowJob?.status === 2 },
+                      { label: 'Worker submits result', done: escrowJob?.status === 1 || escrowJob?.status === 2 },
+                      { label: 'Review and release payment', done: escrowJob?.status === 2 },
                     ].map((item, i) => (
                       <div key={i} className={`checklist-item ${item.done ? 'done' : ''}`}>
-                        <span className="checklist-icon">{item.done ? '✓' : '○'}</span>
+                        <span className="checklist-icon">{item.done ? '✓' : ''}</span>
                         <span>{item.label}</span>
                       </div>
                     ))}
