@@ -8,63 +8,67 @@ interface IERC20 {
 
 // ─── ArcEscrow ───────────────────────────────────────────────────────────────
 //
-// 역할: AI 에이전트 작업 의뢰·검증·USDC 에스크로를 1컨트랙트로 처리
+// 플로우 (marketplace):
+//   1. 의뢰인이 createJob(agent=0) → USDC 즉시 잠금, 누구나 claim 가능
+//   2. 작업자가 claimJob → agent로 확정, Matched 상태
+//   3. 작업자가 submitWork → 결과 URI 기록
+//   4. 의뢰인이 approveWork → 작업자에 USDC 지급
 //
-// 플로우:
-//   1. 의뢰인(client)이 createJob → USDC 락
-//   2. 에이전트(agent)가 submitWork → 결과 URI 기록
-//   3. 의뢰인이 approveWork → 에이전트에 USDC 지급
-//   4. 데드라인 초과 시 의뢰인이 claimRefund → 환불
+// 취소:
+//   - Open 상태(매칭 전): 전액 환불
+//   - Matched 상태(매칭 후): 5% 취소 수수료를 작업자에게, 나머지 환불
+//
+// 플로우 (direct):
+//   createJob(agent=specific) → 바로 Matched 상태로 생성
 //
 // 배포 체인: Arc Testnet
-// 배포 파라미터 (Arc Testnet):
-//   _usdc = 0xbA89E65f0f55F7F6E88E8FfB0F8d6e1e3f4A7B2C  (Arc Testnet USDC — 배포 후 확인)
 
 contract ArcEscrow {
     IERC20 public immutable usdc;
 
-    enum Status { Open, Submitted, Approved, Refunded }
+    uint256 public constant CANCEL_FEE_BPS = 500; // 5%
+
+    enum Status { Open, Matched, Submitted, Approved, Refunded, Cancelled }
 
     struct Job {
         address client;
         address agent;
-        uint256 amount;       // USDC (6 decimals)
-        uint256 deadline;     // Unix timestamp
-        string  description;  // 작업 설명
-        string  resultUri;    // 제출된 결과 URI (IPFS / URL)
+        uint256 amount;
+        uint256 deadline;
+        string  description;
+        string  resultUri;
         Status  status;
     }
 
     uint256 public nextJobId;
     mapping(uint256 => Job) public jobs;
 
-    event JobCreated(
-        uint256 indexed jobId,
-        address indexed client,
-        address indexed agent,
-        uint256 amount,
-        uint256 deadline,
-        string  description
-    );
+    event JobCreated(uint256 indexed jobId, address indexed client, address indexed agent, uint256 amount, uint256 deadline, string description);
+    event JobClaimed(uint256 indexed jobId, address indexed agent);
     event WorkSubmitted(uint256 indexed jobId, string resultUri);
     event WorkApproved(uint256 indexed jobId, address agent, uint256 amount);
+    event JobCancelled(uint256 indexed jobId, address client, uint256 refund, address agent, uint256 fee);
     event Refunded(uint256 indexed jobId, address client, uint256 amount);
 
     constructor(address _usdc) {
         usdc = IERC20(_usdc);
     }
 
+    // agent == address(0) → open job (anyone can claim)
+    // agent != address(0) → direct assignment, status starts as Matched
     function createJob(
         address agent,
         uint256 amount,
         uint256 deadline,
         string calldata description
     ) external returns (uint256 jobId) {
-        require(agent != address(0) && agent != msg.sender, "Invalid agent");
         require(amount > 0, "Amount must be > 0");
         require(deadline > block.timestamp, "Deadline in past");
+        require(agent != msg.sender, "Cannot assign yourself");
 
         usdc.transferFrom(msg.sender, address(this), amount);
+
+        Status initialStatus = (agent == address(0)) ? Status.Open : Status.Matched;
 
         jobId = nextJobId++;
         jobs[jobId] = Job({
@@ -74,16 +78,54 @@ contract ArcEscrow {
             deadline:    deadline,
             description: description,
             resultUri:   '',
-            status:      Status.Open
+            status:      initialStatus
         });
 
         emit JobCreated(jobId, msg.sender, agent, amount, deadline, description);
     }
 
+    // Any address can claim an open job
+    function claimJob(uint256 jobId) external {
+        Job storage job = jobs[jobId];
+        require(job.status == Status.Open, "Job not open");
+        require(job.agent == address(0), "Already claimed");
+        require(msg.sender != job.client, "Client cannot claim own job");
+        require(block.timestamp <= job.deadline, "Deadline passed");
+
+        job.agent = msg.sender;
+        job.status = Status.Matched;
+
+        emit JobClaimed(jobId, msg.sender);
+    }
+
+    // Client cancels. Full refund if Open, 5% fee to agent if Matched.
+    function cancelJob(uint256 jobId) external {
+        Job storage job = jobs[jobId];
+        require(msg.sender == job.client, "Not client");
+        require(job.status == Status.Open || job.status == Status.Matched, "Cannot cancel");
+
+        uint256 fee = 0;
+        address agent = job.agent;
+
+        if (job.status == Status.Matched) {
+            fee = (job.amount * CANCEL_FEE_BPS) / 10_000;
+        }
+
+        uint256 refund = job.amount - fee;
+        job.status = Status.Cancelled;
+
+        if (fee > 0) {
+            usdc.transfer(agent, fee);
+        }
+        usdc.transfer(job.client, refund);
+
+        emit JobCancelled(jobId, job.client, refund, agent, fee);
+    }
+
     function submitWork(uint256 jobId, string calldata resultUri) external {
         Job storage job = jobs[jobId];
         require(msg.sender == job.agent, "Not agent");
-        require(job.status == Status.Open, "Not open");
+        require(job.status == Status.Matched, "Not matched");
         require(block.timestamp <= job.deadline, "Deadline passed");
         require(bytes(resultUri).length > 0, "Empty result");
 
@@ -108,7 +150,9 @@ contract ArcEscrow {
         Job storage job = jobs[jobId];
         require(msg.sender == job.client, "Not client");
         require(
-            job.status == Status.Open || job.status == Status.Submitted,
+            job.status == Status.Open ||
+            job.status == Status.Matched ||
+            job.status == Status.Submitted,
             "Already resolved"
         );
         require(block.timestamp > job.deadline, "Deadline not passed");
@@ -120,7 +164,6 @@ contract ArcEscrow {
         emit Refunded(jobId, job.client, amount);
     }
 
-    // ── View: 잡 전체 조회 ─────────────────────────────────────────────────
     function getJob(uint256 jobId) external view returns (
         address client, address agent, uint256 amount, uint256 deadline,
         string memory description, string memory resultUri, Status status

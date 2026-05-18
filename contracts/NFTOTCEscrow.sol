@@ -13,14 +13,27 @@ interface IERC721Like {
     function transferFrom(address from, address to, uint256 tokenId) external;
 }
 
+// ─── NFTOTCEscrow ─────────────────────────────────────────────────────────────
+//
+// 플로우 (marketplace):
+//   1. 구매자가 fundDeal(seller=0) → USDC 즉시 잠금, NFT 판매자 미정
+//   2. NFT 소유자가 claimDeal → 판매자로 확정 (ownerOf 체크), Matched 상태
+//   3. 판매자가 NFT를 이 컨트랙트에 approve
+//   4. 구매자 또는 판매자가 settle → NFT는 구매자에게, USDC는 판매자에게
+//
+// 취소:
+//   - Funded 상태(매칭 전): 전액 환불
+//   - Matched 상태(매칭 후): 5% 취소 수수료를 판매자에게, 나머지 환불
+//
+// 플로우 (direct):
+//   fundDeal(seller=specific) → 바로 Matched 상태로 생성 (ownerOf 즉시 체크)
+
 contract NFTOTCEscrow {
     IUSDC public immutable usdc;
 
-    enum Status {
-        Funded,
-        Settled,
-        Refunded
-    }
+    uint256 public constant CANCEL_FEE_BPS = 500; // 5%
+
+    enum Status { Funded, Matched, Settled, Refunded, Cancelled }
 
     struct Deal {
         address buyer;
@@ -29,22 +42,16 @@ contract NFTOTCEscrow {
         uint256 tokenId;
         uint256 usdcAmount;
         uint256 deadline;
-        Status status;
+        Status  status;
     }
 
     uint256 public nextDealId;
     mapping(uint256 => Deal) public deals;
 
-    event DealFunded(
-        uint256 indexed dealId,
-        address indexed buyer,
-        address indexed seller,
-        address nft,
-        uint256 tokenId,
-        uint256 usdcAmount,
-        uint256 deadline
-    );
+    event DealFunded(uint256 indexed dealId, address indexed buyer, address seller, address nft, uint256 tokenId, uint256 usdcAmount, uint256 deadline);
+    event DealClaimed(uint256 indexed dealId, address indexed seller);
     event DealSettled(uint256 indexed dealId, address indexed buyer, address indexed seller);
+    event DealCancelled(uint256 indexed dealId, address buyer, uint256 refund, address seller, uint256 fee);
     event DealRefunded(uint256 indexed dealId, address indexed buyer, uint256 usdcAmount);
 
     constructor(address usdcAddress) {
@@ -52,6 +59,8 @@ contract NFTOTCEscrow {
         usdc = IUSDC(usdcAddress);
     }
 
+    // seller == address(0) → open deal (anyone with the NFT can claim)
+    // seller != address(0) → direct deal (ownerOf check at creation)
     function fundDeal(
         address seller,
         address nft,
@@ -59,31 +68,76 @@ contract NFTOTCEscrow {
         uint256 usdcAmount,
         uint256 deadline
     ) external returns (uint256 dealId) {
-        require(seller != address(0) && seller != msg.sender, "Invalid seller");
         require(nft != address(0), "Invalid NFT");
         require(usdcAmount > 0, "Amount must be > 0");
         require(deadline > block.timestamp, "Deadline in past");
-        require(IERC721Like(nft).ownerOf(tokenId) == seller, "Seller does not own NFT");
+        require(seller != msg.sender, "Cannot be own seller");
+
+        // For direct deals, verify seller owns NFT upfront
+        if (seller != address(0)) {
+            require(IERC721Like(nft).ownerOf(tokenId) == seller, "Seller does not own NFT");
+        }
 
         require(usdc.transferFrom(msg.sender, address(this), usdcAmount), "USDC transfer failed");
 
+        Status initialStatus = (seller == address(0)) ? Status.Funded : Status.Matched;
+
         dealId = nextDealId++;
         deals[dealId] = Deal({
-            buyer: msg.sender,
-            seller: seller,
-            nft: nft,
-            tokenId: tokenId,
+            buyer:      msg.sender,
+            seller:     seller,
+            nft:        nft,
+            tokenId:    tokenId,
             usdcAmount: usdcAmount,
-            deadline: deadline,
-            status: Status.Funded
+            deadline:   deadline,
+            status:     initialStatus
         });
 
         emit DealFunded(dealId, msg.sender, seller, nft, tokenId, usdcAmount, deadline);
     }
 
+    // NFT owner claims an open deal and becomes the seller
+    function claimDeal(uint256 dealId) external {
+        Deal storage deal = deals[dealId];
+        require(deal.status == Status.Funded, "Deal not open");
+        require(deal.seller == address(0), "Already claimed");
+        require(msg.sender != deal.buyer, "Buyer cannot claim own deal");
+        require(block.timestamp <= deal.deadline, "Deadline passed");
+        require(IERC721Like(deal.nft).ownerOf(deal.tokenId) == msg.sender, "Must own the NFT");
+
+        deal.seller = msg.sender;
+        deal.status = Status.Matched;
+
+        emit DealClaimed(dealId, msg.sender);
+    }
+
+    // Buyer cancels. Full refund if Funded (no seller), 5% fee to seller if Matched.
+    function cancelDeal(uint256 dealId) external {
+        Deal storage deal = deals[dealId];
+        require(msg.sender == deal.buyer, "Only buyer");
+        require(deal.status == Status.Funded || deal.status == Status.Matched, "Cannot cancel");
+
+        uint256 fee = 0;
+        address seller = deal.seller;
+
+        if (deal.status == Status.Matched) {
+            fee = (deal.usdcAmount * CANCEL_FEE_BPS) / 10_000;
+        }
+
+        uint256 refund = deal.usdcAmount - fee;
+        deal.status = Status.Cancelled;
+
+        if (fee > 0) {
+            usdc.transfer(seller, fee);
+        }
+        usdc.transfer(deal.buyer, refund);
+
+        emit DealCancelled(dealId, deal.buyer, refund, seller, fee);
+    }
+
     function isReadyToSettle(uint256 dealId) public view returns (bool) {
         Deal storage deal = deals[dealId];
-        if (deal.status != Status.Funded) return false;
+        if (deal.status != Status.Matched) return false;
         if (block.timestamp > deal.deadline) return false;
         IERC721Like nft = IERC721Like(deal.nft);
         if (nft.ownerOf(deal.tokenId) != deal.seller) return false;
@@ -92,7 +146,7 @@ contract NFTOTCEscrow {
 
     function settle(uint256 dealId) external {
         Deal storage deal = deals[dealId];
-        require(deal.status == Status.Funded, "Not funded");
+        require(deal.status == Status.Matched, "Not matched");
         require(block.timestamp <= deal.deadline, "Deadline passed");
         require(msg.sender == deal.buyer || msg.sender == deal.seller, "Not participant");
         require(isReadyToSettle(dealId), "NFT not approved");
@@ -106,13 +160,22 @@ contract NFTOTCEscrow {
 
     function refundAfterDeadline(uint256 dealId) external {
         Deal storage deal = deals[dealId];
-        require(deal.status == Status.Funded, "Not funded");
         require(msg.sender == deal.buyer, "Only buyer");
+        require(deal.status == Status.Funded || deal.status == Status.Matched, "Not refundable");
         require(block.timestamp > deal.deadline, "Deadline not passed");
 
+        uint256 amount = deal.usdcAmount;
         deal.status = Status.Refunded;
-        require(usdc.transfer(deal.buyer, deal.usdcAmount), "Refund failed");
+        require(usdc.transfer(deal.buyer, amount), "Refund failed");
 
-        emit DealRefunded(dealId, deal.buyer, deal.usdcAmount);
+        emit DealRefunded(dealId, deal.buyer, amount);
+    }
+
+    function getDeal(uint256 dealId) external view returns (
+        address buyer, address seller, address nft, uint256 tokenId,
+        uint256 usdcAmount, uint256 deadline, Status status
+    ) {
+        Deal storage d = deals[dealId];
+        return (d.buyer, d.seller, d.nft, d.tokenId, d.usdcAmount, d.deadline, d.status);
     }
 }

@@ -44,8 +44,11 @@ const ARC_MSG_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x$
 const ARC_ONBOARDER = '0x495825fF81B048B2A6e1FE10571625496f8fF1FD' as `0x${string}`
 
 // ??? ArcEscrow ????????????????????????????????????????????????????????????
-const ARC_ESCROW = '0xc73821142DeD9Ab7f0F299389Fd3a186475676d5' as `0x${string}`
+const ARC_ESCROW = '0x2D961a34d7558AA5A3BaB17f4d928fd0deC7a5Dc' as `0x${string}`
 const ARC_TESTNET_USDC = '0x3600000000000000000000000000000000000000' as `0x${string}`
+
+// NFTOTCEscrow — TODO: replace with deployed address after redeploying contract
+const NFT_OTC_ESCROW = '0xdC47D9AE448BcE3E524C768446fE65f30d03f20e' as `0x${string}`
 
 
 // CCTP V2 Arc TokenMessenger (Arc -> Sepolia burn) — CREATE2, same addr on both chains
@@ -122,6 +125,10 @@ const ARC_ESCROW_ABI = [
       { name: 'deadline',    type: 'uint256' },
       { name: 'description', type: 'string'  },
     ], outputs: [{ name: 'jobId', type: 'uint256' }] },
+  { name: 'claimJob', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'jobId', type: 'uint256' }], outputs: [] },
+  { name: 'cancelJob', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'jobId', type: 'uint256' }], outputs: [] },
   { name: 'submitWork', type: 'function', stateMutability: 'nonpayable',
     inputs: [
       { name: 'jobId',     type: 'uint256' },
@@ -142,6 +149,50 @@ const ARC_ESCROW_ABI = [
       { name: 'resultUri',   type: 'string'  },
       { name: 'status',      type: 'uint8'   },
     ] },
+] as const
+
+// NFT OTC Escrow ABI
+const NFT_OTC_ESCROW_ABI = [
+  { name: 'fundDeal', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'seller',     type: 'address' },
+      { name: 'nft',        type: 'address' },
+      { name: 'tokenId',    type: 'uint256' },
+      { name: 'usdcAmount', type: 'uint256' },
+      { name: 'deadline',   type: 'uint256' },
+    ], outputs: [{ name: 'dealId', type: 'uint256' }] },
+  { name: 'claimDeal', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'dealId', type: 'uint256' }], outputs: [] },
+  { name: 'cancelDeal', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'dealId', type: 'uint256' }], outputs: [] },
+  { name: 'settle', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'dealId', type: 'uint256' }], outputs: [] },
+  { name: 'refundAfterDeadline', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'dealId', type: 'uint256' }], outputs: [] },
+  { name: 'isReadyToSettle', type: 'function', stateMutability: 'view',
+    inputs: [{ name: 'dealId', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }] },
+  { name: 'nextDealId', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint256' }] },
+  { name: 'getDeal', type: 'function', stateMutability: 'view',
+    inputs: [{ name: 'dealId', type: 'uint256' }],
+    outputs: [
+      { name: 'buyer',      type: 'address' },
+      { name: 'seller',     type: 'address' },
+      { name: 'nft',        type: 'address' },
+      { name: 'tokenId',    type: 'uint256' },
+      { name: 'usdcAmount', type: 'uint256' },
+      { name: 'deadline',   type: 'uint256' },
+      { name: 'status',     type: 'uint8'   },
+    ] },
+] as const
+
+// ERC-721 ABI for NFT approve and transferFrom
+const ERC721_ABI = [
+  { name: 'approve', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'to', type: 'address' }, { name: 'tokenId', type: 'uint256' }], outputs: [] },
+  { name: 'transferFrom', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'from', type: 'address' }, { name: 'to', type: 'address' }, { name: 'tokenId', type: 'uint256' }], outputs: [] },
+  { name: 'ownerOf', type: 'function', stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }], outputs: [{ name: '', type: 'address' }] },
 ] as const
 
 const NEXT_JOB_ID_ABI = [
@@ -306,7 +357,7 @@ type NetworkMode = 'mainnet' | 'testnet'
 type MainTab     = 'assets' | 'history' | 'faucet'
 type Theme       = 'dark' | 'light'
 type InAppFaucetChain = 'ARC-TESTNET' | 'ETH-SEPOLIA' | 'BASE-SEPOLIA'
-type MarketRequestStatus = 'open' | 'matched' | 'escrow-ready' | 'escrow-funded'
+type MarketRequestStatus = 'open' | 'matched' | 'cancelled'
 type DealType = 'work' | 'milestone' | 'nft-otc'
 
 interface Contact { id: string; name: string; address: string }
@@ -649,6 +700,10 @@ export default function App() {
   const [requestListingDays, setRequestListingDays] = useState('3')
   const [requestDescription, setRequestDescription] = useState('')
   const [requestDeliverable, setRequestDeliverable] = useState('')
+  const [nftSendContract, setNftSendContract] = useState('')
+  const [nftSendTokenId, setNftSendTokenId] = useState('')
+  const [nftSendRecipient, setNftSendRecipient] = useState('')
+  const [nftSendLoading, setNftSendLoading] = useState(false)
   const [sortBy, setSortBy]         = useState<'value' | 'symbol' | 'chain'>('value')
 
   const [assets, setAssets]         = useState<AssetRow[]>([])
@@ -969,17 +1024,41 @@ export default function App() {
       if (!isAddress(requestNftContract)) return addToast({ type: 'error', message: 'Enter a valid NFT contract address' })
       if (!requestNftTokenId.trim()) return addToast({ type: 'error', message: 'Enter the NFT token ID' })
       if (requestNftSeller && !isAddress(requestNftSeller)) return addToast({ type: 'error', message: 'Seller wallet must be a valid address' })
+      if (NFT_OTC_ESCROW === '0x0000000000000000000000000000000000000000') {
+        return addToast({ type: 'error', message: 'NFT OTC Escrow not deployed yet — update NFT_OTC_ESCROW address' })
+      }
     }
+    const { encodeFunctionData } = await import('viem')
     setMarketLoading(true)
     try {
+      await switchChain({ chainId: arcTestnet.id })
+      const usdcAmt  = BigInt(Math.round(budget * 1e6))
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + parseInt(requestDays) * 86400)
+      const arcClient = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
+      let escrowJobId: number
+      if (requestDealType === 'nft-otc') {
+        await sendTransactionAsync({ to: ARC_TESTNET_USDC,
+          data: encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve', args: [NFT_OTC_ESCROW, usdcAmt] }) })
+        const sellerAddr = (requestNftSeller && isAddress(requestNftSeller) ? requestNftSeller : '0x0000000000000000000000000000000000000000') as `0x${string}`
+        await sendTransactionAsync({ to: NFT_OTC_ESCROW,
+          data: encodeFunctionData({ abi: NFT_OTC_ESCROW_ABI, functionName: 'fundDeal',
+            args: [sellerAddr, requestNftContract as `0x${string}`, BigInt(requestNftTokenId), usdcAmt, deadline] }) })
+        const nextId = await arcClient.readContract({ address: NFT_OTC_ESCROW, abi: NFT_OTC_ESCROW_ABI, functionName: 'nextDealId' })
+        escrowJobId = Number(nextId) - 1
+      } else {
+        await sendTransactionAsync({ to: ARC_TESTNET_USDC,
+          data: encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve', args: [ARC_ESCROW, usdcAmt] }) })
+        await sendTransactionAsync({ to: ARC_ESCROW,
+          data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'createJob',
+            args: ['0x0000000000000000000000000000000000000000' as `0x${string}`, usdcAmt, deadline, `${requestTitle}: ${requestDeliverable}`] }) })
+        const nextId = await arcClient.readContract({ address: ARC_ESCROW, abi: NEXT_JOB_ID_ABI, functionName: 'nextJobId' })
+        escrowJobId = Number(nextId) - 1
+      }
       const res = await fetch('/api/requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          dealType: requestDealType,
-          title: requestTitle,
-          category: requestCategory,
-          budget,
+          dealType: requestDealType, title: requestTitle, category: requestCategory, budget,
           upfrontAmount: requestDealType === 'milestone' ? upfront : undefined,
           completionAmount: requestDealType === 'milestone' ? completion : undefined,
           nftChain: requestDealType === 'nft-otc' ? requestNftChain : undefined,
@@ -987,11 +1066,9 @@ export default function App() {
           nftTokenId: requestDealType === 'nft-otc' ? requestNftTokenId : undefined,
           nftSeller: requestDealType === 'nft-otc' ? requestNftSeller : undefined,
           nftCollection: requestDealType === 'nft-otc' ? requestNftCollection : undefined,
-          deadlineDays: requestDays,
-          listingDays: requestListingDays,
-          description: requestDescription,
-          deliverable: requestDeliverable,
-          client: activeWallet,
+          deadlineDays: requestDays, listingDays: requestListingDays,
+          description: requestDescription, deliverable: requestDeliverable,
+          client: activeWallet, escrowJobId,
         }),
       })
       const json = await res.json()
@@ -1002,7 +1079,7 @@ export default function App() {
       setRequestDealType('work'); setRequestUpfront('10'); setRequestCompletion('10')
       setRequestNftChain('Arc Testnet'); setRequestNftContract(''); setRequestNftTokenId(''); setRequestNftSeller(''); setRequestNftCollection('')
       setMarketTab('browse')
-      addToast({ type: 'success', message: 'Request posted to the shared board' })
+      addToast({ type: 'success', message: `Posted — ${budget} USDC locked in escrow (job #${escrowJobId})` })
     } catch (e) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Could not post request' })
     } finally {
@@ -1010,10 +1087,20 @@ export default function App() {
     }
   }
 
-  async function acceptMarketRequest(id: string) {
+  async function acceptMarketRequest(id: string, dealType: DealType, escrowJobId: string | undefined) {
     if (!isConnected || !activeWallet) return addToast({ type: 'error', message: 'Connect a wallet first' })
+    if (!escrowJobId) return addToast({ type: 'error', message: 'No on-chain job ID found for this request' })
+    const { encodeFunctionData } = await import('viem')
     setMarketLoading(true)
     try {
+      await switchChain({ chainId: arcTestnet.id })
+      if (dealType === 'nft-otc') {
+        await sendTransactionAsync({ to: NFT_OTC_ESCROW,
+          data: encodeFunctionData({ abi: NFT_OTC_ESCROW_ABI, functionName: 'claimDeal', args: [BigInt(escrowJobId)] }) })
+      } else {
+        await sendTransactionAsync({ to: ARC_ESCROW,
+          data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'claimJob', args: [BigInt(escrowJobId)] }) })
+      }
       const res = await fetch('/api/requests', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -1022,12 +1109,87 @@ export default function App() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Could not accept request')
       if (Array.isArray(json.requests)) setMarketRequests(json.requests)
-      setMarketScopeFilter('all')
-      addToast({ type: 'success', message: 'Request accepted on the shared board' })
+      addToast({ type: 'success', message: 'Accepted — you are now the matched worker' })
     } catch (e) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Could not accept request' })
     } finally {
       setMarketLoading(false)
+    }
+  }
+
+  async function cancelMarketRequest(id: string, dealType: DealType, escrowJobId: string | undefined) {
+    if (!isConnected || !activeWallet) return addToast({ type: 'error', message: 'Connect a wallet first' })
+    if (!escrowJobId) return addToast({ type: 'error', message: 'No on-chain job ID found' })
+    const { encodeFunctionData } = await import('viem')
+    setMarketLoading(true)
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+      if (dealType === 'nft-otc') {
+        await sendTransactionAsync({ to: NFT_OTC_ESCROW,
+          data: encodeFunctionData({ abi: NFT_OTC_ESCROW_ABI, functionName: 'cancelDeal', args: [BigInt(escrowJobId)] }) })
+      } else {
+        await sendTransactionAsync({ to: ARC_ESCROW,
+          data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'cancelJob', args: [BigInt(escrowJobId)] }) })
+      }
+      const res = await fetch('/api/requests', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'cancel', client: activeWallet }),
+      })
+      const json = await res.json()
+      if (res.ok && Array.isArray(json.requests)) setMarketRequests(json.requests)
+      addToast({ type: 'success', message: 'Cancelled — USDC refunded (5% fee to worker if already matched)' })
+    } catch (e) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Cancel failed' })
+    } finally {
+      setMarketLoading(false)
+    }
+  }
+
+  async function approveNftForEscrow(nftContract: string, tokenId: string) {
+    if (!isConnected) return addToast({ type: 'error', message: 'Connect a wallet first' })
+    const { encodeFunctionData } = await import('viem')
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+      await sendTransactionAsync({ to: nftContract as `0x${string}`,
+        data: encodeFunctionData({ abi: ERC721_ABI, functionName: 'approve', args: [NFT_OTC_ESCROW, BigInt(tokenId)] }) })
+      addToast({ type: 'success', message: 'NFT approved for escrow — either side can now settle' })
+    } catch (e) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Approve failed' })
+    }
+  }
+
+  async function settleNftOtcDeal(escrowJobId: string) {
+    if (!isConnected) return addToast({ type: 'error', message: 'Connect a wallet first' })
+    const { encodeFunctionData } = await import('viem')
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+      await sendTransactionAsync({ to: NFT_OTC_ESCROW,
+        data: encodeFunctionData({ abi: NFT_OTC_ESCROW_ABI, functionName: 'settle', args: [BigInt(escrowJobId)] }) })
+      addToast({ type: 'success', message: 'Settled — NFT sent to buyer, USDC released to seller' })
+    } catch (e) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Settle failed' })
+    }
+  }
+
+  async function sendNft(nftContract: string, tokenId: string, recipient: string) {
+    if (!isConnected || !activeWallet) return addToast({ type: 'error', message: 'Connect a wallet first' })
+    if (!isAddress(nftContract)) return addToast({ type: 'error', message: 'Invalid NFT contract address' })
+    if (!tokenId.trim()) return addToast({ type: 'error', message: 'Enter token ID' })
+    if (!isAddress(recipient)) return addToast({ type: 'error', message: 'Invalid recipient address' })
+    const { encodeFunctionData } = await import('viem')
+    setNftSendLoading(true)
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+      await sendTransactionAsync({ to: nftContract as `0x${string}`,
+        data: encodeFunctionData({ abi: ERC721_ABI, functionName: 'transferFrom',
+          args: [activeWallet as `0x${string}`, recipient as `0x${string}`, BigInt(tokenId)] }) })
+      addToast({ type: 'success', message: `NFT #${tokenId} sent to ${recipient.slice(0, 8)}...` })
+      setNftSendContract(''); setNftSendTokenId(''); setNftSendRecipient('')
+    } catch (e) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Transfer failed' })
+    } finally {
+      setNftSendLoading(false)
     }
   }
 
@@ -1055,26 +1217,14 @@ export default function App() {
     }
   }
 
-  function useRequestForEscrow(request: MarketRequest) {
-    if (!activeWallet || activeWallet.toLowerCase() !== request.client.toLowerCase()) {
-      addToast({ type: 'error', message: 'Only the request owner can fund escrow' })
+  function viewRequestEscrow(request: MarketRequest) {
+    if (!request.escrowJobId) {
+      addToast({ type: 'error', message: 'No escrow job linked to this request' })
       return
     }
-    if (!request.agent) {
-      addToast({ type: 'error', message: 'Wait for a worker to accept this request first' })
-      return
-    }
-    setEscrowPayoutMode('custom')
-    setActiveEscrowRequestId(request.id)
-    setEscrowAgent(request.agent ?? '')
-    setEscrowAmount(request.budget)
-    setEscrowDays(request.deadlineDays)
-    setEscrowDesc(`${request.title}: ${request.deliverable}`)
-    setEscrowProtocol('arc-escrow')
-    setEscrowMyTab('new')
+    setEscrowJobId(request.escrowJobId)
+    setEscrowMyTab('jobs')
     setActivePage('escrow')
-    setMarketRequests((prev) => prev.map((r) => r.id === request.id ? { ...r, status: 'escrow-ready' } : r))
-    addToast({ type: 'success', message: 'Escrow form prepared from request' })
   }
 
   function openEscrowSubmission(request: MarketRequest) {
@@ -3013,15 +3163,17 @@ export default function App() {
                   const dealType = request.dealType ?? 'work'
                   const dealLabel = dealType === 'nft-otc' ? 'NFT OTC' : dealType === 'milestone' ? 'Milestone' : 'Work'
                   const isExpiredRequest = Boolean(request.expiresAt && new Date(request.expiresAt).getTime() <= Date.now())
-                  const nextStep = request.status === 'open'
-                    ? (isOwner ? 'Waiting for a worker' : 'Accept this request')
-                    : !isEscrowFunded
-                      ? (isOwner ? 'Fund escrow' : isAgent ? 'Waiting for client funding' : 'Matched')
-                      : (isAgent ? 'Submit result' : isOwner ? 'Wait for worker result' : 'Escrow funded')
+                  const isCancelled = request.status === 'cancelled'
+                  const nextStep = isCancelled
+                    ? 'Cancelled'
+                    : request.status === 'open'
+                      ? (isOwner ? 'Waiting for a worker' : 'Accept & claim on-chain')
+                      : (isAgent
+                          ? (dealType === 'nft-otc' ? 'Approve NFT then settle' : 'Submit result')
+                          : isOwner ? (dealType === 'nft-otc' ? 'Wait for seller to approve NFT' : 'Wait for worker result') : 'Matched')
                   const flowSteps = [
-                    { label: 'Post', done: true },
+                    { label: 'Post + Fund', done: true },
                     { label: 'Match', done: Boolean(request.agent) },
-                    { label: 'Fund', done: isEscrowFunded },
                     { label: 'Submit', done: false },
                     { label: 'Release', done: false },
                   ]
@@ -3109,21 +3261,45 @@ export default function App() {
                         </div>
                       )}
                       <div className="market-card-actions">
-                        <button className="btn-outline" onClick={() => acceptMarketRequest(request.id)} disabled={!isConnected || marketLoading || request.status !== 'open' || isOwner}>
-                          {request.status === 'open' ? 'Accept Request' : 'Matched'}
-                        </button>
-                        {isExpiredRequest && (
-                          <button className="btn-ghost" onClick={() => deleteExpiredMarketRequest(request.id)} disabled={marketLoading}>
-                            Remove expired
+                        {/* Accept / Claim on-chain — only for open requests, not owner */}
+                        {!isCancelled && (
+                          <button className="btn-outline"
+                            onClick={() => acceptMarketRequest(request.id, dealType, request.escrowJobId)}
+                            disabled={!isConnected || marketLoading || request.status !== 'open' || isOwner || !request.escrowJobId}>
+                            {request.status === 'open' ? 'Accept & Claim' : 'Matched'}
                           </button>
                         )}
-                        {isAgent && request.escrowJobId ? (
+                        {/* Cancel — only owner, only while open or matched */}
+                        {isOwner && !isCancelled && (request.status === 'open' || request.status === 'matched') && (
+                          <button className="btn-ghost"
+                            onClick={() => cancelMarketRequest(request.id, dealType, request.escrowJobId)}
+                            disabled={marketLoading}
+                            title={request.status === 'matched' ? '5% cancellation fee goes to matched worker' : 'Full refund'}>
+                            {request.status === 'matched' ? 'Cancel (5% fee)' : 'Cancel'}
+                          </button>
+                        )}
+                        {/* NFT OTC seller actions */}
+                        {dealType === 'nft-otc' && isAgent && request.status === 'matched' && request.escrowJobId && (
+                          <>
+                            <button className="btn-outline"
+                              onClick={() => approveNftForEscrow(request.nftContract ?? '', request.nftTokenId ?? '')}>
+                              Approve NFT
+                            </button>
+                            <button className="btn-primary"
+                              onClick={() => settleNftOtcDeal(request.escrowJobId!)}>
+                              Settle Deal
+                            </button>
+                          </>
+                        )}
+                        {/* Work/Milestone: agent submits result */}
+                        {dealType !== 'nft-otc' && isAgent && request.escrowJobId && request.status === 'matched' && (
                           <button className="btn-primary" onClick={() => openEscrowSubmission(request)}>
                             Submit Result
                           </button>
-                        ) : (
-                          <button className="btn-primary" onClick={() => useRequestForEscrow(request)} disabled={!isConnected || !isOwner || !request.agent || Boolean(request.escrowJobId)}>
-                            {isOwner ? (request.escrowJobId ? 'Escrow funded' : request.agent ? 'Fund Escrow' : 'Waiting for worker') : (isAgent ? 'Accepted - waiting for client' : 'Client funds escrow')}
+                        )}
+                        {isExpiredRequest && (
+                          <button className="btn-ghost" onClick={() => deleteExpiredMarketRequest(request.id)} disabled={marketLoading}>
+                            Remove expired
                           </button>
                         )}
                       </div>
@@ -3133,6 +3309,32 @@ export default function App() {
               </section>
               </>
             )}
+
+            {/* NFT Transfer Tool */}
+            <section className="nft-send-panel">
+              <div className="nft-send-head">
+                <strong>Send NFT</strong>
+                <span>Transfer any ERC-721 NFT on Arc Testnet to another wallet</span>
+              </div>
+              <div className="nft-send-form">
+                <label className="pay-field">
+                  <span>NFT contract address</span>
+                  <input className="pay-text-input" value={nftSendContract} onChange={(e) => setNftSendContract(e.target.value)} placeholder="0x collection contract" />
+                </label>
+                <label className="pay-field">
+                  <span>Token ID</span>
+                  <input className="pay-text-input" value={nftSendTokenId} onChange={(e) => setNftSendTokenId(e.target.value)} placeholder="1" />
+                </label>
+                <label className="pay-field">
+                  <span>Recipient address</span>
+                  <input className="pay-text-input" value={nftSendRecipient} onChange={(e) => setNftSendRecipient(e.target.value)} placeholder="0x recipient" />
+                </label>
+                <button className="btn-primary" onClick={() => sendNft(nftSendContract, nftSendTokenId, nftSendRecipient)} disabled={!isConnected || nftSendLoading}>
+                  {nftSendLoading ? 'Sending...' : 'Send NFT'}
+                </button>
+              </div>
+            </section>
+
           </div>
         )}
 
@@ -3464,12 +3666,8 @@ export default function App() {
                                   </div>
                                   {request.escrowJobId ? (
                                     <button onClick={() => escrowLookupJob(Number(request.escrowJobId))}>View</button>
-                                  ) : isOwner ? (
-                                    <button onClick={() => useRequestForEscrow(request)}>Fund escrow</button>
-                                  ) : isWorker ? (
-                                    <button disabled>Waiting for client</button>
                                   ) : (
-                                    <button disabled>Matched</button>
+                                    <button onClick={() => viewRequestEscrow(request)} disabled={!request.escrowJobId}>View escrow</button>
                                   )}
                                 </div>
                               )

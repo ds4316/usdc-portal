@@ -74,6 +74,7 @@ export default async function handler(req, res) {
       const {
         dealType, title, category, budget, deadlineDays, listingDays, description, deliverable, client,
         upfrontAmount, completionAmount, nftChain, nftContract, nftTokenId, nftSeller, nftCollection,
+        escrowJobId, // on-chain job/deal ID — set at creation since USDC is locked immediately
       } = req.body ?? {}
       if (!isAddress(client)) return res.status(400).json({ error: 'Valid client wallet required' })
       const safeDealType = cleanDealType(dealType)
@@ -118,6 +119,8 @@ export default async function handler(req, res) {
         description: cleanText(description),
         deliverable: cleanText(deliverable),
         client,
+        // USDC is locked on-chain at posting time — escrowJobId is set from the start
+        escrowJobId: escrowJobId != null ? String(escrowJobId) : undefined,
         status: 'open',
         createdAt: createdAt.toISOString(),
         expiresAt: new Date(createdAt.getTime() + visibleDays * 86400_000).toISOString(),
@@ -131,12 +134,29 @@ export default async function handler(req, res) {
       const { id, action, agent, client, escrowJobId } = req.body ?? {}
       const target = requests.find((request) => request.id === id)
       if (!target) return res.status(404).json({ error: 'Request not found' })
+
       if (action === 'deleteExpired') {
         if (!isExpired(target)) return res.status(409).json({ error: 'Request is not expired' })
         const updated = requests.filter((request) => request.id !== id)
         await writeRequests(updated, token)
         return res.status(200).json({ requests: updated })
       }
+
+      if (action === 'cancel') {
+        // Allow cancellation in open or matched state
+        if (!isAddress(client) || target.client.toLowerCase() !== client.toLowerCase()) {
+          return res.status(403).json({ error: 'Only the request owner can cancel' })
+        }
+        if (target.status === 'cancelled' || target.status === 'settled') {
+          return res.status(409).json({ error: 'Request is already resolved' })
+        }
+        const updated = requests.map((request) => request.id === id
+          ? { ...request, status: 'cancelled', cancelledAt: new Date().toISOString() }
+          : request)
+        await writeRequests(updated, token)
+        return res.status(200).json({ request: updated.find((r) => r.id === id), requests: updated })
+      }
+
       if (isExpired(target)) return res.status(410).json({ error: 'Request has expired' })
 
       let updated
@@ -148,6 +168,7 @@ export default async function handler(req, res) {
           ? { ...request, agent, status: 'matched', acceptedAt: new Date().toISOString() }
           : request)
       } else if (action === 'fund') {
+        // Legacy: attach escrow job id after the fact (kept for backward compatibility)
         if (!isAddress(client) || target.client.toLowerCase() !== client.toLowerCase()) {
           return res.status(403).json({ error: 'Only the request owner can attach escrow' })
         }
@@ -156,7 +177,7 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: 'Valid escrow job id required' })
         }
         updated = requests.map((request) => request.id === id
-          ? { ...request, status: 'escrow-funded', escrowJobId: String(escrowJobId), escrowFundedAt: new Date().toISOString() }
+          ? { ...request, status: 'matched', escrowJobId: String(escrowJobId), escrowFundedAt: new Date().toISOString() }
           : request)
       } else {
         return res.status(400).json({ error: 'Unsupported action' })

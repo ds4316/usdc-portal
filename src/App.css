@@ -4328,6 +4328,31 @@ html {
   font-size: 14px;
 }
 
+.nft-send-panel {
+  margin: 24px 0 0;
+  padding: 20px;
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.nft-send-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+.nft-send-head strong { font-size: var(--text-sm); }
+.nft-send-head span   { font-size: var(--text-xs); opacity: 0.6; }
+.nft-send-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+@media (max-width: 700px) {
+  .nft-send-form { grid-template-columns: 1fr; }
+}
+
 .nft-card-box {
   display: grid;
   gap: 10px;
