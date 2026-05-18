@@ -9,7 +9,7 @@ import {
   Wallet, ExternalLink, AlertTriangle, QrCode, ChevronDown,
   ArrowUpRight, Repeat2, Layers, BookUser,
   Fuel, Trash2, Download, Zap, ShieldCheck, CircleDollarSign, Bot,
-  Lock, Upload, BookOpen, LayoutDashboard, ArrowRightLeft, Network,
+  Lock, Upload, BookOpen, LayoutDashboard, ArrowRightLeft, Network, UserCircle, BriefcaseBusiness,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { arcTestnet } from './wagmi.config'
@@ -630,6 +630,8 @@ export default function App() {
   const [marketRequests, setMarketRequests] = useState<MarketRequest[]>(loadMarketRequests)
   const [marketLoading, setMarketLoading] = useState(false)
   const [marketTab, setMarketTab] = useState<'browse' | 'create'>('browse')
+  const [marketDealFilter, setMarketDealFilter] = useState<'all' | DealType>('all')
+  const [marketScopeFilter, setMarketScopeFilter] = useState<'open' | 'mine' | 'all'>('open')
   const [activeEscrowRequestId, setActiveEscrowRequestId] = useState<string | null>(null)
   const [requestDealType, setRequestDealType] = useState<DealType>('work')
   const [requestTitle, setRequestTitle] = useState('')
@@ -656,6 +658,7 @@ export default function App() {
   const [history, setHistory]       = useState<TxRecord[]>(loadHistory)
 
   const [showConnectors, setShowConnectors] = useState(false)
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [connectingId, setConnectingId]     = useState<string | null>(null)
   const [confirmState, setConfirmState]     = useState<ConfirmState | null>(null)
   const [copiedAddr, setCopiedAddr]         = useState(false)
@@ -751,6 +754,13 @@ export default function App() {
     funded: marketRequests.filter((r) => r.escrowJobId).length,
     mine: marketRequests.filter((r) => activeWallet && (r.client.toLowerCase() === activeWallet.toLowerCase() || r.agent?.toLowerCase() === activeWallet.toLowerCase())).length,
   }
+  const filteredMarketRequests = marketRequests.filter((request) => {
+    const matchesDeal = marketDealFilter === 'all' || (request.dealType ?? 'work') === marketDealFilter
+    const matchesScope = marketScopeFilter === 'all'
+      || (marketScopeFilter === 'open' && request.status === 'open')
+      || (marketScopeFilter === 'mine' && Boolean(activeWallet && (request.client.toLowerCase() === activeWallet.toLowerCase() || request.agent?.toLowerCase() === activeWallet.toLowerCase())))
+    return matchesDeal && matchesScope
+  })
 
   // ??? Toast ?ы띁 ??????????????????????????????????????????????????????????
   function addToast(t: Omit<Toast, 'id'>): string {
@@ -2123,12 +2133,11 @@ export default function App() {
 
   // ??? ?뚮뜑 ?????????????????????????????????????????????????????????????????
   const NAV_ITEMS = [
-    { id: 'overview'  as const, label: 'Overview',     icon: <LayoutDashboard size={13} /> },
+    { id: 'overview'  as const, label: 'Product',      icon: <LayoutDashboard size={13} /> },
     { id: 'marketplace' as const, label: 'Requests',    icon: <BookUser size={13} /> },
     { id: 'escrow'    as const, label: 'Escrow',       icon: <Lock size={13} /> },
     { id: 'funds'     as const, label: 'Move Funds',   icon: <ArrowRightLeft size={13} /> },
-    { id: 'portfolio' as const, label: 'Portfolio',    icon: <Wallet size={13} /> },
-    { id: 'activity'  as const, label: 'Activity',     icon: <Network size={13} /> },
+    { id: 'activity'  as const, label: 'Settlements',  icon: <Network size={13} /> },
     { id: 'docs'      as const, label: 'Docs',         icon: <BookOpen size={13} /> },
   ]
 
@@ -2209,7 +2218,7 @@ export default function App() {
           <div className="nav-links">
             {NAV_ITEMS.map((item) => (
               <button key={item.id} className={`nav-link ${activePage === item.id ? 'active' : ''}`}
-                onClick={() => setActivePage(item.id)}>
+                onClick={() => { setActivePage(item.id); setShowProfileMenu(false); setShowConnectors(false) }}>
                 {item.icon} {item.label}
               </button>
             ))}
@@ -2232,27 +2241,64 @@ export default function App() {
             </div>
           )}
 
-          <div className="nav-wallets">
-            {connections.map((conn) =>
-              conn.accounts.map((addr) => (
-                <div key={addr} className="nav-wallet-chip">
-                  <span className="wallet-dot" />
-                  <span>{addr.slice(0, 6)}...{addr.slice(-4)}</span>
-                  <button className="chip-disconnect" onClick={() => disconnect({ connector: conn.connector })}><X size={12} /></button>
-                </div>
-              ))
-            )}
-            <button className="btn-add-wallet" onClick={() => setShowConnectors((v) => !v)}>
-              {isConnected ? <><Plus size={13} /> Add wallet</> : <><Wallet size={13} /> Connect</>}
+          <div className="profile-menu-wrap">
+            <button className={`profile-trigger ${showProfileMenu ? 'active' : ''}`} onClick={() => { setShowProfileMenu((v) => !v); setShowConnectors(false) }}>
+              <UserCircle size={17} />
+              <span>{isConnected ? activeWalletShort : 'Profile'}</span>
+              <ChevronDown size={12} />
             </button>
-            {showConnectors && <div className="wallet-dropdown"><ConnectorList /></div>}
+            {showProfileMenu && (
+              <div className="profile-dropdown">
+                <div className="profile-head">
+                  <div className="profile-avatar"><UserCircle size={24} /></div>
+                  <div>
+                    <span>{isConnected ? 'Connected wallet' : 'Wallet not connected'}</span>
+                    <strong>{isConnected ? activeWalletShort : 'Connect to post or fund escrow'}</strong>
+                  </div>
+                </div>
+                {isConnected && (
+                  <div className="profile-wallet-list">
+                    {connections.map((conn) =>
+                      conn.accounts.map((addr) => (
+                        <div key={addr} className="profile-wallet-row">
+                          <span className="wallet-dot" />
+                          <code>{addr.slice(0, 8)}...{addr.slice(-6)}</code>
+                          <button className="chip-disconnect" onClick={() => disconnect({ connector: conn.connector })}><X size={12} /></button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+                <div className="profile-menu-section">
+                  <button onClick={() => { setActivePage('portfolio'); setMainTab('assets'); setShowProfileMenu(false) }}>
+                    <Wallet size={14} /> Portfolio
+                  </button>
+                  <button onClick={() => { setActivePage('portfolio'); setMainTab('faucet'); setShowProfileMenu(false) }}>
+                    <Fuel size={14} /> Faucet links
+                  </button>
+                  <button onClick={() => { setShowQR(true); setShowProfileMenu(false) }} disabled={!isConnected}>
+                    <QrCode size={14} /> Receive / QR
+                  </button>
+                  <button onClick={() => { setShowContacts(true); setShowProfileMenu(false) }}>
+                    <BookUser size={14} /> Address book
+                  </button>
+                  <button onClick={() => { exportCSV(); setShowProfileMenu(false) }} disabled={!assets.length}>
+                    <Download size={14} /> Export CSV
+                  </button>
+                </div>
+                <div className="profile-menu-section">
+                  <button onClick={() => setShowConnectors((v) => !v)}>
+                    {isConnected ? <><Plus size={14} /> Add wallet</> : <><Wallet size={14} /> Connect wallet</>}
+                  </button>
+                  <button onClick={() => setTheme((t) => t === 'dark' ? 'light' : 'dark')}>
+                    {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />} {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+                  </button>
+                </div>
+                {showConnectors && <div className="profile-connectors"><ConnectorList /></div>}
+              </div>
+            )}
           </div>
 
-          {isConnected && (
-            <button className="btn-theme" onClick={() => setShowQR(true)} title="Receive / QR">
-              <QrCode size={15} />
-            </button>
-          )}
           <button className="btn-theme" onClick={() => setTheme((t) => t === 'dark' ? 'light' : 'dark')}>
             {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
           </button>
@@ -2272,11 +2318,11 @@ export default function App() {
               <div className="ov-ambient ov-ambient-one" />
               <div className="ov-ambient ov-ambient-two" />
               <div className="ov-hero-text">
-                <div className="ov-eyebrow">Circle + Arc agentic settlement</div>
-                <h1 className="ov-h1">USDC escrow for work requests on Arc</h1>
+                <div className="ov-eyebrow">Circle + Arc agentic escrow marketplace</div>
+                <h1 className="ov-h1">Agentic escrow marketplace on Arc</h1>
                 <p className="ov-lead">
-                  Clients post work, workers accept requests, USDC is locked in Arc escrow,
-                  deliverables are reviewed with AI assistance, and approved work settles in USDC.
+                  Post requests, match with workers or AI agents, lock USDC in Arc escrow,
+                  review submitted work with AI assistance, and release payment only after approval.
                 </p>
                 <div className="ov-metrics">
                   <div className="ov-metric">
@@ -2305,10 +2351,10 @@ export default function App() {
                 </div>
                 <div className="ov-ctas">
                   <button className="btn-primary ov-cta" onClick={() => setActivePage('marketplace')}>
-                    <BookUser size={14} /> Browse Requests
+                    <BookUser size={14} /> Post a Request
                   </button>
                   <button className="btn-outline ov-cta" onClick={() => setActivePage('funds')}>
-                    <ArrowRightLeft size={14} /> Move Funds to Arc
+                    <ArrowRightLeft size={14} /> Fund with USDC
                   </button>
                   {!isConnected && (
                     <button className="btn-ghost ov-cta" onClick={() => setShowConnectors(true)}>
@@ -2349,7 +2395,7 @@ export default function App() {
                     {[
                       ['Route', 'Circle rails', 'CCTP and App Kit'],
                       ['Track', 'Explorer proof', 'ArcScan links'],
-                      ['Operate', 'Portfolio', 'Balances as support'],
+                      ['Operate', 'Wallet profile', 'Balances and faucet tucked away'],
                     ].map((item, i) => (
                       <div className="showcase-card" key={`c-${i}`}>
                         <span>{item[0]}</span>
@@ -2363,7 +2409,7 @@ export default function App() {
                   <div className="ov-status-panel-head">
                     <div>
                       <span className="ov-panel-kicker">Active session</span>
-                      <strong>Stablecoin command center</strong>
+                      <strong>Agentic settlement workspace</strong>
                     </div>
                     <span className={`mode-pill ${networkMode}`}>{networkMode === 'mainnet' ? 'Mainnet' : 'Testnet'}</span>
                   </div>
@@ -2400,9 +2446,9 @@ export default function App() {
                       <BookUser size={16} />
                       <span>Requests</span>
                     </button>
-                    <button className="ov-action-tile" onClick={() => setActivePage('portfolio')}>
-                      <Wallet size={16} />
-                      <span>Portfolio</span>
+                    <button className="ov-action-tile" onClick={() => setActivePage('escrow')}>
+                      <Lock size={16} />
+                      <span>Escrow</span>
                     </button>
                     <button className="ov-action-tile" onClick={() => setActivePage('funds')}>
                       <ArrowRightLeft size={16} />
@@ -2415,9 +2461,9 @@ export default function App() {
 
             <section className="ov-grant-strip reveal-section">
               {([
-                { label: 'Use case', title: 'Stablecoin operations', copy: 'One clean surface for balances, routes, contract payment, faucet links, and activity.' },
-                { label: 'Settlement', title: 'Arc-native contract flow', copy: 'Move USDC into Arc, pay a contract, hold escrow, and release funds with clear transaction states.' },
-                { label: 'Verification', title: 'AI-assisted review', copy: 'Claude evaluation turns submitted work into a structured verdict before payout.' },
+                { label: 'Marketplace', title: 'Requests become payable jobs', copy: 'Clients describe what they need done, how much they will pay, and what result should be submitted.' },
+                { label: 'Settlement', title: 'Client-funded Arc escrow', copy: 'Workers never pay to accept work. The client locks USDC after a match and releases it after approval.' },
+                { label: 'Verification', title: 'AI-assisted review before payout', copy: 'Claude turns submitted work into a structured verdict so the client can release or reject with context.' },
               ] as const).map((item, i) => (
                 <div className="ov-grant-card" key={item.title} style={{ '--step-i': i } as React.CSSProperties}>
                   <span>{item.label}</span>
@@ -2435,7 +2481,7 @@ export default function App() {
                 <p>
                   ArcEscrow Market focuses on one clear workflow: post a request, match with a worker,
                   lock USDC on Arc, submit the result, use AI-assisted review, and release payment.
-                  Portfolio and routing tools support the settlement flow without becoming the product.
+                  Wallet, faucet, and portfolio tools live in the profile menu so the main product stays focused on settlement.
                 </p>
               </div>
               <div className="ov-explain-grid">
@@ -2495,8 +2541,8 @@ export default function App() {
                   { name: 'ArcEscrow Settlement', detail: 'Client-funded USDC escrow, worker submission, release, and refund paths.' },
                   { name: 'AI Review Layer', detail: 'Claude-assisted evaluation before payout, with the client keeping final control.' },
                   { name: 'Circle Funding Rails', detail: 'Move USDC toward Arc through App Kit, CCTP, swap, bridge, and send flows.' },
-                  { name: 'Portfolio Support', detail: 'Balances and gas context stay available without distracting from the core workflow.' },
-                  { name: 'Grant-Ready Docs', detail: 'Architecture and contract links make the Circle/Arc integration easy to understand.' },
+                  { name: 'Wallet Profile', detail: 'Portfolio, faucet links, QR receive, address book, and CSV export stay available but tucked away.' },
+                  { name: 'Grant-Ready Docs', detail: 'Circle and Arc product usage, architecture, and contract links are easy to evaluate.' },
                 ] as const).map((service, i) => (
                   <div className="ov-service-card" key={service.name} style={{ '--step-i': i } as React.CSSProperties}>
                     <span>{String(i + 1).padStart(2, '0')}</span>
@@ -2539,7 +2585,7 @@ export default function App() {
                   },
                   {
                     role: 'Workers', tag: 'Work + Earn',
-                    desc: 'Submit proof of work and receive Arc USDC after approval — no trust required from either party.',
+                    desc: 'Submit proof of work and receive Arc USDC after approval with escrow protection for both parties.',
                     items: ['Submit result on-chain', 'Get AI-assisted review', 'Receive USDC payout'],
                   },
                   {
@@ -2564,21 +2610,22 @@ export default function App() {
 
             {/* Architecture */}
             <section className="ov-arch reveal-section">
-              <div className="ov-label">Architecture</div>
+              <div className="ov-label">Circle + Arc Stack</div>
               <div className="ov-arch-rail">
                 {([
-                  { name: 'Wallet',       tech: 'wagmi / viem',     color: '#627eea' },
-                  { name: 'ArcEscrow',    tech: 'Solidity 0.8.20',  color: '#2775ca' },
-                  { name: 'Storage',      tech: 'Vercel Blob',       color: '#888'    },
-                  { name: 'Review API',   tech: 'Claude Haiku',      color: '#d4a574' },
-                  { name: 'Arc USDC',     tech: 'Arc Testnet',       color: '#00c2ff' },
+                  { name: 'USDC',         tech: 'Settlement asset',  color: '#2775ca' },
+                  { name: 'Arc Testnet',  tech: 'Stablecoin L1',     color: '#00c2ff' },
+                  { name: 'CCTP / App Kit', tech: 'Move funds',      color: '#16a34a' },
+                  { name: 'ArcEscrow',    tech: 'Programmable escrow', color: '#8b5cf6' },
+                  { name: 'AI Review',    tech: 'Claude verdict',    color: '#d4a574' },
+                  { name: 'Future',       tech: 'Agent Wallets / ERC-8183 / Nanopayments', color: '#f59e0b' },
                 ] as const).map((node, i) => (
                   <div key={i} className="ov-arch-item">
                     <div className="ov-arch-node">
                       <div className="ov-arch-name">{node.name}</div>
                       <div className="ov-arch-tech" style={{ color: node.color }}>{node.tech}</div>
                     </div>
-                    {i < 4 && <div className="ov-arch-conn">→</div>}
+                    {i < 5 && <div className="ov-arch-conn"><ArrowRight size={14} /></div>}
                   </div>
                 ))}
               </div>
@@ -2615,7 +2662,7 @@ export default function App() {
               <BookUser size={20} style={{ color: 'var(--accent)' }} />
               <div>
                 <h2 className="page-title">Requests Marketplace</h2>
-                <p className="page-sub">A shared request board where anyone can post work, accept jobs, and settle through USDC escrow.</p>
+                <p className="page-sub">Post what you need done, set the USDC reward, match with a worker, then settle through Arc escrow.</p>
               </div>
               <div className="marketplace-tabs">
                 <button className={marketTab === 'browse' ? 'active' : ''} onClick={() => setMarketTab('browse')}>Browse</button>
@@ -2626,9 +2673,9 @@ export default function App() {
 
             <div className="marketplace-hero">
               <div>
-                <span className="market-kicker">USDC-powered service board</span>
-                <h3>From request to escrow in one flow</h3>
-                <p>Clients post requests with a budget and deadline. Builders accept work without paying anything. After a match, the client funds escrow, the builder submits the result, and AI-assisted review helps decide whether to release USDC.</p>
+                <span className="market-kicker">Agentic escrow marketplace</span>
+                <h3>If someone handles this, I will pay this much.</h3>
+                <p>Clients publish a request with scope, reward, and deadline. Workers accept without funding anything. The client locks USDC only after a match, then AI-assisted review helps approve the final payout.</p>
                 <div className="market-hero-actions">
                   <button className="btn-primary" onClick={() => setMarketTab('create')}>
                     <Plus size={14} /> Post Request
@@ -2663,11 +2710,11 @@ export default function App() {
             <div className="market-role-strip">
               <div>
                 <span>Client path</span>
-                <strong>Post a request, wait for a worker, fund escrow, review with AI, release USDC.</strong>
+                <strong>Post the request, choose the worker, lock USDC, review the result with AI, release payment.</strong>
               </div>
               <div>
                 <span>Worker path</span>
-                <strong>Accept open work, wait for client funding, submit result, receive USDC after approval.</strong>
+                <strong>Accept open work, submit the result after escrow is funded, receive USDC after approval.</strong>
               </div>
             </div>
 
@@ -2676,7 +2723,7 @@ export default function App() {
                 <div className="market-form-head">
                   <div>
                     <span>Create request</span>
-                    <strong>Describe the outcome, not just the task.</strong>
+                    <strong>Say what you need done and how much you will pay.</strong>
                   </div>
                   <small>Clear deliverables make AI review and client approval easier.</small>
                 </div>
@@ -2694,7 +2741,7 @@ export default function App() {
                 </div>
                 <div className="market-form-grid">
                   <label className="pay-field">
-                    <span>Request title</span>
+                    <span>What do you need done?</span>
                     <input className="pay-text-input" value={requestTitle} onChange={(e) => setRequestTitle(e.target.value)} placeholder="Design a settlement workflow diagram" />
                   </label>
                   <label className="pay-field">
@@ -2706,14 +2753,14 @@ export default function App() {
                   {requestDealType === 'milestone' ? (
                     <>
                       <label className="pay-field">
-                        <span>Upfront</span>
+                        <span>Pay upfront</span>
                         <div className="pay-amount-input">
                           <input value={requestUpfront} onChange={(e) => setRequestUpfront(e.target.value)} inputMode="decimal" placeholder="10.00" />
                           <strong>USDC</strong>
                         </div>
                       </label>
                       <label className="pay-field">
-                        <span>Completion</span>
+                        <span>Pay on completion</span>
                         <div className="pay-amount-input">
                           <input value={requestCompletion} onChange={(e) => setRequestCompletion(e.target.value)} inputMode="decimal" placeholder="10.00" />
                           <strong>USDC</strong>
@@ -2722,7 +2769,7 @@ export default function App() {
                     </>
                   ) : (
                     <label className="pay-field">
-                      <span>{requestDealType === 'nft-otc' ? 'Offer price' : 'Budget'}</span>
+                      <span>{requestDealType === 'nft-otc' ? 'Offer price' : 'How much will you pay?'}</span>
                       <div className="pay-amount-input">
                         <input value={requestBudget} onChange={(e) => setRequestBudget(e.target.value)} inputMode="decimal" placeholder="0.00" />
                         <strong>USDC</strong>
@@ -2730,7 +2777,7 @@ export default function App() {
                     </label>
                   )}
                   <label className="pay-field">
-                    <span>Deadline</span>
+                    <span>When do you need it?</span>
                     <div className="pay-amount-input">
                       <input value={requestDays} onChange={(e) => setRequestDays(e.target.value)} inputMode="numeric" placeholder="3" />
                       <strong>days</strong>
@@ -2788,11 +2835,11 @@ export default function App() {
                   </div>
                 )}
                 <label className="pay-field">
-                  <span>Description</span>
+                  <span>Request details</span>
                   <textarea className="market-textarea" value={requestDescription} onChange={(e) => setRequestDescription(e.target.value)} placeholder="Explain the task, context, quality bar, and any references." />
                 </label>
                 <label className="pay-field">
-                  <span>Expected deliverable</span>
+                  <span>What should the worker submit?</span>
                   <textarea className="market-textarea small" value={requestDeliverable} onChange={(e) => setRequestDeliverable(e.target.value)} placeholder="Define exactly what the agent should submit before payment is released." />
                 </label>
                 <button className="btn-primary market-submit" onClick={createMarketRequest} disabled={!isConnected || marketLoading}>
@@ -2801,6 +2848,30 @@ export default function App() {
                 {!isConnected && <div className="pay-inline-warning"><Wallet size={14} /> Connect a wallet to post as the request owner.</div>}
               </section>
             ) : (
+              <>
+              <section className="market-filter-bar">
+                <div>
+                  <span>Deal type</span>
+                  {([
+                    ['all', 'All'],
+                    ['work', 'Work'],
+                    ['milestone', 'Milestone'],
+                    ['nft-otc', 'NFT OTC'],
+                  ] as const).map(([id, label]) => (
+                    <button key={id} className={marketDealFilter === id ? 'active' : ''} onClick={() => setMarketDealFilter(id)}>{label}</button>
+                  ))}
+                </div>
+                <div>
+                  <span>Scope</span>
+                  {([
+                    ['open', 'Open'],
+                    ['mine', 'My jobs'],
+                    ['all', 'All status'],
+                  ] as const).map(([id, label]) => (
+                    <button key={id} className={marketScopeFilter === id ? 'active' : ''} onClick={() => setMarketScopeFilter(id)}>{label}</button>
+                  ))}
+                </div>
+              </section>
               <section className="market-request-grid">
                 {marketLoading && <div className="market-loading">Syncing shared request board...</div>}
                 {!marketLoading && marketRequests.length === 0 && (
@@ -2811,7 +2882,15 @@ export default function App() {
                     <button className="btn-primary" onClick={() => setMarketTab('create')}>Create the first request</button>
                   </div>
                 )}
-                {marketRequests.map((request) => {
+                {!marketLoading && marketRequests.length > 0 && filteredMarketRequests.length === 0 && (
+                  <div className="market-empty">
+                    <BriefcaseBusiness size={24} />
+                    <h3>No matching requests</h3>
+                    <p>Try another deal type or scope filter, or post a new request with the terms you want.</p>
+                    <button className="btn-primary" onClick={() => setMarketTab('create')}>Post a request</button>
+                  </div>
+                )}
+                {filteredMarketRequests.map((request) => {
                   const isOwner = activeWallet?.toLowerCase() === request.client.toLowerCase()
                   const isAgent = activeWallet && request.agent?.toLowerCase() === activeWallet.toLowerCase()
                   const isEscrowFunded = Boolean(request.escrowJobId)
@@ -2853,7 +2932,7 @@ export default function App() {
                         <div className="nft-card-box">
                           <div className="nft-card-head">
                             <span>{request.nftCollection || 'NFT asset'}</span>
-                            <strong>{request.nftChain ?? 'Ethereum'} · Token #{request.nftTokenId}</strong>
+                            <strong>{request.nftChain ?? 'Ethereum'} / Token #{request.nftTokenId}</strong>
                           </div>
                           <div className="nft-card-meta">
                             <span>Contract</span>
@@ -2932,6 +3011,7 @@ export default function App() {
                   )
                 })}
               </section>
+              </>
             )}
           </div>
         )}

@@ -225,6 +225,141 @@ body {
   box-shadow: var(--shadow-lg);
 }
 
+.profile-menu-wrap {
+  position: relative;
+}
+
+.profile-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--surface2) 92%, var(--accent)), var(--surface2));
+  color: var(--text);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 800;
+  white-space: nowrap;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.profile-trigger:hover,
+.profile-trigger.active {
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--border2));
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--accent) 12%, transparent);
+  transform: translateY(-1px);
+}
+
+.profile-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 240;
+  width: min(360px, calc(100vw - 28px));
+  padding: 14px;
+  border: 1px solid var(--border2);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--arc) 12%, transparent), transparent 34%),
+    color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: 0 28px 80px rgba(0,0,0,0.28);
+  backdrop-filter: blur(18px) saturate(1.15);
+}
+
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface2);
+}
+
+.profile-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 13%, var(--surface3));
+  color: var(--accent);
+}
+
+.profile-head span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.profile-head strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.profile-wallet-list,
+.profile-menu-section {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.profile-wallet-row,
+.profile-menu-section button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 38px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface2) 88%, transparent);
+  color: var(--text-sub);
+}
+
+.profile-wallet-row code {
+  flex: 1;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.profile-menu-section button {
+  cursor: pointer;
+  justify-content: flex-start;
+  font-size: 13px;
+  font-weight: 800;
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+
+.profile-menu-section button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border2));
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface2));
+  color: var(--text);
+}
+
+.profile-menu-section button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.profile-connectors {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
 .btn-theme {
   display: flex; align-items: center; justify-content: center;
   background: var(--surface2);
@@ -3488,6 +3623,55 @@ html {
   color: var(--text);
   font-size: var(--text-sm);
   line-height: 1.5;
+}
+
+.market-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
+
+.market-filter-bar div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.market-filter-bar span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin-right: 3px;
+}
+
+.market-filter-bar button {
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  background: var(--surface2);
+  color: var(--text-sub);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 850;
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.market-filter-bar button:hover,
+.market-filter-bar button.active {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border2));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: var(--text);
+  transform: translateY(-1px);
 }
 
 .market-create-card {
