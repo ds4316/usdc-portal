@@ -620,7 +620,7 @@ export default function App() {
   const [escrowWorkFile,     setEscrowWorkFile]     = useState<File | null>(null)
   const [escrowWorkUploading,setEscrowWorkUploading]= useState(false)
   const [escrowLoading,      setEscrowLoading]      = useState(false)
-  const [resultPreview,      setResultPreview]      = useState<{ url: string; text: string; loading: boolean; error: string } | null>(null)
+  const [resultPreview,      setResultPreview]      = useState<{ url: string; text: string; contentType: string; loading: boolean; error: string } | null>(null)
   const [aiVerdict,          setAiVerdict]          = useState<{ verdict: 'approve' | 'reject'; reasoning: string } | null>(null)
   const [aiLoading,          setAiLoading]          = useState(false)
   const [escrowMyTab,    setEscrowMyTab]    = useState<'new' | 'jobs'>('jobs')
@@ -1911,16 +1911,19 @@ export default function App() {
   }
 
   async function openResultPreview(url: string) {
-    setResultPreview({ url, text: '', loading: true, error: '' })
+    setResultPreview({ url, text: '', contentType: '', loading: true, error: '' })
     try {
       const res = await fetch(url)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const text = await res.text()
-      setResultPreview({ url, text, loading: false, error: '' })
+      const contentType = res.headers.get('content-type') ?? ''
+      const isText = contentType.startsWith('text/') || contentType.includes('json') || contentType.includes('xml')
+      const text = isText ? await res.text() : ''
+      setResultPreview({ url, text, contentType, loading: false, error: '' })
     } catch (e) {
       setResultPreview({
         url,
         text: '',
+        contentType: '',
         loading: false,
         error: e instanceof Error ? e.message : 'Could not load result preview',
       })
@@ -1987,7 +1990,7 @@ export default function App() {
     const res = await fetch('/api/upload', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ filename: 'result.txt', contentType: 'text/plain', data: base64 }),
+      body: JSON.stringify({ filename: 'result.txt', contentType: 'text/plain; charset=utf-8', data: base64 }),
     })
     if (!res.ok) throw new Error('Upload failed')
     const { url } = await res.json()
@@ -2204,8 +2207,19 @@ export default function App() {
                 <span>Preview failed: {resultPreview.error}</span>
                 <a href={resultPreview.url} target="_blank" rel="noreferrer">Open raw file</a>
               </div>
-            ) : (
+            ) : resultPreview.contentType.startsWith('image/') ? (
+              <div className="result-preview-media">
+                <img src={resultPreview.url} alt="Submitted result preview" />
+              </div>
+            ) : resultPreview.contentType.includes('application/pdf') ? (
+              <iframe className="result-preview-pdf" src={resultPreview.url} title="Submitted PDF result" />
+            ) : resultPreview.text ? (
               <pre className="result-preview-text">{resultPreview.text}</pre>
+            ) : (
+              <div className="result-preview-state">
+                <span>This file type cannot be previewed inline yet.</span>
+                <a href={resultPreview.url} target="_blank" rel="noreferrer">Open raw file</a>
+              </div>
             )}
             <div className="result-modal-actions">
               <button className="btn-outline" onClick={() => navigator.clipboard?.writeText(resultPreview.url)}>

@@ -1765,6 +1765,34 @@ body {
   word-break: break-word;
 }
 
+.result-preview-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: min(560px, calc(100vh - 240px));
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface2);
+  overflow: auto;
+}
+
+.result-preview-media img {
+  display: block;
+  max-width: 100%;
+  max-height: min(520px, calc(100vh - 280px));
+  border-radius: 10px;
+  object-fit: contain;
+}
+
+.result-preview-pdf {
+  width: 100%;
+  height: min(560px, calc(100vh - 240px));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface2);
+}
+
 .result-modal-actions {
   display: flex;
   justify-content: flex-end;

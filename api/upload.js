@@ -11,9 +11,14 @@ export default async function handler(req, res) {
 
   try {
     const buffer = Buffer.from(data, 'base64')
+    const safeContentType = contentType
+      ? (String(contentType).startsWith('text/') && !String(contentType).toLowerCase().includes('charset=')
+        ? `${contentType}; charset=utf-8`
+        : contentType)
+      : 'text/plain; charset=utf-8'
     const blob = await put(`escrow/${Date.now()}-${filename ?? 'result.txt'}`, buffer, {
       access: 'public',
-      contentType: contentType ?? 'text/plain',
+      contentType: safeContentType,
       token,
     })
     return res.json({ url: blob.url })
