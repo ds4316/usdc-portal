@@ -755,6 +755,11 @@ export default function App() {
     funded: marketRequests.filter((r) => r.escrowJobId).length,
     mine: marketRequests.filter((r) => activeWallet && (r.client.toLowerCase() === activeWallet.toLowerCase() || r.agent?.toLowerCase() === activeWallet.toLowerCase())).length,
   }
+  const escrowRelatedRequests = marketRequests.filter((request) =>
+    activeWallet
+    && (request.client.toLowerCase() === activeWallet.toLowerCase() || request.agent?.toLowerCase() === activeWallet.toLowerCase())
+    && Boolean(request.agent || request.escrowJobId)
+  )
   const filteredMarketRequests = marketRequests.filter((request) => {
     const matchesDeal = marketDealFilter === 'all' || (request.dealType ?? 'work') === marketDealFilter
     const matchesScope = marketScopeFilter === 'all'
@@ -768,7 +773,7 @@ export default function App() {
     const id = Date.now().toString() + Math.random().toString(36).slice(2)
     setToasts((prev) => [...prev, { ...t, id }])
     if (t.type === 'success') setTimeout(() => removeToast(id), 6000)
-    // errors stay until dismissed (click X on toast)
+    if (t.type === 'error') setTimeout(() => removeToast(id), 10000)
     return id
   }
   function removeToast(id: string) { setToasts((prev) => prev.filter((x) => x.id !== id)) }
@@ -1021,6 +1026,30 @@ export default function App() {
       addToast({ type: 'success', message: 'Request accepted on the shared board' })
     } catch (e) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Could not accept request' })
+    } finally {
+      setMarketLoading(false)
+    }
+  }
+
+  async function deleteExpiredMarketRequest(id: string) {
+    const target = marketRequests.find((request) => request.id === id)
+    if (!target?.expiresAt || new Date(target.expiresAt).getTime() > Date.now()) {
+      return addToast({ type: 'error', message: 'Only expired requests can be removed' })
+    }
+    setMarketLoading(true)
+    try {
+      const res = await fetch('/api/requests', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'deleteExpired' }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not remove request')
+      if (Array.isArray(json.requests)) setMarketRequests(json.requests)
+      addToast({ type: 'success', message: 'Expired request removed' })
+    } catch {
+      setMarketRequests((prev) => prev.filter((request) => request.id !== id))
+      addToast({ type: 'success', message: 'Expired request removed locally' })
     } finally {
       setMarketLoading(false)
     }
@@ -2805,57 +2834,76 @@ export default function App() {
                     </button>
                   ))}
                 </div>
-                <div className="market-form-grid">
-                  <label className="pay-field">
-                    <span>What do you need done?</span>
-                    <input className="pay-text-input" value={requestTitle} onChange={(e) => setRequestTitle(e.target.value)} placeholder="Design a settlement workflow diagram" />
-                  </label>
-                  <label className="pay-field">
-                    <span>Category</span>
-                    <select className="action-input" value={requestCategory} onChange={(e) => setRequestCategory(e.target.value)}>
-                      <option>AI Work</option><option>Design Review</option><option>Frontend Build</option><option>Research</option><option>Smart Contract</option><option>NFT OTC</option><option>Milestone</option>
-                    </select>
-                  </label>
-                  {requestDealType === 'milestone' ? (
-                    <>
-                      <label className="pay-field">
-                        <span>Pay upfront</span>
-                        <div className="pay-amount-input">
-                          <input value={requestUpfront} onChange={(e) => setRequestUpfront(e.target.value)} inputMode="decimal" placeholder="10.00" />
-                          <strong>USDC</strong>
-                        </div>
-                      </label>
-                      <label className="pay-field">
-                        <span>Pay on completion</span>
-                        <div className="pay-amount-input">
-                          <input value={requestCompletion} onChange={(e) => setRequestCompletion(e.target.value)} inputMode="decimal" placeholder="10.00" />
-                          <strong>USDC</strong>
-                        </div>
-                      </label>
-                    </>
-                  ) : (
+                <div className="request-type-helper">Choose the broad deal type first. The detail category below is only used to describe the work more clearly.</div>
+                <div className="market-form-section">
+                  <div className="market-form-section-head">
+                    <div>
+                      <span>Request terms</span>
+                      <strong>Title, detailed category, and USDC reward</strong>
+                    </div>
+                  </div>
+                  <div className="market-form-grid terms-grid">
                     <label className="pay-field">
-                      <span>{requestDealType === 'nft-otc' ? 'Offer price' : 'How much will you pay?'}</span>
+                      <span>Request title</span>
+                      <input className="pay-text-input" value={requestTitle} onChange={(e) => setRequestTitle(e.target.value)} placeholder="Design a settlement workflow diagram" />
+                    </label>
+                    <label className="pay-field">
+                      <span>Detail category</span>
+                      <select className="action-input" value={requestCategory} onChange={(e) => setRequestCategory(e.target.value)}>
+                        <option>AI Work</option><option>Design Review</option><option>Frontend Build</option><option>Research</option><option>Smart Contract</option><option>NFT OTC</option><option>Milestone</option>
+                      </select>
+                    </label>
+                    {requestDealType === 'milestone' ? (
+                      <>
+                        <label className="pay-field">
+                          <span>Pay upfront</span>
+                          <div className="pay-amount-input">
+                            <input value={requestUpfront} onChange={(e) => setRequestUpfront(e.target.value)} inputMode="decimal" placeholder="10.00" />
+                            <strong>USDC</strong>
+                          </div>
+                        </label>
+                        <label className="pay-field">
+                          <span>Pay on completion</span>
+                          <div className="pay-amount-input">
+                            <input value={requestCompletion} onChange={(e) => setRequestCompletion(e.target.value)} inputMode="decimal" placeholder="10.00" />
+                            <strong>USDC</strong>
+                          </div>
+                        </label>
+                      </>
+                    ) : (
+                      <label className="pay-field">
+                        <span>{requestDealType === 'nft-otc' ? 'Offer price' : 'Reward amount'}</span>
+                        <div className="pay-amount-input">
+                          <input value={requestBudget} onChange={(e) => setRequestBudget(e.target.value)} inputMode="decimal" placeholder="0.00" />
+                          <strong>USDC</strong>
+                        </div>
+                      </label>
+                    )}
+                  </div>
+                </div>
+                <div className="market-form-section">
+                  <div className="market-form-section-head">
+                    <div>
+                      <span>Timing</span>
+                      <strong>Work deadline and board visibility</strong>
+                    </div>
+                  </div>
+                  <div className="market-form-grid timing-grid">
+                    <label className="pay-field">
+                      <span>Work deadline</span>
                       <div className="pay-amount-input">
-                        <input value={requestBudget} onChange={(e) => setRequestBudget(e.target.value)} inputMode="decimal" placeholder="0.00" />
-                        <strong>USDC</strong>
+                        <input value={requestDays} onChange={(e) => setRequestDays(e.target.value)} inputMode="numeric" placeholder="3" />
+                        <strong>days</strong>
                       </div>
                     </label>
-                  )}
-                  <label className="pay-field">
-                    <span>When do you need it?</span>
-                    <div className="pay-amount-input">
-                      <input value={requestDays} onChange={(e) => setRequestDays(e.target.value)} inputMode="numeric" placeholder="3" />
-                      <strong>days</strong>
-                    </div>
-                  </label>
-                  <label className="pay-field">
-                    <span>Visible for</span>
-                    <div className="pay-amount-input">
-                      <input value={requestListingDays} onChange={(e) => setRequestListingDays(e.target.value)} inputMode="numeric" placeholder="3" min="1" max="7" />
-                      <strong>days</strong>
-                    </div>
-                  </label>
+                    <label className="pay-field">
+                      <span>Visible for</span>
+                      <div className="pay-amount-input">
+                        <input value={requestListingDays} onChange={(e) => setRequestListingDays(e.target.value)} inputMode="numeric" placeholder="3" min="1" max="7" />
+                        <strong>days</strong>
+                      </div>
+                    </label>
+                  </div>
                 </div>
                 <div className="market-fee-note">
                   <span>Listing fee</span>
@@ -2964,6 +3012,7 @@ export default function App() {
                   const roleClass = isOwner ? 'client' : isAgent ? 'worker' : 'observer'
                   const dealType = request.dealType ?? 'work'
                   const dealLabel = dealType === 'nft-otc' ? 'NFT OTC' : dealType === 'milestone' ? 'Milestone' : 'Work'
+                  const isExpiredRequest = Boolean(request.expiresAt && new Date(request.expiresAt).getTime() <= Date.now())
                   const nextStep = request.status === 'open'
                     ? (isOwner ? 'Waiting for a worker' : 'Accept this request')
                     : !isEscrowFunded
@@ -3063,6 +3112,11 @@ export default function App() {
                         <button className="btn-outline" onClick={() => acceptMarketRequest(request.id)} disabled={!isConnected || marketLoading || request.status !== 'open' || isOwner}>
                           {request.status === 'open' ? 'Accept Request' : 'Matched'}
                         </button>
+                        {isExpiredRequest && (
+                          <button className="btn-ghost" onClick={() => deleteExpiredMarketRequest(request.id)} disabled={marketLoading}>
+                            Remove expired
+                          </button>
+                        )}
                         {isAgent && request.escrowJobId ? (
                           <button className="btn-primary" onClick={() => openEscrowSubmission(request)}>
                             Submit Result
@@ -3396,15 +3450,49 @@ export default function App() {
                       </div>
                     ) : (
                       <div className="escrow-jobs-panel">
+                        {escrowRelatedRequests.length > 0 && (
+                          <div className="matched-request-jobs">
+                            <span>Request-linked jobs</span>
+                            {escrowRelatedRequests.map((request) => {
+                              const isOwner = activeWallet?.toLowerCase() === request.client.toLowerCase()
+                              const isWorker = activeWallet && request.agent?.toLowerCase() === activeWallet.toLowerCase()
+                              return (
+                                <div className="matched-request-job" key={request.id}>
+                                  <div>
+                                    <strong>{request.escrowJobId ? `Job #${request.escrowJobId}` : 'Matched request'}</strong>
+                                    <small>{request.title}</small>
+                                  </div>
+                                  {request.escrowJobId ? (
+                                    <button onClick={() => escrowLookupJob(Number(request.escrowJobId))}>View</button>
+                                  ) : isOwner ? (
+                                    <button onClick={() => useRequestForEscrow(request)}>Fund escrow</button>
+                                  ) : isWorker ? (
+                                    <button disabled>Waiting for client</button>
+                                  ) : (
+                                    <button disabled>Matched</button>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
                         {recentJobIds.length > 0 && (
                           <div className="escrow-job-list">
                             {recentJobIds.map(id => (
                               <button key={id}
                                 className={`escrow-job-row ${escrowJobId === String(id) ? 'selected' : ''}`}
-                                onClick={() => escrowLookupJob(id)}>
+                                onClick={() => {
+                                  if (escrowJobId === String(id) && escrowJob) {
+                                    setEscrowJob(null)
+                                    setEscrowJobId('')
+                                    setAiVerdict(null)
+                                  } else {
+                                    void escrowLookupJob(id)
+                                  }
+                                }}>
                                 <span className="escrow-job-row-id">#{id}</span>
                                 <span className="escrow-job-row-label">Job #{id}</span>
-                                <span className="escrow-job-row-arrow">→</span>
+                                <span className="escrow-job-row-arrow">{escrowJobId === String(id) && escrowJob ? 'Hide' : 'View'}</span>
                               </button>
                             ))}
                           </div>

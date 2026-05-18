@@ -1580,6 +1580,80 @@ body {
 .escrow-job-row-label { flex: 1; font-size: var(--text-sm); color: var(--text-sub); }
 .escrow-job-row-arrow { color: var(--text-muted); font-size: var(--text-xs); }
 
+.matched-request-jobs {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  background: var(--surface3);
+}
+
+.matched-request-jobs > span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.matched-request-job {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 38px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface2);
+  color: var(--text);
+  text-align: left;
+}
+
+.matched-request-job:hover {
+  border-color: var(--accent);
+}
+
+.matched-request-job > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.matched-request-job button {
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 7px 10px;
+  border: 1px solid var(--border2);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.matched-request-job button:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.matched-request-jobs strong {
+  flex-shrink: 0;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.matched-request-jobs small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-sub);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .escrow-search-block {
   display: flex; flex-direction: column; gap: 8px;
   background: var(--surface3); border: 1px solid var(--border2);
@@ -3925,6 +3999,57 @@ html {
   line-height: 1.5;
 }
 
+.request-type-helper {
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.market-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface3) 84%, transparent);
+}
+
+.market-form-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.market-form-section-head span {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.market-form-section-head strong {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.market-form-grid.terms-grid {
+  grid-template-columns: minmax(240px, 1.25fr) minmax(160px, 0.65fr) repeat(2, minmax(150px, 0.55fr));
+}
+
+.market-form-grid.timing-grid {
+  grid-template-columns: repeat(2, minmax(170px, 240px));
+}
+
 .nft-otc-panel {
   display: flex;
   flex-direction: column;
@@ -4527,6 +4652,8 @@ html {
   .market-role-strip,
   .deal-type-grid,
   .market-form-grid,
+  .market-form-grid.terms-grid,
+  .market-form-grid.timing-grid,
   .market-form-grid.nft-grid,
   .market-request-grid {
     grid-template-columns: 1fr;

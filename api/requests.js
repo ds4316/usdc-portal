@@ -131,6 +131,12 @@ export default async function handler(req, res) {
       const { id, action, agent, client, escrowJobId } = req.body ?? {}
       const target = requests.find((request) => request.id === id)
       if (!target) return res.status(404).json({ error: 'Request not found' })
+      if (action === 'deleteExpired') {
+        if (!isExpired(target)) return res.status(409).json({ error: 'Request is not expired' })
+        const updated = requests.filter((request) => request.id !== id)
+        await writeRequests(updated, token)
+        return res.status(200).json({ requests: updated })
+      }
       if (isExpired(target)) return res.status(410).json({ error: 'Request has expired' })
 
       let updated
