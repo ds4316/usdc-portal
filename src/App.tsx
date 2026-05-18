@@ -3570,6 +3570,9 @@ export default function App() {
                                           {aiVerdict.verdict === 'approve' ? '✓ Claude recommends Approve' : '✗ Claude recommends Reject'}
                                         </div>
                                         <div className="escrow-verdict-reason">{aiVerdict.reasoning}</div>
+                                        <div className="escrow-verdict-note">
+                                          Claude is advisory only. The client can still inspect the submitted result and release payment manually.
+                                        </div>
                                       </div>
                                     )}
 
@@ -4411,6 +4414,17 @@ export default function App() {
                   <a className="docs-link" href="https://github.com/ds4316/usdc-portal" target="_blank" rel="noreferrer">
                     <ExternalLink size={13} /> GitHub Repository
                   </a>
+                </div>
+              </div>
+
+              <div className="docs-section">
+                <div className="docs-section-title">NFT OTC Test Path</div>
+                <div className="docs-note-list">
+                  <p>Testnet NFT OTC is possible with the included contracts:</p>
+                  <span>1. Deploy MockArcNFT and mint a token to the seller.</span>
+                  <span>2. Deploy NFTOTCEscrow with Arc USDC.</span>
+                  <span>3. Buyer funds USDC, seller approves the NFT, then either side settles.</span>
+                  <span>4. The contract checks ownerOf(tokenId) and approval before swapping NFT for USDC.</span>
                 </div>
               </div>
             </div>

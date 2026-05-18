@@ -1800,6 +1800,31 @@ body {
   margin-top: 12px;
 }
 
+.docs-note-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.docs-note-list p {
+  margin: 0 0 4px;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.docs-note-list span {
+  display: block;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface2);
+  color: var(--text-sub);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .escrow-actions { display: flex; flex-direction: column; gap: 6px; }
 .escrow-action-group { display: flex; flex-direction: column; gap: 6px; }
 
@@ -1852,6 +1877,14 @@ body {
 .escrow-verdict.approve .escrow-verdict-title { color: #27ae60; }
 .escrow-verdict.reject  .escrow-verdict-title { color: #e74c3c; }
 .escrow-verdict-reason { font-size: var(--text-xs); color: var(--text-sub); line-height: 1.5; }
+.escrow-verdict-note {
+  margin-top: 7px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
 
 /* Submit Work */
 .escrow-submit-label { font-size: var(--text-xs); font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
