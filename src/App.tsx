@@ -307,10 +307,12 @@ type MainTab     = 'assets' | 'history' | 'faucet'
 type Theme       = 'dark' | 'light'
 type InAppFaucetChain = 'ARC-TESTNET' | 'ETH-SEPOLIA' | 'BASE-SEPOLIA'
 type MarketRequestStatus = 'open' | 'matched' | 'escrow-ready' | 'escrow-funded'
+type DealType = 'work' | 'milestone' | 'nft-otc'
 
 interface Contact { id: string; name: string; address: string }
 interface MarketRequest {
   id: string
+  dealType?: DealType
   title: string
   category: string
   budget: string
@@ -320,6 +322,13 @@ interface MarketRequest {
   expiresAt?: string
   description: string
   deliverable: string
+  upfrontAmount?: string
+  completionAmount?: string
+  nftChain?: string
+  nftContract?: string
+  nftTokenId?: string
+  nftSeller?: string
+  nftCollection?: string
   client: string
   agent?: string
   escrowJobId?: string
@@ -622,9 +631,17 @@ export default function App() {
   const [marketLoading, setMarketLoading] = useState(false)
   const [marketTab, setMarketTab] = useState<'browse' | 'create'>('browse')
   const [activeEscrowRequestId, setActiveEscrowRequestId] = useState<string | null>(null)
+  const [requestDealType, setRequestDealType] = useState<DealType>('work')
   const [requestTitle, setRequestTitle] = useState('')
   const [requestCategory, setRequestCategory] = useState('AI Work')
   const [requestBudget, setRequestBudget] = useState('')
+  const [requestUpfront, setRequestUpfront] = useState('10')
+  const [requestCompletion, setRequestCompletion] = useState('10')
+  const [requestNftChain, setRequestNftChain] = useState('Ethereum')
+  const [requestNftContract, setRequestNftContract] = useState('')
+  const [requestNftTokenId, setRequestNftTokenId] = useState('')
+  const [requestNftSeller, setRequestNftSeller] = useState('')
+  const [requestNftCollection, setRequestNftCollection] = useState('')
   const [requestDays, setRequestDays] = useState('3')
   const [requestListingDays, setRequestListingDays] = useState('3')
   const [requestDescription, setRequestDescription] = useState('')
@@ -925,17 +942,35 @@ export default function App() {
     if (!requestTitle.trim()) return addToast({ type: 'error', message: 'Enter a request title' })
     if (!requestDescription.trim()) return addToast({ type: 'error', message: 'Describe the work request' })
     if (!requestDeliverable.trim()) return addToast({ type: 'error', message: 'Define the expected deliverable' })
-    const budget = parseFloat(requestBudget)
-    if (!budget || budget <= 0) return addToast({ type: 'error', message: 'Enter a USDC budget' })
+    const upfront = parseFloat(requestUpfront)
+    const completion = parseFloat(requestCompletion)
+    const budget = requestDealType === 'milestone' ? upfront + completion : parseFloat(requestBudget)
+    if (!Number.isFinite(budget) || budget <= 0) return addToast({ type: 'error', message: 'Enter a USDC budget' })
+    if (requestDealType === 'milestone' && (!Number.isFinite(upfront) || upfront < 0 || !Number.isFinite(completion) || completion <= 0)) {
+      return addToast({ type: 'error', message: 'Enter valid upfront and completion amounts' })
+    }
+    if (requestDealType === 'nft-otc') {
+      if (!isAddress(requestNftContract)) return addToast({ type: 'error', message: 'Enter a valid NFT contract address' })
+      if (!requestNftTokenId.trim()) return addToast({ type: 'error', message: 'Enter the NFT token ID' })
+      if (requestNftSeller && !isAddress(requestNftSeller)) return addToast({ type: 'error', message: 'Seller wallet must be a valid address' })
+    }
     setMarketLoading(true)
     try {
       const res = await fetch('/api/requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          dealType: requestDealType,
           title: requestTitle,
           category: requestCategory,
           budget,
+          upfrontAmount: requestDealType === 'milestone' ? upfront : undefined,
+          completionAmount: requestDealType === 'milestone' ? completion : undefined,
+          nftChain: requestDealType === 'nft-otc' ? requestNftChain : undefined,
+          nftContract: requestDealType === 'nft-otc' ? requestNftContract : undefined,
+          nftTokenId: requestDealType === 'nft-otc' ? requestNftTokenId : undefined,
+          nftSeller: requestDealType === 'nft-otc' ? requestNftSeller : undefined,
+          nftCollection: requestDealType === 'nft-otc' ? requestNftCollection : undefined,
           deadlineDays: requestDays,
           listingDays: requestListingDays,
           description: requestDescription,
@@ -948,6 +983,8 @@ export default function App() {
       if (Array.isArray(json.requests)) setMarketRequests(json.requests)
       setRequestTitle(''); setRequestBudget(''); setRequestDays('3')
       setRequestListingDays('3'); setRequestDescription(''); setRequestDeliverable(''); setRequestCategory('AI Work')
+      setRequestDealType('work'); setRequestUpfront('10'); setRequestCompletion('10')
+      setRequestNftChain('Ethereum'); setRequestNftContract(''); setRequestNftTokenId(''); setRequestNftSeller(''); setRequestNftCollection('')
       setMarketTab('browse')
       addToast({ type: 'success', message: 'Request posted to the shared board' })
     } catch (e) {
@@ -2643,6 +2680,18 @@ export default function App() {
                   </div>
                   <small>Clear deliverables make AI review and client approval easier.</small>
                 </div>
+                <div className="deal-type-grid">
+                  {([
+                    { id: 'work' as const, title: 'Work request', desc: 'Pay for a service, task, review, build, or research deliverable.' },
+                    { id: 'milestone' as const, title: 'Milestone deal', desc: 'Fund an upfront amount plus a completion payment in one proposal.' },
+                    { id: 'nft-otc' as const, title: 'NFT OTC', desc: 'Propose a USDC-for-NFT trade using contract address and token ID checks.' },
+                  ]).map((type) => (
+                    <button key={type.id} className={`deal-type-card ${requestDealType === type.id ? 'active' : ''}`} onClick={() => setRequestDealType(type.id)}>
+                      <span>{type.title}</span>
+                      <strong>{type.desc}</strong>
+                    </button>
+                  ))}
+                </div>
                 <div className="market-form-grid">
                   <label className="pay-field">
                     <span>Request title</span>
@@ -2651,16 +2700,35 @@ export default function App() {
                   <label className="pay-field">
                     <span>Category</span>
                     <select className="action-input" value={requestCategory} onChange={(e) => setRequestCategory(e.target.value)}>
-                      <option>AI Work</option><option>Design Review</option><option>Frontend Build</option><option>Research</option><option>Smart Contract</option>
+                      <option>AI Work</option><option>Design Review</option><option>Frontend Build</option><option>Research</option><option>Smart Contract</option><option>NFT OTC</option><option>Milestone</option>
                     </select>
                   </label>
-                  <label className="pay-field">
-                    <span>Budget</span>
-                    <div className="pay-amount-input">
-                      <input value={requestBudget} onChange={(e) => setRequestBudget(e.target.value)} inputMode="decimal" placeholder="0.00" />
-                      <strong>USDC</strong>
-                    </div>
-                  </label>
+                  {requestDealType === 'milestone' ? (
+                    <>
+                      <label className="pay-field">
+                        <span>Upfront</span>
+                        <div className="pay-amount-input">
+                          <input value={requestUpfront} onChange={(e) => setRequestUpfront(e.target.value)} inputMode="decimal" placeholder="10.00" />
+                          <strong>USDC</strong>
+                        </div>
+                      </label>
+                      <label className="pay-field">
+                        <span>Completion</span>
+                        <div className="pay-amount-input">
+                          <input value={requestCompletion} onChange={(e) => setRequestCompletion(e.target.value)} inputMode="decimal" placeholder="10.00" />
+                          <strong>USDC</strong>
+                        </div>
+                      </label>
+                    </>
+                  ) : (
+                    <label className="pay-field">
+                      <span>{requestDealType === 'nft-otc' ? 'Offer price' : 'Budget'}</span>
+                      <div className="pay-amount-input">
+                        <input value={requestBudget} onChange={(e) => setRequestBudget(e.target.value)} inputMode="decimal" placeholder="0.00" />
+                        <strong>USDC</strong>
+                      </div>
+                    </label>
+                  )}
                   <label className="pay-field">
                     <span>Deadline</span>
                     <div className="pay-amount-input">
@@ -2681,6 +2749,44 @@ export default function App() {
                   <strong>{getListingFee(requestListingDays)} USDC</strong>
                   <small>1-3 days free. 4-7 days add 0.05 USDC per extra day. Max 7 days.</small>
                 </div>
+                {requestDealType === 'nft-otc' && (
+                  <div className="nft-otc-panel">
+                    <div className="nft-otc-head">
+                      <span>On-chain authenticity inputs</span>
+                      <strong>Verify by contract address and token ID, not by image or name.</strong>
+                    </div>
+                    <div className="market-form-grid nft-grid">
+                      <label className="pay-field">
+                        <span>NFT chain</span>
+                        <select className="action-input" value={requestNftChain} onChange={(e) => setRequestNftChain(e.target.value)}>
+                          <option>Ethereum</option><option>Base</option><option>Polygon</option><option>Arbitrum</option><option>Sepolia</option>
+                        </select>
+                      </label>
+                      <label className="pay-field">
+                        <span>NFT contract</span>
+                        <input className="pay-text-input" value={requestNftContract} onChange={(e) => setRequestNftContract(e.target.value)} placeholder="0x collection contract" />
+                      </label>
+                      <label className="pay-field">
+                        <span>Token ID</span>
+                        <input className="pay-text-input" value={requestNftTokenId} onChange={(e) => setRequestNftTokenId(e.target.value)} placeholder="1234" />
+                      </label>
+                      <label className="pay-field">
+                        <span>Seller wallet</span>
+                        <input className="pay-text-input" value={requestNftSeller} onChange={(e) => setRequestNftSeller(e.target.value)} placeholder="0x optional expected owner" />
+                      </label>
+                      <label className="pay-field">
+                        <span>Collection label</span>
+                        <input className="pay-text-input" value={requestNftCollection} onChange={(e) => setRequestNftCollection(e.target.value)} placeholder="Optional display name" />
+                      </label>
+                    </div>
+                    <div className="nft-verify-list">
+                      <span>Future on-chain checks</span>
+                      <strong>ownerOf(tokenId)</strong>
+                      <strong>contract matches official collection</strong>
+                      <strong>escrow approval before settlement</strong>
+                    </div>
+                  </div>
+                )}
                 <label className="pay-field">
                   <span>Description</span>
                   <textarea className="market-textarea" value={requestDescription} onChange={(e) => setRequestDescription(e.target.value)} placeholder="Explain the task, context, quality bar, and any references." />
@@ -2711,6 +2817,8 @@ export default function App() {
                   const isEscrowFunded = Boolean(request.escrowJobId)
                   const cardRole = isOwner ? 'Client' : isAgent ? 'Worker' : 'Observer'
                   const roleClass = isOwner ? 'client' : isAgent ? 'worker' : 'observer'
+                  const dealType = request.dealType ?? 'work'
+                  const dealLabel = dealType === 'nft-otc' ? 'NFT OTC' : dealType === 'milestone' ? 'Milestone' : 'Work'
                   const nextStep = request.status === 'open'
                     ? (isOwner ? 'Waiting for a worker' : 'Accept this request')
                     : !isEscrowFunded
@@ -2729,11 +2837,39 @@ export default function App() {
                         <span className={`market-status ${request.status}`}>{request.status.replace('-', ' ')}</span>
                         <span className="market-budget">{request.budget} USDC</span>
                       </div>
-                      <div className="market-category">{request.category}</div>
+                      <div className="market-card-tags">
+                        <span className={`deal-badge ${dealType}`}>{dealLabel}</span>
+                        <span className="market-category">{request.category}</span>
+                      </div>
                       <h3>{request.title}</h3>
                       <p>{request.description}</p>
+                      {dealType === 'milestone' && (
+                        <div className="deal-detail-strip">
+                          <div><span>Upfront</span><strong>{request.upfrontAmount ?? '0.00'} USDC</strong></div>
+                          <div><span>Completion</span><strong>{request.completionAmount ?? request.budget} USDC</strong></div>
+                        </div>
+                      )}
+                      {dealType === 'nft-otc' && (
+                        <div className="nft-card-box">
+                          <div className="nft-card-head">
+                            <span>{request.nftCollection || 'NFT asset'}</span>
+                            <strong>{request.nftChain ?? 'Ethereum'} · Token #{request.nftTokenId}</strong>
+                          </div>
+                          <div className="nft-card-meta">
+                            <span>Contract</span>
+                            <code>{request.nftContract ? `${request.nftContract.slice(0, 8)}...${request.nftContract.slice(-6)}` : 'Not set'}</code>
+                          </div>
+                          {request.nftSeller && (
+                            <div className="nft-card-meta">
+                              <span>Expected seller</span>
+                              <code>{request.nftSeller.slice(0, 8)}...{request.nftSeller.slice(-6)}</code>
+                            </div>
+                          )}
+                          <div className="nft-auth-note">Authenticity should be verified with ownerOf(tokenId), official contract address, and escrow approval.</div>
+                        </div>
+                      )}
                       <div className="market-deliverable">
-                        <span>Deliverable</span>
+                        <span>{dealType === 'nft-otc' ? 'Seller must provide' : 'Deliverable'}</span>
                         <strong>{request.deliverable}</strong>
                       </div>
                       <div className="market-role-next">

@@ -3311,6 +3311,39 @@ html {
   text-transform: uppercase;
 }
 
+.market-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.deal-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border2));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 11%, transparent);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.deal-badge.milestone {
+  border-color: color-mix(in srgb, var(--warning) 34%, var(--border2));
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--warning);
+}
+
+.deal-badge.nft-otc {
+  border-color: color-mix(in srgb, var(--arc) 38%, var(--border2));
+  background: color-mix(in srgb, var(--arc) 14%, transparent);
+  color: var(--arc);
+}
+
 .marketplace-hero h3 {
   margin: 8px 0 12px;
   color: var(--text);
@@ -3486,6 +3519,102 @@ html {
   color: var(--text-sub);
   font-size: 13px;
   line-height: 1.5;
+}
+
+.deal-type-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.deal-type-card {
+  width: 100%;
+  min-height: 118px;
+  padding: 16px;
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  background: var(--surface3);
+  color: var(--text-sub);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.deal-type-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border3);
+}
+
+.deal-type-card.active {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border2));
+  background: radial-gradient(circle at 90% 8%, color-mix(in srgb, var(--arc) 16%, transparent), transparent 34%), color-mix(in srgb, var(--accent) 8%, var(--surface));
+  box-shadow: 0 18px 42px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.deal-type-card span {
+  display: block;
+  color: var(--text);
+  font-size: var(--text-md);
+  font-weight: 850;
+  margin-bottom: 10px;
+}
+
+.deal-type-card strong {
+  display: block;
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.nft-otc-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--arc) 28%, var(--border));
+  border-radius: 18px;
+  background: radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--arc) 14%, transparent), transparent 30%), var(--surface3);
+}
+
+.nft-otc-head span,
+.nft-verify-list span {
+  display: block;
+  color: var(--arc);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.nft-otc-head strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--text);
+  font-size: var(--text-md);
+}
+
+.market-form-grid.nft-grid {
+  grid-template-columns: 0.7fr 1.2fr 0.6fr 1.2fr 1fr;
+}
+
+.nft-verify-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.nft-verify-list strong {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-sub);
+  font-size: 12px;
 }
 
 .market-form-grid {
@@ -3681,6 +3810,86 @@ html {
   color: var(--text-sub);
   font-size: 15px;
   line-height: 1.65;
+}
+
+.deal-detail-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.deal-detail-strip div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--warning) 8%, transparent), transparent 58%),
+    var(--surface2);
+}
+
+.deal-detail-strip span,
+.nft-card-meta span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.deal-detail-strip strong {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+.nft-card-box {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--arc) 24%, var(--border2));
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--arc) 13%, transparent), transparent 34%),
+    var(--surface2);
+}
+
+.nft-card-head span {
+  display: block;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.nft-card-head strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--arc);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.nft-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.nft-card-meta code {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.nft-auth-note {
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .market-deliverable {
@@ -3958,7 +4167,9 @@ html {
   }
   .marketplace-hero,
   .market-role-strip,
+  .deal-type-grid,
   .market-form-grid,
+  .market-form-grid.nft-grid,
   .market-request-grid {
     grid-template-columns: 1fr;
   }
@@ -3975,6 +4186,14 @@ html {
   }
   .market-card-actions {
     flex-direction: column;
+  }
+  .deal-detail-strip {
+    grid-template-columns: 1fr;
+  }
+  .nft-card-meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
   }
   .pay-layout {
     grid-template-columns: 1fr;

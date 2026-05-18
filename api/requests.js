@@ -16,6 +16,10 @@ function isAddress(value) {
   return typeof value === 'string' && /^0x[a-fA-F0-9]{40}$/.test(value)
 }
 
+function cleanDealType(value) {
+  return ['work', 'milestone', 'nft-otc'].includes(value) ? value : 'work'
+}
+
 function cleanText(value, max = 1200) {
   return String(value ?? '').trim().slice(0, max)
 }
@@ -67,21 +71,47 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const { title, category, budget, deadlineDays, listingDays, description, deliverable, client } = req.body ?? {}
+      const {
+        dealType, title, category, budget, deadlineDays, listingDays, description, deliverable, client,
+        upfrontAmount, completionAmount, nftChain, nftContract, nftTokenId, nftSeller, nftCollection,
+      } = req.body ?? {}
       if (!isAddress(client)) return res.status(400).json({ error: 'Valid client wallet required' })
+      const safeDealType = cleanDealType(dealType)
       const parsedBudget = Number(budget)
+      const parsedUpfront = Number(upfrontAmount)
+      const parsedCompletion = Number(completionAmount)
       if (!cleanText(title, 140)) return res.status(400).json({ error: 'Title is required' })
-      if (!parsedBudget || parsedBudget <= 0) return res.status(400).json({ error: 'Budget must be greater than 0' })
+      if (!Number.isFinite(parsedBudget) || parsedBudget <= 0) return res.status(400).json({ error: 'Budget must be greater than 0' })
       if (!cleanText(description)) return res.status(400).json({ error: 'Description is required' })
       if (!cleanText(deliverable)) return res.status(400).json({ error: 'Deliverable is required' })
+      if (safeDealType === 'milestone') {
+        if (!Number.isFinite(parsedUpfront) || parsedUpfront < 0) return res.status(400).json({ error: 'Valid upfront amount required' })
+        if (!Number.isFinite(parsedCompletion) || parsedCompletion <= 0) return res.status(400).json({ error: 'Valid completion amount required' })
+        if (Math.abs(parsedBudget - (parsedUpfront + parsedCompletion)) > 0.000001) {
+          return res.status(400).json({ error: 'Budget must equal upfront plus completion' })
+        }
+      }
+      if (safeDealType === 'nft-otc') {
+        if (!isAddress(nftContract)) return res.status(400).json({ error: 'Valid NFT contract required' })
+        if (!cleanText(nftTokenId, 80)) return res.status(400).json({ error: 'NFT token ID required' })
+        if (nftSeller && !isAddress(nftSeller)) return res.status(400).json({ error: 'Valid seller wallet required' })
+      }
 
       const visibleDays = Math.max(1, Math.min(7, Number(listingDays) || 3))
       const createdAt = new Date()
       const next = {
         id: `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        dealType: safeDealType,
         title: cleanText(title, 140),
         category: cleanText(category, 60) || 'AI Work',
         budget: parsedBudget.toFixed(2),
+        upfrontAmount: safeDealType === 'milestone' ? parsedUpfront.toFixed(2) : undefined,
+        completionAmount: safeDealType === 'milestone' ? parsedCompletion.toFixed(2) : undefined,
+        nftChain: safeDealType === 'nft-otc' ? cleanText(nftChain, 40) || 'Ethereum' : undefined,
+        nftContract: safeDealType === 'nft-otc' ? cleanText(nftContract, 80) : undefined,
+        nftTokenId: safeDealType === 'nft-otc' ? cleanText(nftTokenId, 80) : undefined,
+        nftSeller: safeDealType === 'nft-otc' ? cleanText(nftSeller, 80) : undefined,
+        nftCollection: safeDealType === 'nft-otc' ? cleanText(nftCollection, 100) : undefined,
         deadlineDays: String(Math.max(1, Math.min(90, Number(deadlineDays) || 3))),
         listingDays: String(visibleDays),
         listingFee: listingFee(visibleDays),
