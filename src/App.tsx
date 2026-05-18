@@ -640,7 +640,7 @@ export default function App() {
   const [requestBudget, setRequestBudget] = useState('')
   const [requestUpfront, setRequestUpfront] = useState('10')
   const [requestCompletion, setRequestCompletion] = useState('10')
-  const [requestNftChain, setRequestNftChain] = useState('Ethereum')
+  const [requestNftChain, setRequestNftChain] = useState('Arc Testnet')
   const [requestNftContract, setRequestNftContract] = useState('')
   const [requestNftTokenId, setRequestNftTokenId] = useState('')
   const [requestNftSeller, setRequestNftSeller] = useState('')
@@ -995,7 +995,7 @@ export default function App() {
       setRequestTitle(''); setRequestBudget(''); setRequestDays('3')
       setRequestListingDays('3'); setRequestDescription(''); setRequestDeliverable(''); setRequestCategory('AI Work')
       setRequestDealType('work'); setRequestUpfront('10'); setRequestCompletion('10')
-      setRequestNftChain('Ethereum'); setRequestNftContract(''); setRequestNftTokenId(''); setRequestNftSeller(''); setRequestNftCollection('')
+      setRequestNftChain('Arc Testnet'); setRequestNftContract(''); setRequestNftTokenId(''); setRequestNftSeller(''); setRequestNftCollection('')
       setMarketTab('browse')
       addToast({ type: 'success', message: 'Request posted to the shared board' })
     } catch (e) {
@@ -2798,7 +2798,7 @@ export default function App() {
                     { id: 'milestone' as const, title: 'Milestone deal', desc: 'Fund an upfront amount plus a completion payment in one proposal.' },
                     { id: 'nft-otc' as const, title: 'NFT OTC', desc: 'Propose a USDC-for-NFT trade using contract address and token ID checks.' },
                   ]).map((type) => (
-                    <button key={type.id} className={`deal-type-card ${requestDealType === type.id ? 'active' : ''}`} onClick={() => setRequestDealType(type.id)}>
+                    <button key={type.id} className={`deal-type-card ${requestDealType === type.id ? 'active' : ''}`} onClick={() => { setRequestDealType(type.id); if (type.id === 'nft-otc') setRequestNftChain('Arc Testnet') }}>
                       <span>{type.title}</span>
                       <strong>{type.desc}</strong>
                     </button>
@@ -2871,7 +2871,7 @@ export default function App() {
                       <label className="pay-field">
                         <span>NFT chain</span>
                         <select className="action-input" value={requestNftChain} onChange={(e) => setRequestNftChain(e.target.value)}>
-                          <option>Ethereum</option><option>Base</option><option>Polygon</option><option>Arbitrum</option><option>Sepolia</option>
+                          <option>Arc Testnet</option><option>Ethereum</option><option>Base</option><option>Polygon</option><option>Arbitrum</option><option>Sepolia</option>
                         </select>
                       </label>
                       <label className="pay-field">
@@ -2997,7 +2997,7 @@ export default function App() {
                         <div className="nft-card-box">
                           <div className="nft-card-head">
                             <span>{request.nftCollection || 'NFT asset'}</span>
-                            <strong>{request.nftChain ?? 'Ethereum'} / Token #{request.nftTokenId}</strong>
+                            <strong>{request.nftChain ?? 'Arc Testnet'} / Token #{request.nftTokenId}</strong>
                           </div>
                           <div className="nft-card-meta">
                             <span>Contract</span>

@@ -107,7 +107,7 @@ export default async function handler(req, res) {
         budget: parsedBudget.toFixed(2),
         upfrontAmount: safeDealType === 'milestone' ? parsedUpfront.toFixed(2) : undefined,
         completionAmount: safeDealType === 'milestone' ? parsedCompletion.toFixed(2) : undefined,
-        nftChain: safeDealType === 'nft-otc' ? cleanText(nftChain, 40) || 'Ethereum' : undefined,
+        nftChain: safeDealType === 'nft-otc' ? cleanText(nftChain, 40) || 'Arc Testnet' : undefined,
         nftContract: safeDealType === 'nft-otc' ? cleanText(nftContract, 80) : undefined,
         nftTokenId: safeDealType === 'nft-otc' ? cleanText(nftTokenId, 80) : undefined,
         nftSeller: safeDealType === 'nft-otc' ? cleanText(nftSeller, 80) : undefined,
