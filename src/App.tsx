@@ -620,6 +620,7 @@ export default function App() {
   const [escrowWorkFile,     setEscrowWorkFile]     = useState<File | null>(null)
   const [escrowWorkUploading,setEscrowWorkUploading]= useState(false)
   const [escrowLoading,      setEscrowLoading]      = useState(false)
+  const [resultPreview,      setResultPreview]      = useState<{ url: string; text: string; loading: boolean; error: string } | null>(null)
   const [aiVerdict,          setAiVerdict]          = useState<{ verdict: 'approve' | 'reject'; reasoning: string } | null>(null)
   const [aiLoading,          setAiLoading]          = useState(false)
   const [escrowMyTab,    setEscrowMyTab]    = useState<'new' | 'jobs'>('jobs')
@@ -1909,6 +1910,23 @@ export default function App() {
     }
   }
 
+  async function openResultPreview(url: string) {
+    setResultPreview({ url, text: '', loading: true, error: '' })
+    try {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const text = await res.text()
+      setResultPreview({ url, text, loading: false, error: '' })
+    } catch (e) {
+      setResultPreview({
+        url,
+        text: '',
+        loading: false,
+        error: e instanceof Error ? e.message : 'Could not load result preview',
+      })
+    }
+  }
+
   async function escrowLookupJob(overrideId?: number) {
     const id = overrideId ?? parseInt(escrowJobId)
     if (isNaN(id) || id < 0) return addToast({ type: 'error', message: 'Enter valid Job ID' })
@@ -2163,6 +2181,39 @@ export default function App() {
               <button className={`btn-copy ${copiedAddr ? 'copied' : ''}`} onClick={copyAddress}>
                 {copiedAddr ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {resultPreview && (
+        <div className="modal-overlay" onClick={() => setResultPreview(null)}>
+          <div className="modal result-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3 className="modal-title">Submitted Result</h3>
+                <p className="result-modal-url">{resultPreview.url}</p>
+              </div>
+              <button className="modal-close" onClick={() => setResultPreview(null)}><X size={16} /></button>
+            </div>
+            {resultPreview.loading ? (
+              <div className="result-preview-state">Loading result...</div>
+            ) : resultPreview.error ? (
+              <div className="result-preview-state error">
+                <AlertTriangle size={16} />
+                <span>Preview failed: {resultPreview.error}</span>
+                <a href={resultPreview.url} target="_blank" rel="noreferrer">Open raw file</a>
+              </div>
+            ) : (
+              <pre className="result-preview-text">{resultPreview.text}</pre>
+            )}
+            <div className="result-modal-actions">
+              <button className="btn-outline" onClick={() => navigator.clipboard?.writeText(resultPreview.url)}>
+                <Copy size={13} /> Copy URL
+              </button>
+              <a className="btn-outline" href={resultPreview.url} target="_blank" rel="noreferrer">
+                <ExternalLink size={13} /> Open raw
+              </a>
             </div>
           </div>
         </div>
@@ -3432,9 +3483,14 @@ export default function App() {
                               </div>
 
                               {escrowJob.resultUri && (
-                                <a className="escrow-result-link" href={escrowJob.resultUri} target="_blank" rel="noreferrer">
-                                  View Result ↗
-                                </a>
+                                <div className="escrow-result-actions">
+                                  <button className="escrow-result-link" onClick={() => openResultPreview(escrowJob.resultUri)}>
+                                    View Result
+                                  </button>
+                                  <a className="escrow-result-raw" href={escrowJob.resultUri} target="_blank" rel="noreferrer" title="Open raw result">
+                                    <ExternalLink size={13} />
+                                  </a>
+                                </div>
                               )}
 
                               <div className="escrow-actions">
