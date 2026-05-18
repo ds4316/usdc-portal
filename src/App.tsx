@@ -632,7 +632,7 @@ export default function App() {
   const [marketLoading, setMarketLoading] = useState(false)
   const [marketTab, setMarketTab] = useState<'browse' | 'create'>('browse')
   const [marketDealFilter, setMarketDealFilter] = useState<'all' | DealType>('all')
-  const [marketScopeFilter, setMarketScopeFilter] = useState<'open' | 'mine' | 'all'>('open')
+  const [marketScopeFilter, setMarketScopeFilter] = useState<'open' | 'mine' | 'all'>('all')
   const [activeEscrowRequestId, setActiveEscrowRequestId] = useState<string | null>(null)
   const [requestDealType, setRequestDealType] = useState<DealType>('work')
   const [requestTitle, setRequestTitle] = useState('')
@@ -1017,6 +1017,7 @@ export default function App() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Could not accept request')
       if (Array.isArray(json.requests)) setMarketRequests(json.requests)
+      setMarketScopeFilter('all')
       addToast({ type: 'success', message: 'Request accepted on the shared board' })
     } catch (e) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Could not accept request' })
@@ -2929,9 +2930,9 @@ export default function App() {
                 <div>
                   <span>Scope</span>
                   {([
-                    ['open', 'Open'],
-                    ['mine', 'My jobs'],
                     ['all', 'All status'],
+                    ['open', 'Open only'],
+                    ['mine', 'My jobs'],
                   ] as const).map(([id, label]) => (
                     <button key={id} className={marketScopeFilter === id ? 'active' : ''} onClick={() => setMarketScopeFilter(id)}>{label}</button>
                   ))}
