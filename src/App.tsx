@@ -357,7 +357,7 @@ type NetworkMode = 'mainnet' | 'testnet'
 type MainTab     = 'assets' | 'history' | 'faucet'
 type Theme       = 'dark' | 'light'
 type InAppFaucetChain = 'ARC-TESTNET' | 'ETH-SEPOLIA' | 'BASE-SEPOLIA'
-type MarketRequestStatus = 'open' | 'matched' | 'cancelled'
+type MarketRequestStatus = 'open' | 'matched' | 'cancelled' | 'completed'
 type DealType = 'work' | 'milestone' | 'nft-otc'
 
 interface Contact { id: string; name: string; address: string }
@@ -700,10 +700,6 @@ export default function App() {
   const [requestListingDays, setRequestListingDays] = useState('3')
   const [requestDescription, setRequestDescription] = useState('')
   const [requestDeliverable, setRequestDeliverable] = useState('')
-  const [nftSendContract, setNftSendContract] = useState('')
-  const [nftSendTokenId, setNftSendTokenId] = useState('')
-  const [nftSendRecipient, setNftSendRecipient] = useState('')
-  const [nftSendLoading, setNftSendLoading] = useState(false)
   const [sortBy, setSortBy]         = useState<'value' | 'symbol' | 'chain'>('value')
 
   const [assets, setAssets]         = useState<AssetRow[]>([])
@@ -1159,39 +1155,24 @@ export default function App() {
     }
   }
 
-  async function settleNftOtcDeal(escrowJobId: string) {
+  async function settleNftOtcDeal(requestId: string, escrowJobId: string) {
     if (!isConnected) return addToast({ type: 'error', message: 'Connect a wallet first' })
     const { encodeFunctionData } = await import('viem')
     try {
       await switchChain({ chainId: arcTestnet.id })
       await sendTransactionAsync({ to: NFT_OTC_ESCROW,
         data: encodeFunctionData({ abi: NFT_OTC_ESCROW_ABI, functionName: 'settle', args: [BigInt(escrowJobId)] }) })
-      addToast({ type: 'success', message: 'Settled — NFT sent to buyer, USDC released to seller' })
+      // Mark request as completed in the shared board
+      await fetch('/api/requests', { method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: requestId, action: 'complete' }) })
+      await loadMarketRequests()
+      addToast({ type: 'success', message: 'Deal settled — NFT sent to buyer, USDC released to seller' })
     } catch (e) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Settle failed' })
     }
   }
 
-  async function sendNft(nftContract: string, tokenId: string, recipient: string) {
-    if (!isConnected || !activeWallet) return addToast({ type: 'error', message: 'Connect a wallet first' })
-    if (!isAddress(nftContract)) return addToast({ type: 'error', message: 'Invalid NFT contract address' })
-    if (!tokenId.trim()) return addToast({ type: 'error', message: 'Enter token ID' })
-    if (!isAddress(recipient)) return addToast({ type: 'error', message: 'Invalid recipient address' })
-    const { encodeFunctionData } = await import('viem')
-    setNftSendLoading(true)
-    try {
-      await switchChain({ chainId: arcTestnet.id })
-      await sendTransactionAsync({ to: nftContract as `0x${string}`,
-        data: encodeFunctionData({ abi: ERC721_ABI, functionName: 'transferFrom',
-          args: [activeWallet as `0x${string}`, recipient as `0x${string}`, BigInt(tokenId)] }) })
-      addToast({ type: 'success', message: `NFT #${tokenId} sent to ${recipient.slice(0, 8)}...` })
-      setNftSendContract(''); setNftSendTokenId(''); setNftSendRecipient('')
-    } catch (e) {
-      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Transfer failed' })
-    } finally {
-      setNftSendLoading(false)
-    }
-  }
 
   async function deleteExpiredMarketRequest(id: string) {
     const target = marketRequests.find((request) => request.id === id)
@@ -3164,13 +3145,16 @@ export default function App() {
                   const dealLabel = dealType === 'nft-otc' ? 'NFT OTC' : dealType === 'milestone' ? 'Milestone' : 'Work'
                   const isExpiredRequest = Boolean(request.expiresAt && new Date(request.expiresAt).getTime() <= Date.now())
                   const isCancelled = request.status === 'cancelled'
+                  const isCompleted = request.status === 'completed'
                   const nextStep = isCancelled
                     ? 'Cancelled'
-                    : request.status === 'open'
-                      ? (isOwner ? 'Waiting for a worker' : 'Accept & claim on-chain')
-                      : (isAgent
-                          ? (dealType === 'nft-otc' ? 'Approve NFT then settle' : 'Submit result')
-                          : isOwner ? (dealType === 'nft-otc' ? 'Wait for seller to approve NFT' : 'Wait for worker result') : 'Matched')
+                    : isCompleted
+                      ? 'Deal complete'
+                      : request.status === 'open'
+                        ? (isOwner ? 'Waiting for a worker' : 'Accept & claim on-chain')
+                        : (isAgent
+                            ? (dealType === 'nft-otc' ? 'Approve NFT then settle' : 'Submit result')
+                            : isOwner ? (dealType === 'nft-otc' ? 'Wait for seller to approve NFT' : 'Wait for worker result') : 'Matched')
                   const flowSteps = [
                     { label: 'Post + Fund', done: true },
                     { label: 'Match', done: Boolean(request.agent) },
@@ -3261,46 +3245,56 @@ export default function App() {
                         </div>
                       )}
                       <div className="market-card-actions">
-                        {/* Accept / Claim on-chain — only for open requests, not owner */}
-                        {!isCancelled && (
-                          <button className="btn-outline"
-                            onClick={() => acceptMarketRequest(request.id, dealType, request.escrowJobId)}
-                            disabled={!isConnected || marketLoading || request.status !== 'open' || isOwner || !request.escrowJobId}>
-                            {request.status === 'open' ? 'Accept & Claim' : 'Matched'}
-                          </button>
-                        )}
-                        {/* Cancel — only owner, only while open or matched */}
-                        {isOwner && !isCancelled && (request.status === 'open' || request.status === 'matched') && (
-                          <button className="btn-ghost"
-                            onClick={() => cancelMarketRequest(request.id, dealType, request.escrowJobId)}
-                            disabled={marketLoading}
-                            title={request.status === 'matched' ? '5% cancellation fee goes to matched worker' : 'Full refund'}>
-                            {request.status === 'matched' ? 'Cancel (5% fee)' : 'Cancel'}
-                          </button>
-                        )}
-                        {/* NFT OTC seller actions */}
-                        {dealType === 'nft-otc' && isAgent && request.status === 'matched' && request.escrowJobId && (
+                        {isCompleted ? (
+                          <span className="deal-complete-badge">
+                            {dealType === 'nft-otc'
+                              ? (isOwner ? 'NFT received' : isAgent ? 'USDC received' : 'Deal settled')
+                              : 'Deal complete'}
+                          </span>
+                        ) : (
                           <>
-                            <button className="btn-outline"
-                              onClick={() => approveNftForEscrow(request.nftContract ?? '', request.nftTokenId ?? '')}>
-                              Approve NFT
-                            </button>
-                            <button className="btn-primary"
-                              onClick={() => settleNftOtcDeal(request.escrowJobId!)}>
-                              Settle Deal
-                            </button>
+                            {/* Accept / Claim on-chain — only for open requests, not owner */}
+                            {!isCancelled && (
+                              <button className="btn-outline"
+                                onClick={() => acceptMarketRequest(request.id, dealType, request.escrowJobId)}
+                                disabled={!isConnected || marketLoading || request.status !== 'open' || isOwner || !request.escrowJobId}>
+                                {request.status === 'open' ? 'Accept & Claim' : 'Matched'}
+                              </button>
+                            )}
+                            {/* Cancel — only owner, only while open or matched */}
+                            {isOwner && !isCancelled && (request.status === 'open' || request.status === 'matched') && (
+                              <button className="btn-ghost"
+                                onClick={() => cancelMarketRequest(request.id, dealType, request.escrowJobId)}
+                                disabled={marketLoading}
+                                title={request.status === 'matched' ? '5% cancellation fee goes to matched worker' : 'Full refund'}>
+                                {request.status === 'matched' ? 'Cancel (5% fee)' : 'Cancel'}
+                              </button>
+                            )}
+                            {/* NFT OTC seller actions — shown in the card to the matched seller */}
+                            {dealType === 'nft-otc' && isAgent && request.status === 'matched' && request.escrowJobId && (
+                              <>
+                                <button className="btn-outline"
+                                  onClick={() => approveNftForEscrow(request.nftContract ?? '', request.nftTokenId ?? '')}>
+                                  Approve NFT
+                                </button>
+                                <button className="btn-primary"
+                                  onClick={() => settleNftOtcDeal(request.id, request.escrowJobId!)}>
+                                  Settle Deal
+                                </button>
+                              </>
+                            )}
+                            {/* Work/Milestone: agent submits result */}
+                            {dealType !== 'nft-otc' && isAgent && request.escrowJobId && request.status === 'matched' && (
+                              <button className="btn-primary" onClick={() => openEscrowSubmission(request)}>
+                                Submit Result
+                              </button>
+                            )}
+                            {isExpiredRequest && (
+                              <button className="btn-ghost" onClick={() => deleteExpiredMarketRequest(request.id)} disabled={marketLoading}>
+                                Remove expired
+                              </button>
+                            )}
                           </>
-                        )}
-                        {/* Work/Milestone: agent submits result */}
-                        {dealType !== 'nft-otc' && isAgent && request.escrowJobId && request.status === 'matched' && (
-                          <button className="btn-primary" onClick={() => openEscrowSubmission(request)}>
-                            Submit Result
-                          </button>
-                        )}
-                        {isExpiredRequest && (
-                          <button className="btn-ghost" onClick={() => deleteExpiredMarketRequest(request.id)} disabled={marketLoading}>
-                            Remove expired
-                          </button>
                         )}
                       </div>
                     </article>
@@ -3310,129 +3304,7 @@ export default function App() {
               </>
             )}
 
-            {/* NFT Transfer Tool */}
-            <section className="nft-send-panel">
-              <div className="nft-send-head">
-                <strong>Send NFT</strong>
-                <span>Transfer any ERC-721 NFT on Arc Testnet to another wallet</span>
-              </div>
-              <div className="nft-send-form">
-                <label className="pay-field">
-                  <span>NFT contract address</span>
-                  <input className="pay-text-input" value={nftSendContract} onChange={(e) => setNftSendContract(e.target.value)} placeholder="0x collection contract" />
-                </label>
-                <label className="pay-field">
-                  <span>Token ID</span>
-                  <input className="pay-text-input" value={nftSendTokenId} onChange={(e) => setNftSendTokenId(e.target.value)} placeholder="1" />
-                </label>
-                <label className="pay-field">
-                  <span>Recipient address</span>
-                  <input className="pay-text-input" value={nftSendRecipient} onChange={(e) => setNftSendRecipient(e.target.value)} placeholder="0x recipient" />
-                </label>
-                <button className="btn-primary" onClick={() => sendNft(nftSendContract, nftSendTokenId, nftSendRecipient)} disabled={!isConnected || nftSendLoading}>
-                  {nftSendLoading ? 'Sending...' : 'Send NFT'}
-                </button>
-              </div>
-            </section>
 
-          </div>
-        )}
-
-        {activePage === 'pay' && (
-          <div className="page pay-page">
-            <div className="page-header pay-header">
-              <CircleDollarSign size={20} style={{ color: 'var(--accent)' }} />
-              <div>
-                <h2 className="page-title">Hub Pay Demo</h2>
-                <p className="page-sub">A separate contract-payment demo. This is not the request escrow flow.</p>
-              </div>
-              <span className="testnet-page-badge"><AlertTriangle size={12} /> Arc Testnet</span>
-            </div>
-
-            <div className="pay-layout">
-              <section className="pay-product-card">
-                <div className="pay-product-top">
-                  <div>
-                    <span className="pay-kicker">Demo recipient contract</span>
-                    <h3>USDCPaymentHub</h3>
-                  </div>
-                  <span className="mode-pill testnet">Testnet</span>
-                </div>
-
-                <div className="pay-contract-box">
-                  <div>
-                    <span className="pay-muted-label">Contract address</span>
-                    <strong>{PAYMENT_HUB_ADDRESS.slice(0, 10)}...{PAYMENT_HUB_ADDRESS.slice(-8)}</strong>
-                  </div>
-                  <div className="pay-contract-actions">
-                    <button className="btn-icon" title="Copy contract" onClick={() => navigator.clipboard?.writeText(PAYMENT_HUB_ADDRESS)}>
-                      <Copy size={13} />
-                    </button>
-                    <a className="btn-icon" title="Open ArcScan" href={`https://testnet.arcscan.app/address/${PAYMENT_HUB_ADDRESS}`} target="_blank" rel="noreferrer">
-                      <ExternalLink size={13} />
-                    </a>
-                  </div>
-                </div>
-
-                <div className="pay-balance-strip">
-                  <div>
-                    <span className="pay-muted-label">Contract balance</span>
-                    <strong>{contractBalance ? Number(contractBalance).toFixed(4) : '0.0000'} USDC</strong>
-                  </div>
-                  <button className="btn-ghost sidebar-refresh" onClick={loadContractInfo}>
-                    <RefreshCw size={11} /> Refresh
-                  </button>
-                </div>
-
-                <div className="pay-form-grid">
-                  <label className="pay-field">
-                    <span>Amount</span>
-                    <div className="pay-amount-input">
-                      <input value={payAmount} onChange={(e) => setPayAmount(e.target.value)} inputMode="decimal" placeholder="0.00" />
-                      <strong>USDC</strong>
-                    </div>
-                  </label>
-                  <label className="pay-field">
-                    <span>Memo</span>
-                    <input className="pay-text-input" value={payNote} onChange={(e) => setPayNote(e.target.value)} placeholder="Invoice, order ID, or note" />
-                  </label>
-                </div>
-
-                <button className="btn-primary pay-submit" onClick={payToContract} disabled={txLoading || !isConnected}>
-                  {txLoading ? 'Processing payment...' : 'Send USDC to Hub'}
-                </button>
-
-                {!isConnected && (
-                  <div className="pay-inline-warning">
-                    <Wallet size={14} />
-                    <span>Connect a wallet before creating a payment.</span>
-                  </div>
-                )}
-              </section>
-
-              <aside className="pay-side-panel">
-                <div className="pay-side-card">
-                  <span className="pay-muted-label">Active wallet</span>
-                  <strong>{activeWalletShort}</strong>
-                  <small>{activeChainMeta?.label ?? 'No active network'}</small>
-                </div>
-                <div className="pay-side-card">
-                  <span className="pay-muted-label">What this does</span>
-                  <strong>Contract payment demo</strong>
-                  <small>This sends USDC into USDCPaymentHub so the contract owner can withdraw. Use Requests + Escrow for client-worker jobs.</small>
-                </div>
-                <div className="pay-side-card">
-                  <span className="pay-muted-label">Network safety</span>
-                  <strong>Arc Testnet only</strong>
-                  <small>Payments use testnet USDC and are not real-dollar transfers.</small>
-                </div>
-                <div className="pay-side-card">
-                  <span className="pay-muted-label">Owner</span>
-                  <strong>{contractOwner ? `${contractOwner.slice(0, 8)}...${contractOwner.slice(-6)}` : 'Loading'}</strong>
-                  <small>Withdrawals are restricted to the contract owner.</small>
-                </div>
-              </aside>
-            </div>
           </div>
         )}
 

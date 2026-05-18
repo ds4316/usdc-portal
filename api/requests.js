@@ -147,11 +147,22 @@ export default async function handler(req, res) {
         if (!isAddress(client) || target.client.toLowerCase() !== client.toLowerCase()) {
           return res.status(403).json({ error: 'Only the request owner can cancel' })
         }
-        if (target.status === 'cancelled' || target.status === 'settled') {
+        if (target.status === 'cancelled' || target.status === 'completed') {
           return res.status(409).json({ error: 'Request is already resolved' })
         }
         const updated = requests.map((request) => request.id === id
           ? { ...request, status: 'cancelled', cancelledAt: new Date().toISOString() }
+          : request)
+        await writeRequests(updated, token)
+        return res.status(200).json({ request: updated.find((r) => r.id === id), requests: updated })
+      }
+
+      if (action === 'complete') {
+        if (target.status === 'cancelled' || target.status === 'completed') {
+          return res.status(409).json({ error: 'Request is already resolved' })
+        }
+        const updated = requests.map((request) => request.id === id
+          ? { ...request, status: 'completed', completedAt: new Date().toISOString() }
           : request)
         await writeRequests(updated, token)
         return res.status(200).json({ request: updated.find((r) => r.id === id), requests: updated })

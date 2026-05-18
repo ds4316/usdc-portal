@@ -4249,6 +4249,26 @@ html {
   gap: 12px;
 }
 
+.deal-complete-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #22c55e 15%, transparent);
+  color: #22c55e;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.deal-complete-badge::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+}
+
 .market-status,
 .market-budget {
   display: inline-flex;
