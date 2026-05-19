@@ -2570,6 +2570,8 @@ export default function App() {
                   <span className="status-dot green" /><span>CCTP V2 active</span>
                   <span className="ov-sep" />
                   <span className="status-dot green" /><span>Claude Haiku ready</span>
+                  <span className="ov-sep" />
+                  <span className="status-dot green" /><span>Gateway nanopayments mapped</span>
                   {isConnected && (
                     <><span className="ov-sep" /><span className="status-dot green" />
                     <span className="ov-mono">{allAddresses[0]?.slice(0, 6)}...{allAddresses[0]?.slice(-4)} connected</span></>
@@ -2660,7 +2662,7 @@ export default function App() {
                     </div>
                   )}
                   <div className="ov-product-path">
-                    {['Request', 'Worker', 'Escrow', 'AI Review', 'Payout'].map((item, i) => (
+                    {['Request', 'Nano fee', 'Worker', 'Escrow', 'Payout'].map((item, i) => (
                       <div key={item}>
                         <span>{String(i + 1).padStart(2, '0')}</span>
                         <strong>{item}</strong>
@@ -2689,7 +2691,7 @@ export default function App() {
               {([
                 { label: 'Marketplace', title: 'Requests become payable jobs', copy: 'Clients describe what they need done, how much they will pay, and what result should be submitted.' },
                 { label: 'Settlement', title: 'Client-funded Arc escrow', copy: 'Workers never pay to accept work. The client locks USDC after a match and releases it after approval.' },
-                { label: 'Verification', title: 'AI-assisted review before payout', copy: 'Claude turns submitted work into a structured verdict so the client can release or reject with context.' },
+                { label: 'Nanopayments', title: 'Tiny fees stay outside escrow', copy: 'Listing visibility, AI review, paid APIs, and agent actions can be charged through Gateway/x402 without turning every action into a full escrow.' },
               ] as const).map((item, i) => (
                 <div className="ov-grant-card" key={item.title} style={{ '--step-i': i } as React.CSSProperties}>
                   <span>{item.label}</span>
@@ -2716,6 +2718,7 @@ export default function App() {
                   { icon: <Lock size={18} />, title: 'Escrow', desc: 'After a worker accepts, the client locks USDC in ArcEscrow for that worker address.' },
                   { icon: <Upload size={18} />, title: 'Submit', desc: 'Workers submit text or files as proof of completion once escrow is funded.' },
                   { icon: <Bot size={18} />, title: 'Review', desc: 'Claude summarizes the deliverable, flags risk, and recommends whether the client should release payment.' },
+                  { icon: <Zap size={18} />, title: 'Nanopay', desc: 'Gateway/x402 can handle sub-cent usage fees for listings, reviews, APIs, and repeated agent steps.' },
                 ] as const).map((item, i) => (
                   <div className="ov-explain-card" key={item.title} style={{ '--step-i': i } as React.CSSProperties}>
                     <div className="ov-explain-icon">{item.icon}</div>
@@ -2739,7 +2742,7 @@ export default function App() {
               <div className="ov-flow-diagram">
                 {([
                   { title: 'Request', sub: 'Budget + deliverable', tone: 'blue' },
-                  { title: 'Worker', sub: 'Accepts job', tone: 'cyan' },
+                  { title: 'Nanopay', sub: 'Listing + usage fees', tone: 'gold' },
                   { title: 'ArcEscrow', sub: 'Client locks USDC', tone: 'blue' },
                   { title: 'AI Review', sub: 'Claude verdict', tone: 'gold' },
                   { title: 'Payout', sub: 'Worker receives USDC', tone: 'green' },
@@ -2765,6 +2768,7 @@ export default function App() {
                 {([
                   { name: 'Requests Board', detail: 'Public work posts with budgets, deadlines, expiration, and role-aware actions.' },
                   { name: 'ArcEscrow Settlement', detail: 'Client-funded USDC escrow, worker submission, release, and refund paths.' },
+                  { name: 'Gateway Nanopayments', detail: 'Planned x402 layer for listing fees, API calls, premium unlocks, and small repeated agent actions.' },
                   { name: 'AI Review Layer', detail: 'Claude-assisted evaluation before payout, with the client keeping final control.' },
                   { name: 'Circle Funding Rails', detail: 'Move USDC toward Arc through App Kit, CCTP, swap, bridge, and send flows.' },
                   { name: 'Wallet Profile', detail: 'Portfolio, faucet links, QR receive, address book, and CSV export stay available but tucked away.' },
@@ -2785,9 +2789,10 @@ export default function App() {
               <div className="ov-pipeline">
                 {([
                   { n: '01', title: 'Post + Match',    sub: 'Requests board',          desc: 'Client posts work. Worker accepts without paying anything, then waits for the client to fund escrow.' },
-                  { n: '02', title: 'Fund Escrow',     sub: 'ArcEscrow.createJob()',   desc: 'Client deposits USDC into ArcEscrow with worker address, deadline, and deliverable spec.' },
-                  { n: '03', title: 'Submit + Review', sub: 'submitWork + /api/evaluate', desc: 'Worker submits the result. Claude evaluates the deliverable and returns a structured recommendation.' },
-                  { n: '04', title: 'Release Payout',  sub: 'ArcEscrow.approveWork()', desc: 'Client confirms the recommendation. USDC transfers from escrow to the worker wallet on Arc Testnet.' },
+                  { n: '02', title: 'Meter Small Usage', sub: 'Gateway + x402',        desc: 'Tiny listing, review, API, or agent-action fees can be authorized offchain and settled in batches.' },
+                  { n: '03', title: 'Fund Escrow',     sub: 'ArcEscrow.createJob()',   desc: 'Client deposits the main reward into ArcEscrow with worker address, deadline, and deliverable spec.' },
+                  { n: '04', title: 'Submit + Review', sub: 'submitWork + /api/evaluate', desc: 'Worker submits the result. Claude evaluates the deliverable and returns a structured recommendation.' },
+                  { n: '05', title: 'Release Payout',  sub: 'ArcEscrow.approveWork()', desc: 'Client confirms the recommendation. USDC transfers from escrow to the worker wallet on Arc Testnet.' },
                 ] as const).map((s, i) => (
                   <div key={i} className="ov-pipeline-step" style={{ '--step-i': i } as React.CSSProperties}>
                     <div className="ov-step-n">{s.n}</div>
@@ -2899,9 +2904,9 @@ export default function App() {
 
             <div className="marketplace-hero">
               <div>
-                <span className="market-kicker">Agentic escrow marketplace</span>
+                <span className="market-kicker">Escrow rewards + Gateway nanopayments</span>
                 <h3>If someone handles this, I will pay this much.</h3>
-                <p>Clients publish a request with scope, reward, and deadline. Workers accept without funding anything. The client locks USDC only after a match, then AI-assisted review helps approve the final payout.</p>
+                <p>Clients publish a request with scope, reward, and deadline. The main bounty stays protected in ArcEscrow, while small platform actions like listing visibility, AI review, API access, and agent steps can be metered through Circle Gateway nanopayments.</p>
                 <div className="market-hero-actions">
                   <button className="btn-primary" onClick={() => setMarketTab('create')}>
                     <Plus size={14} /> Post Request
@@ -2923,7 +2928,7 @@ export default function App() {
                   <div><span>Mine</span><strong>{requestStats.mine}</strong></div>
                 </div>
                 <div className="market-flow-mini">
-                  {['Post', 'Match', 'Fund', 'Submit', 'Release'].map((step, i) => (
+                  {['Post', 'Nano fee', 'Match', 'Escrow', 'Release'].map((step, i) => (
                     <div className="market-flow-step" key={step}>
                       <span>{String(i + 1).padStart(2, '0')}</span>
                       <strong>{step}</strong>
@@ -2941,6 +2946,10 @@ export default function App() {
               <div>
                 <span>Worker path</span>
                 <strong>Accept open work, submit the result after escrow is funded, receive USDC after approval.</strong>
+              </div>
+              <div>
+                <span>Nanopayment path</span>
+                <strong>Use Gateway/x402 for tiny non-escrow charges: listing extensions, AI review, premium unlocks, paid APIs, and agent actions.</strong>
               </div>
             </div>
 
@@ -3039,7 +3048,18 @@ export default function App() {
                 <div className="market-fee-note">
                   <span>Listing fee</span>
                   <strong>{getListingFee(requestListingDays)} USDC</strong>
-                  <small>1-3 days free. 4-7 days add 0.05 USDC per extra day. Max 7 days.</small>
+                  <small>1-3 days free. 4-7 days add 0.05 USDC per extra day. This is the first natural Gateway nanopayment candidate; the larger reward still belongs in escrow.</small>
+                </div>
+                <div className="nanopay-use-card">
+                  <div>
+                    <span>Suggested nanopayment hooks</span>
+                    <strong>Keep escrow for outcomes. Meter tiny usage around the workflow.</strong>
+                  </div>
+                  <ul>
+                    <li>Listing extension: 0.05 USDC/day after the free window</li>
+                    <li>AI review run: small fee per Claude evaluation</li>
+                    <li>Agent/tool call: pay per API request, dataset access, or workflow step</li>
+                  </ul>
                 </div>
                 {requestDealType === 'nft-otc' && (
                   <div className="nft-otc-panel">
@@ -3231,6 +3251,10 @@ export default function App() {
                       <div className="market-meta-row">
                         <span>Listing fee</span>
                         <strong>{request.listingFee ?? getListingFee(request.listingDays ?? '3')} USDC</strong>
+                      </div>
+                      <div className="market-nanopay-row">
+                        <span>Nanopayment fit</span>
+                        <strong>Listing, review, API, and agent-step fees</strong>
                       </div>
                       {request.agent && (
                         <div className="market-meta-row agent">
@@ -4552,6 +4576,17 @@ export default function App() {
                     <div className="arch-conn">→</div>
                     <div className="arch-node arch-contract">ArcEscrow</div>
                   </div>
+                </div>
+              </div>
+
+              <div className="docs-section">
+                <div className="docs-section-title">Gateway Nanopayments Direction</div>
+                <div className="docs-note-list">
+                  <p>Use two payment lanes instead of forcing every action into escrow:</p>
+                  <span>1. ArcEscrow holds the main request reward until the client approves the submitted result.</span>
+                  <span>2. Gateway/x402 can meter small usage around the job: listing extensions, AI review, paid APIs, premium unlocks, and agent tool calls.</span>
+                  <span>3. Buyers keep a Gateway balance, sign offchain payment authorizations, and settlement can be batched instead of paying gas per tiny action.</span>
+                  <span>4. The product pitch becomes outcome escrow plus usage-priced agent commerce on Arc.</span>
                 </div>
               </div>
 
