@@ -356,9 +356,18 @@ type FaucetPollState = 'idle' | 'polling' | 'received'
 type NetworkMode = 'mainnet' | 'testnet'
 type MainTab     = 'assets' | 'history' | 'faucet'
 type Theme       = 'dark' | 'light'
+type Page        = 'overview' | 'marketplace' | 'portfolio' | 'pay' | 'funds' | 'escrow' | 'activity' | 'docs'
 type InAppFaucetChain = 'ARC-TESTNET' | 'ETH-SEPOLIA' | 'BASE-SEPOLIA'
 type MarketRequestStatus = 'open' | 'matched' | 'cancelled' | 'completed'
 type DealType = 'work' | 'milestone' | 'nft-otc'
+
+const PAGE_IDS: Page[] = ['overview', 'marketplace', 'portfolio', 'pay', 'funds', 'escrow', 'activity', 'docs']
+
+function getPageFromLocation(): Page {
+  if (typeof window === 'undefined') return 'overview'
+  const hashPage = window.location.hash.replace('#', '') as Page
+  return PAGE_IDS.includes(hashPage) ? hashPage : 'overview'
+}
 
 interface Contact { id: string; name: string; address: string }
 interface MarketRequest {
@@ -654,7 +663,9 @@ export default function App() {
   const [transferSeg, setTransferSeg] = useState<TransferSeg>('send')
   const [defiSeg, setDefiSeg]       = useState<DefiSeg>('cross')
   const [moveFundsTab, setMoveFundsTab] = useState<'bridge' | 'cross' | 'send'>('bridge')
-  const [activePage, setActivePage] = useState<'overview' | 'marketplace' | 'portfolio' | 'pay' | 'funds' | 'escrow' | 'activity' | 'docs'>('overview')
+  const [activePage, setActivePage] = useState<Page>(() => getPageFromLocation())
+  const pagePopRef = useRef(false)
+  const profileMenuRef = useRef<HTMLDivElement | null>(null)
 
   // ?? ArcEscrow ?곹깭 ????????????????????????????????????????????????????????
   const [escrowAgent,  setEscrowAgent]  = useState('')
@@ -837,8 +848,49 @@ export default function App() {
   useEffect(() => { loadMarketRequestsFromApi() }, [])
   useEffect(() => { if (allAddresses.length) loadAssets() }, [connections.length, allAddresses.join(',')])
   useEffect(() => {
+    const applyPageFromUrl = () => {
+      pagePopRef.current = true
+      setActivePage(getPageFromLocation())
+      setShowProfileMenu(false)
+      setShowConnectors(false)
+    }
+    window.addEventListener('popstate', applyPageFromUrl)
+    window.addEventListener('hashchange', applyPageFromUrl)
+    return () => {
+      window.removeEventListener('popstate', applyPageFromUrl)
+      window.removeEventListener('hashchange', applyPageFromUrl)
+    }
+  }, [])
+  useEffect(() => {
+    const targetHash = `#${activePage}`
+    if (pagePopRef.current) {
+      pagePopRef.current = false
+    } else if (!(activePage === 'overview' && !window.location.hash) && window.location.hash !== targetHash) {
+      window.history.pushState({ activePage }, '', targetHash)
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [activePage])
+  useEffect(() => {
+    if (!showProfileMenu && !showConnectors) return
+    const closeOnOutside = (event: MouseEvent) => {
+      if (!profileMenuRef.current?.contains(event.target as Node)) {
+        setShowProfileMenu(false)
+        setShowConnectors(false)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowProfileMenu(false)
+        setShowConnectors(false)
+      }
+    }
+    document.addEventListener('mousedown', closeOnOutside)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutside)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [showProfileMenu, showConnectors])
 
   // 60珥??먮룞 ?덈줈怨좎묠
   useEffect(() => {
@@ -2467,7 +2519,7 @@ export default function App() {
             </div>
           )}
 
-          <div className="profile-menu-wrap">
+          <div className="profile-menu-wrap" ref={profileMenuRef}>
             <button className={`profile-trigger ${showProfileMenu ? 'active' : ''}`} onClick={() => { setShowProfileMenu((v) => !v); setShowConnectors(false) }}>
               <UserCircle size={17} />
               <span>{isConnected ? activeWalletShort : 'Profile'}</span>
