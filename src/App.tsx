@@ -842,6 +842,16 @@ export default function App() {
   // updateToast available for future use
   // function updateToast(id: string, t: Partial<Toast>) { ... }
 
+  function navigatePage(page: Page) {
+    setActivePage(page)
+    setShowProfileMenu(false)
+    setShowConnectors(false)
+    const targetHash = `#${page}`
+    if (window.location.hash !== targetHash) {
+      window.history.pushState({ activePage: page }, '', targetHash)
+    }
+  }
+
   useEffect(() => { localStorage.setItem('theme', theme) }, [theme])
   useEffect(() => { localStorage.setItem('networkMode', networkMode) }, [networkMode])
   useEffect(() => { saveMarketRequests(marketRequests) }, [marketRequests])
@@ -862,11 +872,8 @@ export default function App() {
     }
   }, [])
   useEffect(() => {
-    const targetHash = `#${activePage}`
     if (pagePopRef.current) {
       pagePopRef.current = false
-    } else if (!(activePage === 'overview' && !window.location.hash) && window.location.hash !== targetHash) {
-      window.history.pushState({ activePage }, '', targetHash)
     }
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [activePage])
@@ -1257,7 +1264,7 @@ export default function App() {
     }
     setEscrowJobId(request.escrowJobId)
     setEscrowMyTab('jobs')
-    setActivePage('escrow')
+    navigatePage('escrow')
   }
 
   function openEscrowSubmission(request: MarketRequest) {
@@ -1268,7 +1275,7 @@ export default function App() {
     setEscrowProtocol('arc-escrow')
     setEscrowMyTab('jobs')
     setEscrowJobId(request.escrowJobId)
-    setActivePage('escrow')
+    navigatePage('escrow')
     void escrowLookupJob(Number(request.escrowJobId))
   }
 
@@ -2471,7 +2478,7 @@ export default function App() {
                     </div>
                     <div className="contact-actions">
                       <button className="btn-icon" title="Use address"
-                        onClick={() => { setRecipient(c.address); setMoveFundsTab('send'); setActivePage('funds'); setShowContacts(false) }}>
+                        onClick={() => { setRecipient(c.address); setMoveFundsTab('send'); navigatePage('funds'); setShowContacts(false) }}>
                         <ArrowUpRight size={13} />
                       </button>
                       <button className="btn-icon danger" title="Delete" onClick={() => removeContact(c.id)}>
@@ -2496,7 +2503,7 @@ export default function App() {
           <div className="nav-links">
             {NAV_ITEMS.map((item) => (
               <button key={item.id} className={`nav-link ${activePage === item.id ? 'active' : ''}`}
-                onClick={() => { setActivePage(item.id); setShowProfileMenu(false); setShowConnectors(false) }}>
+                onClick={() => navigatePage(item.id)}>
                 {item.icon} {item.label}
               </button>
             ))}
@@ -2548,10 +2555,10 @@ export default function App() {
                   </div>
                 )}
                 <div className="profile-menu-section">
-                  <button onClick={() => { setActivePage('portfolio'); setMainTab('assets'); setShowProfileMenu(false) }}>
+                  <button onClick={() => { navigatePage('portfolio'); setMainTab('assets') }}>
                     <Wallet size={14} /> Portfolio
                   </button>
-                  <button onClick={() => { setActivePage('portfolio'); setMainTab('faucet'); setShowProfileMenu(false) }}>
+                  <button onClick={() => { navigatePage('portfolio'); setMainTab('faucet') }}>
                     <Fuel size={14} /> Faucet links
                   </button>
                   <button onClick={() => { setShowQR(true); setShowProfileMenu(false) }} disabled={!isConnected}>
@@ -2630,10 +2637,10 @@ export default function App() {
                   )}
                 </div>
                 <div className="ov-ctas">
-                  <button className="btn-primary ov-cta" onClick={() => setActivePage('marketplace')}>
+                  <button className="btn-primary ov-cta" onClick={() => navigatePage('marketplace')}>
                     <BookUser size={14} /> Post a Request
                   </button>
-                  <button className="btn-outline ov-cta" onClick={() => setActivePage('funds')}>
+                  <button className="btn-outline ov-cta" onClick={() => navigatePage('funds')}>
                     <ArrowRightLeft size={14} /> Fund with USDC
                   </button>
                   {!isConnected && (
@@ -2722,15 +2729,15 @@ export default function App() {
                     ))}
                   </div>
                   <div className="ov-action-grid">
-                    <button className="ov-action-tile primary" onClick={() => setActivePage('marketplace')}>
+                    <button className="ov-action-tile primary" onClick={() => navigatePage('marketplace')}>
                       <BookUser size={16} />
                       <span>Requests</span>
                     </button>
-                    <button className="ov-action-tile" onClick={() => setActivePage('escrow')}>
+                    <button className="ov-action-tile" onClick={() => navigatePage('escrow')}>
                       <Lock size={16} />
                       <span>Escrow</span>
                     </button>
-                    <button className="ov-action-tile" onClick={() => setActivePage('funds')}>
+                    <button className="ov-action-tile" onClick={() => navigatePage('funds')}>
                       <ArrowRightLeft size={16} />
                       <span>Move</span>
                     </button>
@@ -2922,13 +2929,13 @@ export default function App() {
                   Create an escrow job, submit work, and run Claude-based verification on Arc Testnet.
                 </p>
                 <div className="ov-final-btns">
-                  <button className="btn-primary ov-cta" onClick={() => setActivePage('marketplace')}>
+                  <button className="btn-primary ov-cta" onClick={() => navigatePage('marketplace')}>
                     <BookUser size={14} /> Open Requests
                   </button>
-                  <button className="btn-outline ov-cta" onClick={() => setActivePage('funds')}>
+                  <button className="btn-outline ov-cta" onClick={() => navigatePage('funds')}>
                     <ArrowRightLeft size={14} /> Move Funds to Arc
                   </button>
-                  <button className="btn-ghost ov-cta" onClick={() => setActivePage('docs')}>
+                  <button className="btn-ghost ov-cta" onClick={() => navigatePage('docs')}>
                     <BookOpen size={14} /> View Docs
                   </button>
                 </div>
@@ -2963,7 +2970,7 @@ export default function App() {
                   <button className="btn-primary" onClick={() => setMarketTab('create')}>
                     <Plus size={14} /> Post Request
                   </button>
-                  <button className="btn-outline" onClick={() => setActivePage('escrow')}>
+                  <button className="btn-outline" onClick={() => navigatePage('escrow')}>
                     <Lock size={14} /> Manage Escrow
                   </button>
                 </div>
@@ -3401,7 +3408,7 @@ export default function App() {
                       <span>Escrow Workspace</span>
                       <strong>Use Requests for new work. Use this page to manage funded jobs.</strong>
                     </div>
-                    <button className="btn-outline" onClick={() => setActivePage('marketplace')}>
+                    <button className="btn-outline" onClick={() => navigatePage('marketplace')}>
                       <BookUser size={13} /> Open Requests
                     </button>
                   </div>
@@ -4474,7 +4481,7 @@ export default function App() {
                   <span>Primary ledger</span>
                   <strong>Escrow settlement history</strong>
                 </div>
-                <button className="btn-outline" onClick={() => setActivePage('marketplace')}>
+                <button className="btn-outline" onClick={() => navigatePage('marketplace')}>
                   <BookUser size={13} /> Open Requests
                 </button>
               </div>
