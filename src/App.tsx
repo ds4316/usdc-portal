@@ -846,9 +846,9 @@ export default function App() {
     setActivePage(page)
     setShowProfileMenu(false)
     setShowConnectors(false)
-    const targetHash = `#${page}`
-    if (window.location.hash !== targetHash) {
-      window.history.pushState({ activePage: page }, '', targetHash)
+    const targetHash = page
+    if (window.location.hash.replace('#', '') !== targetHash) {
+      window.location.hash = targetHash
     }
   }
 
@@ -864,10 +864,8 @@ export default function App() {
       setShowProfileMenu(false)
       setShowConnectors(false)
     }
-    window.addEventListener('popstate', applyPageFromUrl)
     window.addEventListener('hashchange', applyPageFromUrl)
     return () => {
-      window.removeEventListener('popstate', applyPageFromUrl)
       window.removeEventListener('hashchange', applyPageFromUrl)
     }
   }, [])
