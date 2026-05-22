@@ -28,8 +28,7 @@ const ERC20_ABI = [
 const SEPOLIA_USDC        = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`
 const ARC_MSG_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x${string}`
 
-// ── ArcOnboarder ─
-// TODO: Remix濡?Sepolia 諛고룷 ????二쇱냼瑜??ㅼ젣 而⑦듃?숉듃 二쇱냼濡?援먯껜
+// ── ArcOnboarder ─ helper contract for onboarding Arc Testnet wallets
 const ARC_ONBOARDER = '0x495825fF81B048B2A6e1FE10571625496f8fF1FD' as `0x${string}`
 
 // ── ArcEscrow ─
@@ -279,7 +278,7 @@ const TOKENS: Record<number, TokenInfo[]> = {
   [baseSepolia.id]: [{ symbol: 'USDC', address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', decimals: 6, coingeckoId: 'usd-coin' }],
 }
 
-// LI.FI EVM 泥댁씤 紐⑸줉
+// LI.FI EVM chain support list
 const LIFI_CHAINS = [
   { id: mainnet.id,   label: 'Ethereum',  nativeSymbol: 'ETH' },
   { id: base.id,      label: 'Base',      nativeSymbol: 'ETH' },
@@ -316,7 +315,7 @@ async function fetchPrices(ids: string[]): Promise<Record<string, PriceData>> {
   } catch { return {} }
 }
 
-// ── ?? ─
+// ── LI.FI chain config ─
 interface AssetRow {
   wallet: string; chain: number; symbol: string
   balance: string; usdcValue: string; coingeckoId: string; change24h: number
@@ -383,6 +382,9 @@ interface MarketRequest {
   escrowJobId?: string
   status: MarketRequestStatus
   createdAt: string
+  acceptedAt?: string
+  cancelledAt?: string
+  completedAt?: string
 }
 
 const CONTACTS_KEY = 'usdc_portal_contacts'
@@ -445,7 +447,7 @@ const FAUCETS: FaucetInfo[] = [
     tokens: ['USDC'], desc: 'Official Circle faucet - 20 USDC every 2 hours', cooldownHours: 2,
     pollToken: { address: '0x3600000000000000000000000000000000000000', decimals: 6 } },
   { chain: 'Ethereum Sepolia', chainId: sepolia.id, name: 'Alchemy Faucet', url: 'https://sepoliafaucet.com',
-    tokens: ['ETH'], desc: 'Sepolia test ETH ??0.5 ETH/day', cooldownHours: 24, pollToken: 'native' },
+    tokens: ['ETH'], desc: 'Sepolia test ETH, up to 0.5 ETH/day', cooldownHours: 24, pollToken: 'native' },
   { chain: 'Ethereum Sepolia', chainId: sepolia.id, name: 'Chainlink Faucet', url: 'https://faucets.chain.link/sepolia',
     tokens: ['ETH', 'LINK'], desc: 'ETH + LINK in one request', cooldownHours: 24, pollToken: 'native' },
   { chain: 'Base Sepolia', chainId: baseSepolia.id, name: 'Base Faucet', url: 'https://faucet.quicknode.com/base/sepolia',
@@ -478,7 +480,7 @@ const publicClients = Object.fromEntries(
   })
 )
 
-// ── TX ?ëëª?ì¢â ─
+// ── TX helpers ─
 const TX_KEY = 'usdc_portal_history'
 function loadHistory(): TxRecord[] {
   try { return JSON.parse(localStorage.getItem(TX_KEY) ?? '[]') } catch { return [] }
@@ -589,7 +591,7 @@ type PendingBridge = {
   direction: 'to-arc' | 'to-sepolia'; amount: string; savedAt: number; attestation?: string
 }
 
-// ── æ¿¡ìë ?ìëµ¿ é®ê¾©ï¼?? ─
+// ── Wallet balance refresh ─
 function SettlementFlowDiagram() {
   const steps = [
     {
@@ -638,7 +640,7 @@ function SettlementFlowDiagram() {
   )
 }
 
-// ── ï§ë¶¿ì¤ ?? ─
+// ── Portfolio ─
 export default function App() {
   const connections = useConnections()
   const { connectors, connect, isPending: isConnecting, error: connectError, variables: connectVariables } = useConnect()
@@ -727,14 +729,14 @@ export default function App() {
 // Wallet + chain helpers
   const [gasPrices, setGasPrices] = useState<Record<number, string>>({})
 
-  // ?뚯슦???대쭅
+  // loading states
   const [faucetPoll, setFaucetPoll] = useState<Record<number, FaucetPollState>>({})
   const [inAppFaucetChain, setInAppFaucetChain] = useState<InAppFaucetChain>('ARC-TESTNET')
   const [inAppFaucetLoading, setInAppFaucetLoading] = useState(false)
   const [inAppFaucetMessage, setInAppFaucetMessage] = useState('')
   const pollTimers = useRef<Record<number, ReturnType<typeof setInterval>>>({})
 
-  // ???곹깭
+  // escrow state
   const [recipient, setRecipient] = useState('')
   const [amount, setAmount]       = useState('')
   // fromChain kept for Circle AppKit compatibility (kit.unifiedBalance)
@@ -813,7 +815,7 @@ export default function App() {
     return matchesDeal && matchesScope
   })
 
-// ── Toast ?Ñë ─
+// ── Toast manager ─
   function addToast(t: Omit<Toast, 'id'>): string {
     const id = Date.now().toString() + Math.random().toString(36).slice(2)
     setToasts((prev) => [...prev, { ...t, id }])
@@ -880,14 +882,15 @@ export default function App() {
     }
   }, [showProfileMenu, showConnectors])
 
-  // 60珥??먮룞 ?덈줈怨좎묠
+  // auto-refresh every 60 seconds
   useEffect(() => {
     if (!isConnected) return
     const t = setInterval(() => loadAssets(), 60000)
     return () => clearInterval(t)
   }, [isConnected])
 
-  // ?대쭅 ?대┛??  useEffect(() => () => { Object.values(pollTimers.current).forEach(clearInterval) }, [])
+  // cleanup poll timers on unmount
+  useEffect(() => () => { Object.values(pollTimers.current).forEach(clearInterval) }, [])
 
 // Asset loading + polling
   useEffect(() => {
@@ -910,7 +913,7 @@ export default function App() {
     return () => clearInterval(t)
   }, [networkMode])
 
-// ── ?ë¨¯ê¶ è­°ê³ ì¶ ─
+// ── Confirm modal ─
   const loadAssets = useCallback(async () => {
     if (!allAddresses.length) return
     setLoadingAssets(true)
@@ -1016,7 +1019,7 @@ export default function App() {
     return () => { clearTimeout(timer); obs?.disconnect() }
   }, [activePage])
 
-// ── äºì±ë¼æ¿¡? ─
+// ── Bidirectional CCTP bridge ─
   function addContact() {
     if (!newContactName.trim() || !isAddress(newContactAddr)) return
     const next = [...contacts, { id: Date.now().toString(), name: newContactName.trim(), address: newContactAddr }]
@@ -1250,7 +1253,7 @@ export default function App() {
 
   function openEscrowSubmission(request: MarketRequest) {
     if (!request.escrowJobId) {
-      addToast({ type: 'error', message: 'The client has not funded escrow yet' })
+      addToast({ type: 'error', message: 'No on-chain escrow job found for this request' })
       return
     }
     setEscrowProtocol('arc-escrow')
@@ -1404,7 +1407,7 @@ export default function App() {
     } finally { setLifiExecuting(false) }
   }
 
-// ── ?ë¶¿ë¹ ?ìí ─
+// ── LI.FI routing ─
   const ethValue      = assets.filter((a) => a.symbol === 'ETH').reduce((s, a) => s + parseFloat(a.usdcValue), 0)
   const usdcTotalVal  = assets.filter((a) => a.symbol.includes('USDC')).reduce((s, a) => s + parseFloat(a.usdcValue), 0)
   const otherValue    = parseFloat(totalUsdc) - ethValue - usdcTotalVal
@@ -1478,7 +1481,7 @@ export default function App() {
     }
 
     try {
-// ── Step 1: Sepoliaæ¿¡?ï§£ëì¤ ?ê¾ªì ─
+// ── Step 1: Sepolia USDC approve + depositForBurn ─
       await switchChain({ chainId: sepolia.id })
 
 // ── Step 2: USDC approve ??ArcOnboarder ─
@@ -1536,7 +1539,7 @@ export default function App() {
       }
       if (!attestation) throw new Error('Attestation timeout ??retry later')
 
-// ── Step 6: Arc Testnet?ë¨¯ê½ receiveMessage ─
+// ── Step 6: Arc Testnet receiveMessage ─
       setCctpStep('minting')
       showBridgeStep('4/4 Minting USDC on Arc Testnet...')
       await switchChain({ chainId: arcTestnet.id })
@@ -1973,7 +1976,7 @@ export default function App() {
     }
   }
 
-// ── ArcEscrow ?â¥ë?? ─
+// ── ArcEscrow functions ─
 
   async function escrowCreateJob() {
     const { encodeFunctionData } = await import('viem')
@@ -2054,7 +2057,7 @@ export default function App() {
       const data = await res.json()
       setAiVerdict(data)
     } catch (e) {
-      addToast({ type: 'error', message: 'AI evaluation failed ??check API key config' })
+      addToast({ type: 'error', message: 'AI evaluation failed — check ANTHROPIC_API_KEY config' })
     } finally {
       setAiLoading(false)
     }
@@ -2189,8 +2192,19 @@ export default function App() {
         data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'approveWork',
           args: [BigInt(parseInt(escrowJobId))] }),
       })
-      addToast({ type: 'success', message: 'Work approved - USDC released to worker!', txHash: hash, explorerBase: 'https://testnet.arcscan.app' })
+      addToast({ type: 'success', message: 'Work approved — USDC released to worker!', txHash: hash, explorerBase: 'https://testnet.arcscan.app' })
       setHistory((prev) => addHistory(prev, { type: 'escrow', summary: `Payment released: Job #${escrowJobId}`, txHash: hash, timestamp: Date.now(), status: 'success' }))
+      // Also mark the linked marketplace request as completed
+      const linked = marketRequests.find((r) => r.escrowJobId === escrowJobId)
+      if (linked) {
+        const res = await fetch('/api/requests', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: linked.id, action: 'complete' }),
+        })
+        const json = await res.json()
+        if (res.ok && Array.isArray(json.requests)) setMarketRequests(json.requests)
+      }
       await escrowLookupJob()
     } catch (e: unknown) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Transaction failed' })
@@ -2242,7 +2256,7 @@ export default function App() {
     navigator.clipboard.writeText(addr).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 2000) })
   }
 
-// ── ?ê¾ªê½£ & ?ëº£ì ¹ ─
+// ── Market requests & filtering ─
   const displayed = assets
     .filter((a) => networkMode === 'mainnet' ? MAINNET_IDS.has(a.chain) : TESTNET_IDS.has(a.chain))
     .sort((a, b) => sortBy === 'value' ? parseFloat(b.usdcValue) - parseFloat(a.usdcValue)
@@ -2302,7 +2316,7 @@ export default function App() {
     )
   }
 
-// ── ?ë®ë ─
+// ── Navbar items ─
   const NAV_ITEMS = [
     { id: 'overview'  as const, label: 'Product',      icon: <LayoutDashboard size={13} /> },
     { id: 'marketplace' as const, label: 'Requests',    icon: <BookUser size={13} /> },
@@ -2536,22 +2550,22 @@ export default function App() {
                 <div className="ov-eyebrow">Circle + Arc agentic escrow marketplace</div>
                 <h1 className="ov-h1">Trustless escrow &amp; settlement on Arc</h1>
                 <p className="ov-lead">
-                  The trustless marketplace for work and NFT settlement on Arc.
-                  Lock USDC at posting time, match with workers on-chain, use AI review before
-                  every payout, and bridge from any chain via Circle CCTP V2.
+                  Post a request, lock USDC instantly in ArcEscrow, and match with workers on-chain.
+                  AI review before every payout. NFT OTC atomic swaps. ERC-8183 agentic jobs.
+                  Bridge from any chain via Circle CCTP V2 with zero slippage.
                 </p>
                 <div className="ov-metrics">
                   <div className="ov-metric">
-                    <span className="ov-metric-value">USDC Escrow</span>
-                    <span className="ov-metric-label">Locked at post. Released on approval.</span>
+                    <span className="ov-metric-value">{marketRequests.length > 0 ? marketRequests.length : '—'}</span>
+                    <span className="ov-metric-label">Requests on shared board</span>
                   </div>
                   <div className="ov-metric">
-                    <span className="ov-metric-value">AI Review</span>
-                    <span className="ov-metric-label">Claude verdict before every payout</span>
+                    <span className="ov-metric-value">{requestStats.open > 0 ? requestStats.open : '—'}</span>
+                    <span className="ov-metric-label">Open · USDC locked at post</span>
                   </div>
                   <div className="ov-metric">
-                    <span className="ov-metric-value">NFT OTC</span>
-                    <span className="ov-metric-label">Trustless NFT ↔ USDC atomic swap</span>
+                    <span className="ov-metric-value">4</span>
+                    <span className="ov-metric-label">Contracts live on Arc Testnet</span>
                   </div>
                 </div>
                 <div className="ov-status-row">
@@ -2589,9 +2603,9 @@ export default function App() {
                 <div className="ov-showcase-wall" aria-hidden="true">
                   <div className="showcase-column slow">
                     {[
-                      ['Post', 'Request terms', 'Budget and deadline'],
-                      ['Match', 'Worker accepts', 'No upfront worker payment'],
-                      ['Fund', 'Client escrow', 'USDC locked on Arc'],
+                      ['Post', 'USDC locked now', 'Immediate escrow lock'],
+                      ['Claim', 'Worker on-chain', 'claimJob on Arc'],
+                      ['Submit', 'Deliverable', 'Vercel Blob + URI proof'],
                     ].map((item, i) => (
                       <div className="showcase-card" key={`a-${i}`}>
                         <span>{item[0]}</span>
@@ -2615,9 +2629,9 @@ export default function App() {
                   </div>
                   <div className="showcase-column slow">
                     {[
-                      ['Route', 'Circle rails', 'CCTP and App Kit'],
-                      ['Track', 'Explorer proof', 'ArcScan links'],
-                      ['Operate', 'Wallet profile', 'Balances and faucet tucked away'],
+                      ['AI Review', 'Claude Haiku', 'Approve / reject verdict'],
+                      ['Release', 'USDC payout', 'ArcEscrow → worker'],
+                      ['Bridge', 'Circle CCTP V2', 'Sepolia → Arc, 0 slippage'],
                     ].map((item, i) => (
                       <div className="showcase-card" key={`c-${i}`}>
                         <span>{item[0]}</span>
@@ -2656,7 +2670,7 @@ export default function App() {
                     </div>
                   )}
                   <div className="ov-product-path">
-                    {['Request', 'Nano fee', 'Worker', 'Escrow', 'Payout'].map((item, i) => (
+                    {['Post', 'Claim', 'Submit', 'AI', 'Release'].map((item, i) => (
                       <div key={item}>
                         <span>{String(i + 1).padStart(2, '0')}</span>
                         <strong>{item}</strong>
@@ -2768,6 +2782,7 @@ export default function App() {
                   { name: 'Circle CCTP V2', detail: 'Bridge USDC Sepolia → Arc (and reverse) via Circle CCTP V2. Zero slippage. Also App Kit, LI.FI swap, and direct send.' },
                   { name: 'AI Review (Claude)', detail: 'Claude Haiku evaluates submitted work: approve/reject verdict with one-sentence reasoning before every payout.' },
                   { name: 'Gateway Nanopayments', detail: 'x402-compatible Circle Gateway layer for sub-cent listing, review, API, and agent micropayment flows.' },
+                  { name: 'Circle Programmable Wallets', detail: 'Server-controlled wallets for custodial agent workflows. Enables agents to transact without holding private keys directly.' },
                 ] as const).map((service, i) => (
                   <div className="ov-service-card" key={service.name} style={{ '--step-i': i } as React.CSSProperties}>
                     <span>{String(i + 1).padStart(2, '0')}</span>
@@ -2942,7 +2957,7 @@ export default function App() {
               </div>
               <div>
                 <span>Worker path</span>
-                <strong>Accept open work, submit the result after escrow is funded, receive USDC after approval.</strong>
+                <strong>Call claimJob on-chain to accept. Submit your result. Receive USDC after AI-assisted approval.</strong>
               </div>
               <div>
                 <span>Nanopayment path</span>
@@ -3135,7 +3150,13 @@ export default function App() {
                 </div>
               </section>
               <section className="market-request-grid">
-                {marketLoading && <div className="market-loading">Syncing shared request board...</div>}
+                {marketLoading && (
+                  <div className="market-loading">
+                    <div className="market-skeleton-card" />
+                    <div className="market-skeleton-card" />
+                    <div className="market-skeleton-card" />
+                  </div>
+                )}
                 {!marketLoading && marketRequests.length === 0 && (
                   <div className="market-empty">
                     <BookUser size={24} />
@@ -3175,8 +3196,8 @@ export default function App() {
                   const flowSteps = [
                     { label: 'Post + Fund', done: true },
                     { label: 'Match', done: Boolean(request.agent) },
-                    { label: 'Submit', done: false },
-                    { label: 'Release', done: false },
+                    { label: 'Submit', done: isCompleted || request.status === 'matched' && Boolean(request.agent) },
+                    { label: 'Release', done: isCompleted },
                   ]
                   return (
                     <article className={`market-request-card ${roleClass}`} key={request.id}>

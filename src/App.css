@@ -2744,15 +2744,18 @@ html {
   margin-bottom: 3px;
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: 26px;
   font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1;
 }
 
 .ov-metric-label {
   display: block;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 11.5px;
   line-height: 1.5;
+  margin-top: 4px;
 }
 
 .overview-page .ov-status-row {
@@ -4311,18 +4314,16 @@ html {
   gap: 6px;
   padding: 6px 14px;
   border-radius: 999px;
-  background: color-mix(in srgb, #22c55e 15%, transparent);
+  background: color-mix(in srgb, #22c55e 12%, transparent);
   color: #22c55e;
   font-size: 0.8rem;
   font-weight: 600;
+  border: 1px solid color-mix(in srgb, #22c55e 30%, transparent);
 }
 .deal-complete-badge::before {
-  content: '';
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #22c55e;
+  content: '✓';
+  font-weight: 700;
+  font-size: 11px;
 }
 
 .market-status,
@@ -4354,6 +4355,11 @@ html {
 .market-budget {
   color: var(--text);
   font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: color-mix(in srgb, var(--accent) 85%, var(--text));
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .market-request-card h3 {
@@ -5706,3 +5712,21 @@ html {
 .reveal-section {
   animation: float-up 0.6s ease both;
 }
+
+/* ── Marketplace loading skeleton ── */
+.market-loading {
+  display: contents;
+}
+.market-skeleton-card {
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+  border-radius: 12px;
+  height: 260px;
+  border: 1px solid var(--border);
+}
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
