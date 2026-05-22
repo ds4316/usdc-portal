@@ -1249,9 +1249,11 @@ export default function App() {
       addToast({ type: 'error', message: 'No escrow job linked to this request' })
       return
     }
+    setEscrowProtocol('arc-escrow')
     setEscrowJobId(request.escrowJobId)
     setEscrowMyTab('jobs')
     navigatePage('escrow')
+    void escrowLookupJob(Number(request.escrowJobId))
   }
 
   function openEscrowSubmission(request: MarketRequest) {
@@ -3417,6 +3419,12 @@ export default function App() {
                             {dealType !== 'nft-otc' && isAgent && request.escrowJobId && request.status === 'matched' && (
                               <button className="btn-primary" onClick={() => openEscrowSubmission(request)}>
                                 Submit Result
+                              </button>
+                            )}
+                            {/* Work/Milestone: client manages job (review + release) */}
+                            {dealType !== 'nft-otc' && isOwner && request.escrowJobId && request.status === 'matched' && (
+                              <button className="btn-outline" onClick={() => viewRequestEscrow(request)}>
+                                <Lock size={12} /> Review &amp; Release
                               </button>
                             )}
                             {isExpiredRequest && (
