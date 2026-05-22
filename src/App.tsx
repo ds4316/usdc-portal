@@ -345,9 +345,18 @@ type FaucetPollState = 'idle' | 'polling' | 'received'
 type NetworkMode = 'mainnet' | 'testnet'
 type MainTab     = 'assets' | 'history' | 'faucet'
 type Theme       = 'dark' | 'light'
+type Page        = 'overview' | 'marketplace' | 'portfolio' | 'pay' | 'funds' | 'escrow' | 'activity' | 'docs'
 type InAppFaucetChain = 'ARC-TESTNET' | 'ETH-SEPOLIA' | 'BASE-SEPOLIA'
 type MarketRequestStatus = 'open' | 'matched' | 'cancelled' | 'completed'
 type DealType = 'work' | 'milestone' | 'nft-otc'
+
+const PAGE_IDS: Page[] = ['overview', 'marketplace', 'portfolio', 'pay', 'funds', 'escrow', 'activity', 'docs']
+
+function getPageFromLocation(): Page {
+  if (typeof window === 'undefined') return 'overview'
+  const hashPage = window.location.hash.replace('#', '') as Page
+  return PAGE_IDS.includes(hashPage) ? hashPage : 'overview'
+}
 
 interface Contact { id: string; name: string; address: string }
 interface MarketRequest {
@@ -643,7 +652,9 @@ export default function App() {
   const [transferSeg, setTransferSeg] = useState<TransferSeg>('send')
   const [defiSeg, setDefiSeg]       = useState<DefiSeg>('cross')
   const [moveFundsTab, setMoveFundsTab] = useState<'bridge' | 'cross' | 'send'>('bridge')
-  const [activePage, setActivePage] = useState<'overview' | 'marketplace' | 'portfolio' | 'pay' | 'funds' | 'escrow' | 'activity' | 'docs'>('overview')
+  const [activePage, setActivePage] = useState<Page>(() => getPageFromLocation())
+  const pagePopRef = useRef(false)
+  const profileMenuRef = useRef<HTMLDivElement | null>(null)
 
 // ── ArcEscrow ?ê³¹ê¹­ ─
   const [escrowAgent,  setEscrowAgent]  = useState('')
@@ -820,14 +831,60 @@ export default function App() {
   // updateToast available for future use
   // function updateToast(id: string, t: Partial<Toast>) { ... }
 
+  function navigatePage(page: Page) {
+    setActivePage(page)
+    setShowProfileMenu(false)
+    setShowConnectors(false)
+    const targetHash = page
+    if (window.location.hash.replace('#', '') !== targetHash) {
+      window.location.hash = targetHash
+    }
+  }
+
   useEffect(() => { localStorage.setItem('theme', theme) }, [theme])
   useEffect(() => { localStorage.setItem('networkMode', networkMode) }, [networkMode])
   useEffect(() => { saveMarketRequests(marketRequests) }, [marketRequests])
   useEffect(() => { loadMarketRequestsFromApi() }, [])
   useEffect(() => { if (allAddresses.length) loadAssets() }, [connections.length, allAddresses.join(',')])
   useEffect(() => {
+    const applyPageFromUrl = () => {
+      pagePopRef.current = true
+      setActivePage(getPageFromLocation())
+      setShowProfileMenu(false)
+      setShowConnectors(false)
+    }
+    window.addEventListener('hashchange', applyPageFromUrl)
+    return () => {
+      window.removeEventListener('hashchange', applyPageFromUrl)
+    }
+  }, [])
+  useEffect(() => {
+    if (pagePopRef.current) {
+      pagePopRef.current = false
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [activePage])
+  useEffect(() => {
+    if (!showProfileMenu && !showConnectors) return
+    const closeOnOutside = (event: MouseEvent) => {
+      if (!profileMenuRef.current?.contains(event.target as Node)) {
+        setShowProfileMenu(false)
+        setShowConnectors(false)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowProfileMenu(false)
+        setShowConnectors(false)
+      }
+    }
+    document.addEventListener('mousedown', closeOnOutside)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutside)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [showProfileMenu, showConnectors])
 
   // 60珥??먮룞 ?덈줈怨좎묠
   useEffect(() => {
@@ -1194,7 +1251,7 @@ export default function App() {
     }
     setEscrowJobId(request.escrowJobId)
     setEscrowMyTab('jobs')
-    setActivePage('escrow')
+    navigatePage('escrow')
   }
 
   function openEscrowSubmission(request: MarketRequest) {
@@ -1205,7 +1262,7 @@ export default function App() {
     setEscrowProtocol('arc-escrow')
     setEscrowMyTab('jobs')
     setEscrowJobId(request.escrowJobId)
-    setActivePage('escrow')
+    navigatePage('escrow')
     void escrowLookupJob(Number(request.escrowJobId))
   }
 
@@ -2408,7 +2465,7 @@ export default function App() {
                     </div>
                     <div className="contact-actions">
                       <button className="btn-icon" title="Use address"
-                        onClick={() => { setRecipient(c.address); setMoveFundsTab('send'); setActivePage('funds'); setShowContacts(false) }}>
+                        onClick={() => { setRecipient(c.address); setMoveFundsTab('send'); navigatePage('funds'); setShowContacts(false) }}>
                         <ArrowUpRight size={13} />
                       </button>
                       <button className="btn-icon danger" title="Delete" onClick={() => removeContact(c.id)}>
@@ -2433,7 +2490,7 @@ export default function App() {
           <div className="nav-links">
             {NAV_ITEMS.map((item) => (
               <button key={item.id} className={`nav-link ${activePage === item.id ? 'active' : ''}`}
-                onClick={() => { setActivePage(item.id); setShowProfileMenu(false); setShowConnectors(false) }}>
+                onClick={() => navigatePage(item.id)}>
                 {item.icon} {item.label}
               </button>
             ))}
@@ -2456,7 +2513,7 @@ export default function App() {
             </div>
           )}
 
-          <div className="profile-menu-wrap">
+          <div className="profile-menu-wrap" ref={profileMenuRef}>
             <button className={`profile-trigger ${showProfileMenu ? 'active' : ''}`} onClick={() => { setShowProfileMenu((v) => !v); setShowConnectors(false) }}>
               <UserCircle size={17} />
               <span>{isConnected ? activeWalletShort : 'Profile'}</span>
@@ -2485,10 +2542,10 @@ export default function App() {
                   </div>
                 )}
                 <div className="profile-menu-section">
-                  <button onClick={() => { setActivePage('portfolio'); setMainTab('assets'); setShowProfileMenu(false) }}>
+                  <button onClick={() => { navigatePage('portfolio'); setMainTab('assets') }}>
                     <Wallet size={14} /> Portfolio
                   </button>
-                  <button onClick={() => { setActivePage('portfolio'); setMainTab('faucet'); setShowProfileMenu(false) }}>
+                  <button onClick={() => { navigatePage('portfolio'); setMainTab('faucet') }}>
                     <Fuel size={14} /> Faucet links
                   </button>
                   <button onClick={() => { setShowQR(true); setShowProfileMenu(false) }} disabled={!isConnected}>
@@ -2564,16 +2621,18 @@ export default function App() {
                   <span className="status-dot green" /><span>ERC-8183 active</span>
                   <span className="ov-sep" />
                   <span className="status-dot green" /><span>AI Review ready</span>
+                  <span className="ov-sep" />
+                  <span className="status-dot green" /><span>Gateway nanopayments</span>
                   {isConnected && (
                     <><span className="ov-sep" /><span className="status-dot green" />
                     <span className="ov-mono">{allAddresses[0]?.slice(0, 6)}...{allAddresses[0]?.slice(-4)} connected</span></>
                   )}
                 </div>
                 <div className="ov-ctas">
-                  <button className="btn-primary ov-cta" onClick={() => setActivePage('marketplace')}>
+                  <button className="btn-primary ov-cta" onClick={() => navigatePage('marketplace')}>
                     <BookUser size={14} /> Post a Request
                   </button>
-                  <button className="btn-outline ov-cta" onClick={() => setActivePage('funds')}>
+                  <button className="btn-outline ov-cta" onClick={() => navigatePage('funds')}>
                     <ArrowRightLeft size={14} /> Fund with USDC
                   </button>
                   {!isConnected && (
@@ -2654,7 +2713,7 @@ export default function App() {
                     </div>
                   )}
                   <div className="ov-product-path">
-                    {['Request', 'Worker', 'Escrow', 'AI Review', 'Payout'].map((item, i) => (
+                    {['Request', 'Nano fee', 'Worker', 'Escrow', 'Payout'].map((item, i) => (
                       <div key={item}>
                         <span>{String(i + 1).padStart(2, '0')}</span>
                         <strong>{item}</strong>
@@ -2662,15 +2721,15 @@ export default function App() {
                     ))}
                   </div>
                   <div className="ov-action-grid">
-                    <button className="ov-action-tile primary" onClick={() => setActivePage('marketplace')}>
+                    <button className="ov-action-tile primary" onClick={() => navigatePage('marketplace')}>
                       <BookUser size={16} />
                       <span>Requests</span>
                     </button>
-                    <button className="ov-action-tile" onClick={() => setActivePage('escrow')}>
+                    <button className="ov-action-tile" onClick={() => navigatePage('escrow')}>
                       <Lock size={16} />
                       <span>Escrow</span>
                     </button>
-                    <button className="ov-action-tile" onClick={() => setActivePage('funds')}>
+                    <button className="ov-action-tile" onClick={() => navigatePage('funds')}>
                       <ArrowRightLeft size={16} />
                       <span>Move</span>
                     </button>
@@ -2706,10 +2765,11 @@ export default function App() {
               </div>
               <div className="ov-explain-grid">
                 {([
-                  { icon: <BookUser size={18} />, title: 'Post & Lock', desc: 'Clients post requests with USDC locked immediately in ArcEscrow. Work, Milestone, and NFT OTC deal types are supported.' },
-                  { icon: <Lock size={18} />, title: 'On-chain Match', desc: 'Workers call claimJob on Arc Testnet to accept open requests. The escrow contract records the match immutably.' },
-                  { icon: <Upload size={18} />, title: 'Submit Work', desc: 'Workers upload deliverables (text, file, or link) to Vercel Blob. The URI is stored on-chain via submitWork().' },
-                  { icon: <Bot size={18} />, title: 'AI + Release', desc: 'Claude Haiku evaluates the submission and returns approve/reject with reasoning. Client releases USDC after review.' },
+                  { icon: <BookUser size={18} />, title: 'Request', desc: 'Clients publish work with a budget, deadline, expected deliverable, and visibility window.' },
+                  { icon: <Lock size={18} />, title: 'Escrow', desc: 'After a worker accepts, the client locks USDC in ArcEscrow for that worker address.' },
+                  { icon: <Upload size={18} />, title: 'Submit', desc: 'Workers submit text or files as proof of completion once escrow is funded.' },
+                  { icon: <Bot size={18} />, title: 'Review', desc: 'Claude summarizes the deliverable, flags risk, and recommends whether the client should release payment.' },
+                  { icon: <Zap size={18} />, title: 'Nanopay', desc: 'Gateway/x402 can handle sub-cent usage fees for listings, reviews, APIs, and repeated agent steps.' },
                 ] as const).map((item, i) => (
                   <div className="ov-explain-card" key={item.title} style={{ '--step-i': i } as React.CSSProperties}>
                     <div className="ov-explain-icon">{item.icon}</div>
@@ -2759,8 +2819,9 @@ export default function App() {
                 {([
                   { name: 'Requests Board', detail: 'Public work posts with budgets, deadlines, expiration, and role-aware actions.' },
                   { name: 'ArcEscrow Settlement', detail: 'Client-funded USDC escrow, worker submission, release, and refund paths.' },
+                  { name: 'Gateway Nanopayments', detail: 'Planned x402 layer for listing fees, API calls, premium unlocks, and small repeated agent actions.' },
                   { name: 'AI Review Layer', detail: 'Claude-assisted evaluation before payout, with the client keeping final control.' },
-                  { name: 'Circle Funding Rails', detail: 'Circle App Kit, CCTP V2 bridging (Sepolia ↔ Arc, 0 slippage), LI.FI routes, and direct send.' },
+                  { name: 'Circle Funding Rails', detail: 'Move USDC toward Arc through App Kit, CCTP, swap, bridge, and send flows.' },
                   { name: 'Wallet Profile', detail: 'Portfolio, faucet links, QR receive, address book, and CSV export stay available but tucked away.' },
                   { name: 'Grant-Ready Docs', detail: 'Circle and Arc product usage, architecture, and contract links are easy to evaluate.' },
                 ] as const).map((service, i) => (
@@ -2778,10 +2839,11 @@ export default function App() {
               <div className="ov-label">Settlement Workflow</div>
               <div className="ov-pipeline">
                 {([
-                  { n: '01', title: 'Post & Lock',     sub: 'Marketplace → escrow',    desc: 'Client posts request with budget. USDC is locked in ArcEscrow immediately. No partial commitment — escrow is live at creation.' },
-                  { n: '02', title: 'Claim On-chain',  sub: 'claimJob() on Arc',      desc: 'Worker finds the open request and calls claimJob on-chain. The escrow records the worker address and marks the job as matched.' },
-                  { n: '03', title: 'Submit + AI',     sub: 'submitWork + Claude',    desc: 'Worker uploads the deliverable. Claude reads the result and produces a structured approve/reject recommendation.' },
-                  { n: '04', title: 'Release',         sub: 'approveWork() → USDC',   desc: 'Client sees the AI verdict and approves. USDC transfers directly from ArcEscrow to the worker wallet on Arc Testnet.' },
+                  { n: '01', title: 'Post + Match',    sub: 'Requests board',          desc: 'Client posts work. Worker accepts without paying anything, then waits for the client to fund escrow.' },
+                  { n: '02', title: 'Meter Small Usage', sub: 'Gateway + x402',        desc: 'Tiny listing, review, API, or agent-action fees can be authorized offchain and settled in batches.' },
+                  { n: '03', title: 'Fund Escrow',     sub: 'ArcEscrow.createJob()',   desc: 'Client deposits the main reward into ArcEscrow with worker address, deadline, and deliverable spec.' },
+                  { n: '04', title: 'Submit + Review', sub: 'submitWork + /api/evaluate', desc: 'Worker submits the result. Claude evaluates the deliverable and returns a structured recommendation.' },
+                  { n: '05', title: 'Release Payout',  sub: 'ArcEscrow.approveWork()', desc: 'Client confirms the recommendation. USDC transfers from escrow to the worker wallet on Arc Testnet.' },
                 ] as const).map((s, i) => (
                   <div key={i} className="ov-pipeline-step" style={{ '--step-i': i } as React.CSSProperties}>
                     <div className="ov-step-n">{s.n}</div>
@@ -2861,13 +2923,13 @@ export default function App() {
                   submit proof, and release via AI-verified escrow on Arc Testnet.
                 </p>
                 <div className="ov-final-btns">
-                  <button className="btn-primary ov-cta" onClick={() => setActivePage('marketplace')}>
+                  <button className="btn-primary ov-cta" onClick={() => navigatePage('marketplace')}>
                     <BookUser size={14} /> Open Requests
                   </button>
-                  <button className="btn-outline ov-cta" onClick={() => setActivePage('funds')}>
+                  <button className="btn-outline ov-cta" onClick={() => navigatePage('funds')}>
                     <ArrowRightLeft size={14} /> Move Funds to Arc
                   </button>
-                  <button className="btn-ghost ov-cta" onClick={() => setActivePage('docs')}>
+                  <button className="btn-ghost ov-cta" onClick={() => navigatePage('docs')}>
                     <BookOpen size={14} /> View Docs
                   </button>
                 </div>
@@ -2902,7 +2964,7 @@ export default function App() {
                   <button className="btn-primary" onClick={() => setMarketTab('create')}>
                     <Plus size={14} /> Post Request
                   </button>
-                  <button className="btn-outline" onClick={() => setActivePage('escrow')}>
+                  <button className="btn-outline" onClick={() => navigatePage('escrow')}>
                     <Lock size={14} /> Manage Escrow
                   </button>
                 </div>
@@ -2936,7 +2998,11 @@ export default function App() {
               </div>
               <div>
                 <span>Worker path</span>
-                <strong>Accept & claim open requests on-chain. Submit deliverable. Receive USDC after client approval.</strong>
+                <strong>Accept open work, submit the result after escrow is funded, receive USDC after approval.</strong>
+              </div>
+              <div>
+                <span>Nanopayment path</span>
+                <strong>Use Gateway/x402 for tiny non-escrow charges: listing extensions, AI review, premium unlocks, paid APIs, and agent actions.</strong>
               </div>
             </div>
 
@@ -3035,7 +3101,18 @@ export default function App() {
                 <div className="market-fee-note">
                   <span>Listing fee</span>
                   <strong>{getListingFee(requestListingDays)} USDC</strong>
-                  <small>1-3 days free. 4-7 days add 0.05 USDC per extra day. Max 7 days.</small>
+                  <small>1-3 days free. 4-7 days add 0.05 USDC per extra day. This is the first natural Gateway nanopayment candidate; the larger reward still belongs in escrow.</small>
+                </div>
+                <div className="nanopay-use-card">
+                  <div>
+                    <span>Suggested nanopayment hooks</span>
+                    <strong>Keep escrow for outcomes. Meter tiny usage around the workflow.</strong>
+                  </div>
+                  <ul>
+                    <li>Listing extension: 0.05 USDC/day after the free window</li>
+                    <li>AI review run: small fee per Claude evaluation</li>
+                    <li>Agent/tool call: pay per API request, dataset access, or workflow step</li>
+                  </ul>
                 </div>
                 {requestDealType === 'nft-otc' && (
                   <div className="nft-otc-panel">
@@ -3228,6 +3305,10 @@ export default function App() {
                         <span>Listing fee</span>
                         <strong>{request.listingFee ?? getListingFee(request.listingDays ?? '3')} USDC</strong>
                       </div>
+                      <div className="market-nanopay-row">
+                        <span>Nanopayment fit</span>
+                        <strong>Listing, review, API, and agent-step fees</strong>
+                      </div>
                       {request.agent && (
                         <div className="market-meta-row agent">
                           <span>Matched agent</span>
@@ -3321,7 +3402,7 @@ export default function App() {
                       <span>Escrow Workspace</span>
                       <strong>Look up and manage on-chain escrow jobs. New requests are posted from the Marketplace.</strong>
                     </div>
-                    <button className="btn-outline" onClick={() => setActivePage('marketplace')}>
+                    <button className="btn-outline" onClick={() => navigatePage('marketplace')}>
                       <BookUser size={13} /> Open Requests
                     </button>
                   </div>
@@ -4396,7 +4477,7 @@ export default function App() {
                   <span>Primary ledger</span>
                   <strong>Escrow settlement history</strong>
                 </div>
-                <button className="btn-outline" onClick={() => setActivePage('marketplace')}>
+                <button className="btn-outline" onClick={() => navigatePage('marketplace')}>
                   <BookUser size={13} /> Open Requests
                 </button>
               </div>
@@ -4557,6 +4638,17 @@ export default function App() {
                     <div className="arch-conn">→</div>
                     <div className="arch-node arch-contract">ArcEscrow</div>
                   </div>
+                </div>
+              </div>
+
+              <div className="docs-section">
+                <div className="docs-section-title">Gateway Nanopayments Direction</div>
+                <div className="docs-note-list">
+                  <p>Use two payment lanes instead of forcing every action into escrow:</p>
+                  <span>1. ArcEscrow holds the main request reward until the client approves the submitted result.</span>
+                  <span>2. Gateway/x402 can meter small usage around the job: listing extensions, AI review, paid APIs, premium unlocks, and agent tool calls.</span>
+                  <span>3. Buyers keep a Gateway balance, sign offchain payment authorizations, and settlement can be batched instead of paying gas per tiny action.</span>
+                  <span>4. The product pitch becomes outcome escrow plus usage-priced agent commerce on Arc.</span>
                 </div>
               </div>
 
