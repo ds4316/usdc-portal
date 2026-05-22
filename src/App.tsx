@@ -2597,7 +2597,7 @@ export default function App() {
                     <ArrowRightLeft size={14} /> Fund with USDC
                   </button>
                   {!isConnected && (
-                    <button className="btn-ghost ov-cta" onClick={() => setShowConnectors(true)}>
+                    <button className="btn-ghost ov-cta" onClick={() => { setShowProfileMenu(true); setShowConnectors(true) }}>
                       <Wallet size={14} /> Connect Wallet
                     </button>
                   )}
@@ -3023,7 +3023,7 @@ export default function App() {
                   <strong>Connect a wallet to post requests and claim work</strong>
                   <p>You can browse open requests without a wallet. To post, accept, or submit work, connect a wallet on Arc Testnet.</p>
                 </div>
-                <button className="btn-primary" onClick={() => setShowConnectors(true)}>
+                <button className="btn-primary" onClick={() => { setShowProfileMenu(true); setShowConnectors(true) }}>
                   Connect Wallet
                 </button>
               </div>
@@ -3947,7 +3947,7 @@ export default function App() {
                   ) : (
                     <div className="sidebar-no-wallet">
                       <p>Connect a wallet to see balances</p>
-                      <button className="btn-primary" style={{ fontSize: 12, padding: '8px 16px' }} onClick={() => setShowConnectors(true)}>
+                      <button className="btn-primary" style={{ fontSize: 12, padding: '8px 16px' }} onClick={() => { setShowProfileMenu(true); setShowConnectors(true) }}>
                         Connect
                       </button>
                     </div>
@@ -4337,7 +4337,7 @@ export default function App() {
                         <div className="connect-prompt-icon"><Wallet size={40} strokeWidth={1.2} /></div>
                         <p className="connect-prompt-title">Connect your wallet</p>
                         <p className="connect-prompt-sub">Your assets will appear here once connected</p>
-                        <button className="btn-primary" style={{ maxWidth: 200 }} onClick={() => setShowConnectors(true)}>Connect wallet</button>
+                        <button className="btn-primary" style={{ maxWidth: 200 }} onClick={() => { setShowProfileMenu(true); setShowConnectors(true) }}>Connect wallet</button>
                       </div>
                     ) : (
                       <div className="table-wrap">
@@ -4426,7 +4426,7 @@ export default function App() {
                           ) : (
                             <div className="faucet-no-wallet">
                               <span>Connect a wallet first</span>
-                              <button className="btn-primary" style={{ padding: '6px 14px', fontSize: '12px', width: 'auto' }} onClick={() => setShowConnectors(true)}>Connect</button>
+                              <button className="btn-primary" style={{ padding: '6px 14px', fontSize: '12px', width: 'auto' }} onClick={() => { setShowProfileMenu(true); setShowConnectors(true) }}>Connect</button>
                             </div>
                           )}
                         </div>
