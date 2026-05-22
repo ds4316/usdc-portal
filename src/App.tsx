@@ -2538,7 +2538,6 @@ export default function App() {
       <main className="page-container">
 
         {/* ─── OVERVIEW ─── */}
-        {/* ─── OVERVIEW ─── */}
         {activePage === 'overview' && (
           <div className="page overview-page">
 
@@ -3332,10 +3331,6 @@ export default function App() {
                         <span>Listing fee</span>
                         <strong>{request.listingFee ?? getListingFee(request.listingDays ?? '3')} USDC</strong>
                       </div>
-                      <div className="market-nanopay-row">
-                        <span>Nanopayment fit</span>
-                        <strong>Listing, review, API, and agent-step fees</strong>
-                      </div>
                       {request.agent && (
                         <div className="market-meta-row agent">
                           <span>Matched agent</span>
@@ -3419,8 +3414,8 @@ export default function App() {
             <div className="page-header">
               <Bot size={20} style={{ color: 'var(--accent)' }} />
               <div>
-                <h2 className="page-title">Escrow Payment</h2>
-                <p className="page-sub">Manage Arc escrow jobs and ERC-8183 agentic commerce contracts on Arc Testnet.</p>
+                <h2 className="page-title">Escrow & Settlement</h2>
+                <p className="page-sub">Manage ArcEscrow jobs, ERC-8183 agentic contracts, and NFT OTC deals on Arc Testnet.</p>
               </div>
             </div>
             <div className="section-layout">

@@ -5584,7 +5584,7 @@ html {
 /* Role strip hover */
 .market-role-strip {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 .market-role-strip > div {
@@ -5928,3 +5928,54 @@ html {
   transition: opacity 0.15s;
 }
 .ov-qs-link:hover { opacity: 0.8; }
+
+/* ─── LIGHT MODE: fix white-on-white gradient text ─────────────────────── */
+.root[data-theme="light"] .ov-section-heading h2,
+.root[data-theme="light"] .ov-flow-copy h2 {
+  background: linear-gradient(135deg, #0a1628 0%, #2775ca 60%, #0099cc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.root[data-theme="light"] .market-stat-grid div strong {
+  background: linear-gradient(135deg, #0a1628, #2775ca);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.root[data-theme="light"] .market-budget {
+  background: linear-gradient(135deg, #006fa8, #2775ca);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.root[data-theme="light"] .market-kicker {
+  background: rgba(0,99,153,0.08);
+  border-color: rgba(0,99,153,0.22);
+  color: #006fa8;
+}
+
+.root[data-theme="light"] .nav-logo {
+  background: linear-gradient(135deg, #0a1628 0%, #2775ca 50%, #0099cc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.root[data-theme="light"] .ov-eyebrow {
+  background: rgba(39,117,202,0.08);
+  border-color: rgba(39,117,202,0.22);
+  color: #1a5fa0;
+}
+
+.root[data-theme="light"] .ov-eyebrow::before {
+  background: #0099cc;
+}
+
+/* Light mode status dots */
+.root[data-theme="light"] .status-dot.green { background: #16a34a; }
+.root[data-theme="light"] .status-dot.yellow { background: #d97706; }
+.root[data-theme="light"] .status-dot.red { background: #dc2626; }
