@@ -35,7 +35,7 @@ const ARC_ONBOARDER = '0x495825fF81B048B2A6e1FE10571625496f8fF1FD' as `0x${strin
 const ARC_ESCROW = '0x2D961a34d7558AA5A3BaB17f4d928fd0deC7a5Dc' as `0x${string}`
 const ARC_TESTNET_USDC = '0x3600000000000000000000000000000000000000' as `0x${string}`
 
-// NFTOTCEscrow — TODO: replace with deployed address after redeploying contract
+// NFTOTCEscrow — deployed Arc Testnet · atomic NFT ↔ USDC swap
 const NFT_OTC_ESCROW = '0xdC47D9AE448BcE3E524C768446fE65f30d03f20e' as `0x${string}`
 
 
@@ -3258,7 +3258,7 @@ export default function App() {
                   const flowSteps = [
                     { label: 'Post + Fund', done: true },
                     { label: 'Match', done: Boolean(request.agent) },
-                    { label: 'Submit', done: isCompleted || request.status === 'matched' && Boolean(request.agent) },
+                    { label: 'Submit', done: isCompleted },
                     { label: 'Release', done: isCompleted },
                   ]
                   return (
