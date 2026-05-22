@@ -22,28 +22,17 @@ const ERC20_ABI = [
     inputs: [{ name: 'account', type: 'address' }], outputs: [{ name: '', type: 'uint256' }] },
 ] as const
 
-// ??? USDCPaymentHub 而⑦듃?숉듃 ??????????????????????????????????????????????
-const PAYMENT_HUB_ADDRESS = '0x5292C3d44e374a794d4b3477e2C81417BE5Db211' as `0x${string}`
-const PAYMENT_HUB_ABI = [
-  { name: 'pay',        type: 'function', stateMutability: 'payable',
-    inputs: [{ name: 'note', type: 'string' }], outputs: [] },
-  { name: 'withdraw',   type: 'function', stateMutability: 'nonpayable',
-    inputs: [], outputs: [] },
-  { name: 'getBalance', type: 'function', stateMutability: 'view',
-    inputs: [], outputs: [{ name: '', type: 'uint256' }] },
-  { name: 'owner',      type: 'function', stateMutability: 'view',
-    inputs: [], outputs: [{ name: '', type: 'address' }] },
-] as const
+// USDCPaymentHub removed (replaced by ArcEscrow + NFTOTCEscrow)
 
-// ??? CCTP V2 (Testnet) ????????????????????????????????????????????????????
+// ── CCTP V2 (Testnet) ─
 const SEPOLIA_USDC        = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`
 const ARC_MSG_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x${string}`
 
-// ??? ArcOnboarder ?????????????????????????????????????????????????????????
+// ── ArcOnboarder ─
 // TODO: Remix濡?Sepolia 諛고룷 ????二쇱냼瑜??ㅼ젣 而⑦듃?숉듃 二쇱냼濡?援먯껜
 const ARC_ONBOARDER = '0x495825fF81B048B2A6e1FE10571625496f8fF1FD' as `0x${string}`
 
-// ??? ArcEscrow ????????????????????????????????????????????????????????????
+// ── ArcEscrow ─
 const ARC_ESCROW = '0x2D961a34d7558AA5A3BaB17f4d928fd0deC7a5Dc' as `0x${string}`
 const ARC_TESTNET_USDC = '0x3600000000000000000000000000000000000000' as `0x${string}`
 
@@ -226,7 +215,7 @@ const MESSAGE_SENT_EVENT = [
     inputs: [{ name: 'message', type: 'bytes', indexed: false }] },
 ] as const
 
-// ??? 泥댁씤 硫뷀? ????????????????????????????????????????????????????????????
+// Wallet connection state
 export const CHAINS = [mainnet, base, polygon, arbitrum, optimism, avalanche, arcTestnet, sepolia, baseSepolia] as const
 
 export const CHAIN_META: Record<number, { label: string; color: string; isTestnet: boolean; explorer?: string }> = {
@@ -314,7 +303,7 @@ function friendlyConnectError(error: Error | null, name: string): string | null 
   return 'Connection failed. Please try again.'
 }
 
-// ??? 媛寃?API ?????????????????????????????????????????????????????????????
+// Public client API setup
 interface PriceData { usd: number; change24h: number }
 
 async function fetchPrices(ids: string[]): Promise<Record<string, PriceData>> {
@@ -327,7 +316,7 @@ async function fetchPrices(ids: string[]): Promise<Record<string, PriceData>> {
   } catch { return {} }
 }
 
-// ??? ????????????????????????????????????????????????????????????????????
+// ── ?? ─
 interface AssetRow {
   wallet: string; chain: number; symbol: string
   balance: string; usdcValue: string; coingeckoId: string; change24h: number
@@ -462,7 +451,7 @@ const IN_APP_FAUCETS: Record<InAppFaucetChain, { label: string; chainId: number;
   'BASE-SEPOLIA': { label: 'Base Sepolia',     chainId: baseSepolia.id,  token: 'USDC', url: 'https://faucet.circle.com/?allow=true', desc: 'Use Circle public faucet for Base Sepolia USDC before route testing.' },
 }
 
-// ??? Public clients ???????????????????????????????????????????????????????
+// ── Public clients ─
 const publicClients = Object.fromEntries(
   CHAINS.map((chain) => {
     const rpcs: Record<number, string[]> = {
@@ -480,7 +469,7 @@ const publicClients = Object.fromEntries(
   })
 )
 
-// ??? TX ?덉뒪?좊━ ???????????????????????????????????????????????????????????
+// ── TX ?ëëª?ì¢â ─
 const TX_KEY = 'usdc_portal_history'
 function loadHistory(): TxRecord[] {
   try { return JSON.parse(localStorage.getItem(TX_KEY) ?? '[]') } catch { return [] }
@@ -501,7 +490,7 @@ function isReceiptTimeout(error: unknown): boolean {
   return error.message.toLowerCase().includes('timed out while waiting for transaction')
 }
 
-// ??? ?좏떥 而댄룷?뚰듃 ????????????????????????????????????????????????????????
+// Market request + bridge state
 function TokenIconWithChain({ symbol, chainId }: { symbol: string; chainId: number }) {
   const color = TOKEN_COLORS[symbol] ?? '#555'
   const chainColor = CHAIN_META[chainId]?.color ?? '#555'
@@ -591,7 +580,7 @@ type PendingBridge = {
   direction: 'to-arc' | 'to-sepolia'; amount: string; savedAt: number; attestation?: string
 }
 
-// ??? ?濡쒓렇?섑뵿 鍮꾩＜??????????????????????????????????????????????????????
+// ── æ¿¡ìë ?ìëµ¿ é®ê¾©ï¼?? ─
 function SettlementFlowDiagram() {
   const steps = [
     {
@@ -640,7 +629,7 @@ function SettlementFlowDiagram() {
   )
 }
 
-// ??? 硫붿씤 ????????????????????????????????????????????????????????????????
+// ── ï§ë¶¿ì¤ ?? ─
 export default function App() {
   const connections = useConnections()
   const { connectors, connect, isPending: isConnecting, error: connectError, variables: connectVariables } = useConnect()
@@ -656,7 +645,7 @@ export default function App() {
   const [moveFundsTab, setMoveFundsTab] = useState<'bridge' | 'cross' | 'send'>('bridge')
   const [activePage, setActivePage] = useState<'overview' | 'marketplace' | 'portfolio' | 'pay' | 'funds' | 'escrow' | 'activity' | 'docs'>('overview')
 
-  // ?? ArcEscrow ?곹깭 ????????????????????????????????????????????????????????
+// ── ArcEscrow ?ê³¹ê¹­ ─
   const [escrowAgent,  setEscrowAgent]  = useState('')
   const [escrowAmount, setEscrowAmount] = useState('')
   const [escrowDays,   setEscrowDays]   = useState('3')
@@ -724,7 +713,7 @@ export default function App() {
   const [newContactName, setNewContactName] = useState('')
   const [newContactAddr, setNewContactAddr] = useState('')
 
-  // 媛?ㅻ퉬
+// Wallet + chain helpers
   const [gasPrices, setGasPrices] = useState<Record<number, string>>({})
 
   // ?뚯슦???대쭅
@@ -819,7 +808,7 @@ export default function App() {
     return matchesDeal && matchesScope
   })
 
-  // ??? Toast ?ы띁 ??????????????????????????????????????????????????????????
+// ── Toast ?Ñë ─
   function addToast(t: Omit<Toast, 'id'>): string {
     const id = Date.now().toString() + Math.random().toString(36).slice(2)
     setToasts((prev) => [...prev, { ...t, id }])
@@ -849,7 +838,7 @@ export default function App() {
 
   // ?대쭅 ?대┛??  useEffect(() => () => { Object.values(pollTimers.current).forEach(clearInterval) }, [])
 
-  // ??? 媛?ㅻ퉬 議고쉶 ?????????????????????????????????????????????????????????
+// Asset loading + polling
   useEffect(() => {
     async function fetchGas() {
       const results: Record<number, string> = {}
@@ -870,7 +859,7 @@ export default function App() {
     return () => clearInterval(t)
   }, [networkMode])
 
-  // ??? ?먯궛 議고쉶 ???????????????????????????????????????????????????????????
+// ── ?ë¨¯ê¶ è­°ê³ ì¶ ─
   const loadAssets = useCallback(async () => {
     if (!allAddresses.length) return
     setLoadingAssets(true)
@@ -976,7 +965,7 @@ export default function App() {
     return () => { clearTimeout(timer); obs?.disconnect() }
   }, [activePage])
 
-  // ??? 二쇱냼濡???????????????????????????????????????????????????????????????
+// ── äºì±ë¼æ¿¡? ─
   function addContact() {
     if (!newContactName.trim() || !isAddress(newContactAddr)) return
     const next = [...contacts, { id: Date.now().toString(), name: newContactName.trim(), address: newContactAddr }]
@@ -1220,7 +1209,7 @@ export default function App() {
     void escrowLookupJob(Number(request.escrowJobId))
   }
 
-  // ??? ?뚯슦???대쭅 ?????????????????????????????????????????????????????????
+// Confirm modal + contact helpers
   async function getTokenBalance(address: `0x${string}`, faucet: FaucetInfo): Promise<bigint> {
     const client = publicClients[faucet.chainId]
     if (!client) return 0n
@@ -1283,7 +1272,7 @@ export default function App() {
     }
   }
 
-  // ??? CSV ?대낫?닿린 ?????????????????????????????????????????????????????????
+// CSV export
   function exportCSV() {
     const rows = ['Token,Chain,Wallet,Balance,Value (USD),24h Change']
     displayed.forEach((a) => {
@@ -1296,7 +1285,7 @@ export default function App() {
     URL.revokeObjectURL(url)
   }
 
-  // ??? Payment Hub ??????????????????????????????????????????????????????????
+// ── Payment Hub ─
   async function loadContractInfo() {
     try {
       const client = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
@@ -1348,7 +1337,7 @@ export default function App() {
     } finally { setWithdrawLoading(false) }
   }
 
-  // ??? LI.FI ???????????????????????????????????????????????????????????????
+// ── LI.FI ─
   function getLifiTokenAddress(chainId: number, symbol: string): string {
     if (symbol === 'ETH' || symbol === 'POL' || symbol === 'AVAX') return '0x0000000000000000000000000000000000000000'
     return TOKENS[chainId]?.find((t) => t.symbol === symbol)?.address ?? '0x0000000000000000000000000000000000000000'
@@ -1415,7 +1404,7 @@ export default function App() {
     } finally { setLifiExecuting(false) }
   }
 
-  // ??? ?붿빟 ?섏튂 ????????????????????????????????????????????????????????????
+// ── ?ë¶¿ë¹ ?ìí ─
   const ethValue      = assets.filter((a) => a.symbol === 'ETH').reduce((s, a) => s + parseFloat(a.usdcValue), 0)
   const usdcTotalVal  = assets.filter((a) => a.symbol.includes('USDC')).reduce((s, a) => s + parseFloat(a.usdcValue), 0)
   const otherValue    = parseFloat(totalUsdc) - ethValue - usdcTotalVal
@@ -1424,7 +1413,7 @@ export default function App() {
     .map((c) => ({ id: c.id, val: assets.filter((a) => a.chain === c.id).reduce((s, a) => s + parseFloat(a.usdcValue), 0) }))
     .filter((c) => c.val > 0)
 
-  // ??? 蹂댁븞 & ?대뙌?????????????????????????????????????????????????????????
+// Bridge & attestation helpers
   function validateSend(to: string, amt: string): string[] {
     const warnings: string[] = []
     if (allAddresses.some((a) => a.toLowerCase() === to.toLowerCase())) warnings.push('Sending to your own wallet address')
@@ -1471,7 +1460,7 @@ export default function App() {
     })
   }
 
-  // ??? CCTP Bridge: Sepolia USDC ??Arc Testnet USDC ???????????????????????
+// ── CCTP Bridge: Sepolia USDC ??Arc Testnet USDC ─
   async function executeCCTPBridge() {
     const amt = parseFloat(cctpAmount)
     if (!amt || amt <= 0) return addToast({ type: 'error', message: 'Enter an amount' })
@@ -1489,10 +1478,10 @@ export default function App() {
     }
 
     try {
-      // ?? Step 1: Sepolia濡?泥댁씤 ?꾪솚 ?????????????????????????????????
+// ── Step 1: Sepoliaæ¿¡?ï§£ëì¤ ?ê¾ªì ─
       await switchChain({ chainId: sepolia.id })
 
-      // ?? Step 2: USDC approve ??ArcOnboarder ?????????????????????????
+// ── Step 2: USDC approve ??ArcOnboarder ─
       setCctpStep('approving')
       showBridgeStep('1/4 Approving USDC on Sepolia...')
       await sendTransactionAsync({
@@ -1501,7 +1490,7 @@ export default function App() {
           args: [ARC_ONBOARDER, usdcAmount] }),
       })
 
-      // ?? Step 3: ArcOnboarder.bridgeUSDCToArc ?????????????????????????
+// ── Step 3: ArcOnboarder.bridgeUSDCToArc ─
       setCctpStep('burning')
       showBridgeStep('2/4 Bridging USDC to Arc via ArcOnboarder...')
       const burnHash = await sendTransactionAsync({
@@ -1511,7 +1500,7 @@ export default function App() {
       })
       setCctpBurnHash(burnHash)
 
-      // ?? Step 4: MessageSent ?대깽?몄뿉??message 異붿텧 ?????????????????
+// Step 4: extract MessageSent event + message bytes
       const sepoliaClient = createPublicClient({
         chain: sepolia,
         transport: http('https://rpc.sepolia.org'),
@@ -1535,7 +1524,7 @@ export default function App() {
       localStorage.setItem('cctp_pending_bridge', JSON.stringify(pendingToArc))
       setPendingBridge(pendingToArc)
 
-      // ?? Step 5: Circle Attestation API ?대쭅 ?????????????????????????
+// Step 5: poll Circle Attestation API
       setCctpStep('attesting')
       showBridgeStep('3/4 Waiting Circle attestation...')
       let attestation = ''
@@ -1547,7 +1536,7 @@ export default function App() {
       }
       if (!attestation) throw new Error('Attestation timeout ??retry later')
 
-      // ?? Step 6: Arc Testnet?먯꽌 receiveMessage ???????????????????????
+// ── Step 6: Arc Testnet?ë¨¯ê½ receiveMessage ─
       setCctpStep('minting')
       showBridgeStep('4/4 Minting USDC on Arc Testnet...')
       await switchChain({ chainId: arcTestnet.id })
@@ -1984,7 +1973,7 @@ export default function App() {
     }
   }
 
-  // ??? ArcEscrow ?⑥닔??????????????????????????????????????????????????????
+// ── ArcEscrow ?â¥ë?? ─
 
   async function escrowCreateJob() {
     const { encodeFunctionData } = await import('viem')
@@ -2253,13 +2242,13 @@ export default function App() {
     navigator.clipboard.writeText(addr).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 2000) })
   }
 
-  // ??? ?꾪꽣 & ?뺣젹 ??????????????????????????????????????????????????????????
+// ── ?ê¾ªê½£ & ?ëº£ì ¹ ─
   const displayed = assets
     .filter((a) => networkMode === 'mainnet' ? MAINNET_IDS.has(a.chain) : TESTNET_IDS.has(a.chain))
     .sort((a, b) => sortBy === 'value' ? parseFloat(b.usdcValue) - parseFloat(a.usdcValue)
       : sortBy === 'symbol' ? a.symbol.localeCompare(b.symbol) : a.chain - b.chain)
 
-  // ??? 而ㅻ꽖??紐⑸줉 ??????????????????????????????????????????????????????????
+// Settlement history helpers
   function ConnectorList() {
     return (
       <div className="connector-list">
@@ -2283,7 +2272,7 @@ export default function App() {
     )
   }
 
-  // ??? LI.FI 寃ъ쟻 移대뱶 ??????????????????????????????????????????????????????
+// LI.FI swap routes
   function LiFiQuoteCard() {
     if (!lifiQuote) return null
     const toAmt    = parseFloat(formatUnits(BigInt(lifiQuote.estimate.toAmount), lifiQuote.action.toToken.decimals))
@@ -2313,7 +2302,7 @@ export default function App() {
     )
   }
 
-  // ??? ?뚮뜑 ?????????????????????????????????????????????????????????????????
+// ── ?ë®ë ─
   const NAV_ITEMS = [
     { id: 'overview'  as const, label: 'Product',      icon: <LayoutDashboard size={13} /> },
     { id: 'marketplace' as const, label: 'Requests',    icon: <BookUser size={13} /> },
@@ -2434,7 +2423,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ??? NAVBAR ??? */}
+      {/* NAVBAR */}
       <nav className="navbar">
         <div className="nav-left">
           <span className="nav-logo">
@@ -2545,31 +2534,36 @@ export default function App() {
               <div className="ov-ambient ov-ambient-two" />
               <div className="ov-hero-text">
                 <div className="ov-eyebrow">Circle + Arc agentic escrow marketplace</div>
-                <h1 className="ov-h1">Agentic escrow marketplace on Arc</h1>
+                <h1 className="ov-h1">Trustless escrow &amp; settlement on Arc</h1>
                 <p className="ov-lead">
-                  Post requests, match with workers or AI agents, lock USDC in Arc escrow,
-                  review submitted work with AI assistance, and release payment only after approval.
+                  The trustless marketplace for work and NFT settlement on Arc.
+                  Lock USDC at posting time, match with workers on-chain, use AI review before
+                  every payout, and bridge from any chain via Circle CCTP V2.
                 </p>
                 <div className="ov-metrics">
                   <div className="ov-metric">
-                    <span className="ov-metric-value">Requests</span>
-                    <span className="ov-metric-label">Post work with budget, deadline, and deliverable</span>
-                  </div>
-                  <div className="ov-metric">
-                    <span className="ov-metric-value">Escrow</span>
-                    <span className="ov-metric-label">Client-funded Arc USDC settlement</span>
+                    <span className="ov-metric-value">USDC Escrow</span>
+                    <span className="ov-metric-label">Locked at post. Released on approval.</span>
                   </div>
                   <div className="ov-metric">
                     <span className="ov-metric-value">AI Review</span>
-                    <span className="ov-metric-label">Claude-assisted quality check before payout</span>
+                    <span className="ov-metric-label">Claude verdict before every payout</span>
+                  </div>
+                  <div className="ov-metric">
+                    <span className="ov-metric-value">NFT OTC</span>
+                    <span className="ov-metric-label">Trustless NFT ↔ USDC atomic swap</span>
                   </div>
                 </div>
                 <div className="ov-status-row">
                   <span className="status-dot green" /><span>ArcEscrow live</span>
                   <span className="ov-sep" />
+                  <span className="status-dot green" /><span>NFTOTCEscrow live</span>
+                  <span className="ov-sep" />
                   <span className="status-dot green" /><span>CCTP V2 active</span>
                   <span className="ov-sep" />
-                  <span className="status-dot green" /><span>Claude Haiku ready</span>
+                  <span className="status-dot green" /><span>ERC-8183 active</span>
+                  <span className="ov-sep" />
+                  <span className="status-dot green" /><span>AI Review ready</span>
                   {isConnected && (
                     <><span className="ov-sep" /><span className="status-dot green" />
                     <span className="ov-mono">{allAddresses[0]?.slice(0, 6)}...{allAddresses[0]?.slice(-4)} connected</span></>
@@ -2687,9 +2681,9 @@ export default function App() {
 
             <section className="ov-grant-strip reveal-section">
               {([
-                { label: 'Marketplace', title: 'Requests become payable jobs', copy: 'Clients describe what they need done, how much they will pay, and what result should be submitted.' },
-                { label: 'Settlement', title: 'Client-funded Arc escrow', copy: 'Workers never pay to accept work. The client locks USDC after a match and releases it after approval.' },
-                { label: 'Verification', title: 'AI-assisted review before payout', copy: 'Claude turns submitted work into a structured verdict so the client can release or reject with context.' },
+                { label: 'Circle CCTP V2', title: 'Bridge USDC to Arc, 0 slippage', copy: 'Move USDC from Sepolia to Arc Testnet using Circle CCTP V2. Fast finality, no slippage, native Circle attestation.' },
+                { label: 'Arc Escrow', title: 'USDC locked at post, released on proof', copy: 'ArcEscrow locks USDC when the request is created. No separate funding step. Cancel with refund or 5% fee if matched.' },
+                { label: 'ERC-8183', title: 'Agentic commerce standard on Arc', copy: 'Full ERC-8183 implementation alongside ArcEscrow. Agents can autonomously create jobs, submit work, and trigger USDC payouts.' },
               ] as const).map((item, i) => (
                 <div className="ov-grant-card" key={item.title} style={{ '--step-i': i } as React.CSSProperties}>
                   <span>{item.label}</span>
@@ -2712,10 +2706,10 @@ export default function App() {
               </div>
               <div className="ov-explain-grid">
                 {([
-                  { icon: <BookUser size={18} />, title: 'Request', desc: 'Clients publish work with a budget, deadline, expected deliverable, and visibility window.' },
-                  { icon: <Lock size={18} />, title: 'Escrow', desc: 'After a worker accepts, the client locks USDC in ArcEscrow for that worker address.' },
-                  { icon: <Upload size={18} />, title: 'Submit', desc: 'Workers submit text or files as proof of completion once escrow is funded.' },
-                  { icon: <Bot size={18} />, title: 'Review', desc: 'Claude summarizes the deliverable, flags risk, and recommends whether the client should release payment.' },
+                  { icon: <BookUser size={18} />, title: 'Post & Lock', desc: 'Clients post requests with USDC locked immediately in ArcEscrow. Work, Milestone, and NFT OTC deal types are supported.' },
+                  { icon: <Lock size={18} />, title: 'On-chain Match', desc: 'Workers call claimJob on Arc Testnet to accept open requests. The escrow contract records the match immutably.' },
+                  { icon: <Upload size={18} />, title: 'Submit Work', desc: 'Workers upload deliverables (text, file, or link) to Vercel Blob. The URI is stored on-chain via submitWork().' },
+                  { icon: <Bot size={18} />, title: 'AI + Release', desc: 'Claude Haiku evaluates the submission and returns approve/reject with reasoning. Client releases USDC after review.' },
                 ] as const).map((item, i) => (
                   <div className="ov-explain-card" key={item.title} style={{ '--step-i': i } as React.CSSProperties}>
                     <div className="ov-explain-icon">{item.icon}</div>
@@ -2738,11 +2732,11 @@ export default function App() {
               </div>
               <div className="ov-flow-diagram">
                 {([
-                  { title: 'Request', sub: 'Budget + deliverable', tone: 'blue' },
-                  { title: 'Worker', sub: 'Accepts job', tone: 'cyan' },
-                  { title: 'ArcEscrow', sub: 'Client locks USDC', tone: 'blue' },
+                  { title: 'Post', sub: 'USDC locked instantly', tone: 'blue' },
+                  { title: 'Claim', sub: 'Worker on-chain', tone: 'cyan' },
+                  { title: 'Submit', sub: 'Deliverable uploaded', tone: 'blue' },
                   { title: 'AI Review', sub: 'Claude verdict', tone: 'gold' },
-                  { title: 'Payout', sub: 'Worker receives USDC', tone: 'green' },
+                  { title: 'Payout', sub: 'USDC → worker', tone: 'green' },
                 ] as const).map((node, i) => (
                   <div className="ov-flow-node-wrap" key={node.title} style={{ '--step-i': i } as React.CSSProperties}>
                     <div className={`ov-flow-box ${node.tone}`}>
@@ -2766,7 +2760,7 @@ export default function App() {
                   { name: 'Requests Board', detail: 'Public work posts with budgets, deadlines, expiration, and role-aware actions.' },
                   { name: 'ArcEscrow Settlement', detail: 'Client-funded USDC escrow, worker submission, release, and refund paths.' },
                   { name: 'AI Review Layer', detail: 'Claude-assisted evaluation before payout, with the client keeping final control.' },
-                  { name: 'Circle Funding Rails', detail: 'Move USDC toward Arc through App Kit, CCTP, swap, bridge, and send flows.' },
+                  { name: 'Circle Funding Rails', detail: 'Circle App Kit, CCTP V2 bridging (Sepolia ↔ Arc, 0 slippage), LI.FI routes, and direct send.' },
                   { name: 'Wallet Profile', detail: 'Portfolio, faucet links, QR receive, address book, and CSV export stay available but tucked away.' },
                   { name: 'Grant-Ready Docs', detail: 'Circle and Arc product usage, architecture, and contract links are easy to evaluate.' },
                 ] as const).map((service, i) => (
@@ -2784,10 +2778,10 @@ export default function App() {
               <div className="ov-label">Settlement Workflow</div>
               <div className="ov-pipeline">
                 {([
-                  { n: '01', title: 'Post + Match',    sub: 'Requests board',          desc: 'Client posts work. Worker accepts without paying anything, then waits for the client to fund escrow.' },
-                  { n: '02', title: 'Fund Escrow',     sub: 'ArcEscrow.createJob()',   desc: 'Client deposits USDC into ArcEscrow with worker address, deadline, and deliverable spec.' },
-                  { n: '03', title: 'Submit + Review', sub: 'submitWork + /api/evaluate', desc: 'Worker submits the result. Claude evaluates the deliverable and returns a structured recommendation.' },
-                  { n: '04', title: 'Release Payout',  sub: 'ArcEscrow.approveWork()', desc: 'Client confirms the recommendation. USDC transfers from escrow to the worker wallet on Arc Testnet.' },
+                  { n: '01', title: 'Post & Lock',     sub: 'Marketplace → escrow',    desc: 'Client posts request with budget. USDC is locked in ArcEscrow immediately. No partial commitment — escrow is live at creation.' },
+                  { n: '02', title: 'Claim On-chain',  sub: 'claimJob() on Arc',      desc: 'Worker finds the open request and calls claimJob on-chain. The escrow records the worker address and marks the job as matched.' },
+                  { n: '03', title: 'Submit + AI',     sub: 'submitWork + Claude',    desc: 'Worker uploads the deliverable. Claude reads the result and produces a structured approve/reject recommendation.' },
+                  { n: '04', title: 'Release',         sub: 'approveWork() → USDC',   desc: 'Client sees the AI verdict and approves. USDC transfers directly from ArcEscrow to the worker wallet on Arc Testnet.' },
                 ] as const).map((s, i) => (
                   <div key={i} className="ov-pipeline-step" style={{ '--step-i': i } as React.CSSProperties}>
                     <div className="ov-step-n">{s.n}</div>
@@ -2815,9 +2809,9 @@ export default function App() {
                     items: ['Submit result on-chain', 'Get AI-assisted review', 'Receive USDC payout'],
                   },
                   {
-                    role: 'Protocols', tag: 'Build + Scale',
-                    desc: 'Build task markets, agent marketplaces, and service automation on top of escrow rails.',
-                    items: ['Composable escrow API', 'Cross-chain USDC inflow', 'Programmable verification'],
+                    role: 'Protocols & Agents', tag: 'Build + Scale',
+                    desc: 'Build task markets, agent economies, and service automation on Arc. ERC-8183 enables fully autonomous job creation and payment.',
+                    items: ['Composable escrow API', 'Circle CCTP cross-chain inflow', 'ERC-8183 agentic standard'],
                   },
                 ] as const).map((a, i) => (
                   <div key={i} className="ov-audience-card" style={{ '--step-i': i } as React.CSSProperties}>
@@ -2841,10 +2835,11 @@ export default function App() {
                 {([
                   { name: 'USDC',         tech: 'Settlement asset',  color: '#2775ca' },
                   { name: 'Arc Testnet',  tech: 'Stablecoin L1',     color: '#00c2ff' },
-                  { name: 'CCTP / App Kit', tech: 'Move funds',      color: '#16a34a' },
-                  { name: 'ArcEscrow',    tech: 'Programmable escrow', color: '#8b5cf6' },
-                  { name: 'AI Review',    tech: 'Claude verdict',    color: '#d4a574' },
-                  { name: 'Future',       tech: 'Agent Wallets / ERC-8183 / Nanopayments', color: '#f59e0b' },
+                  { name: 'CCTP V2',      tech: 'Circle cross-chain', color: '#16a34a' },
+                  { name: 'ArcEscrow',    tech: 'Work / Milestone', color: '#8b5cf6' },
+                  { name: 'NFTOTCEscrow', tech: 'NFT atomic swap',  color: '#ec4899' },
+                  { name: 'AI Review',    tech: 'Claude verdict',   color: '#d4a574' },
+                  { name: 'ERC-8183',     tech: 'Agentic standard', color: '#f59e0b' },
                 ] as const).map((node, i) => (
                   <div key={i} className="ov-arch-item">
                     <div className="ov-arch-node">
@@ -2860,9 +2855,10 @@ export default function App() {
             {/* Final CTA */}
             <section className="ov-final-cta reveal-section">
               <div className="ov-final-inner">
-                <h2 className="ov-final-title">Test agentic settlement on Arc</h2>
+                <h2 className="ov-final-title">Start settling on Arc with USDC</h2>
                 <p className="ov-final-sub">
-                  Create an escrow job, submit work, and run Claude-based verification on Arc Testnet.
+                  Bridge USDC from Sepolia, post a request, match with a worker,
+                  submit proof, and release via AI-verified escrow on Arc Testnet.
                 </p>
                 <div className="ov-final-btns">
                   <button className="btn-primary ov-cta" onClick={() => setActivePage('marketplace')}>
@@ -2888,7 +2884,7 @@ export default function App() {
               <BookUser size={20} style={{ color: 'var(--accent)' }} />
               <div>
                 <h2 className="page-title">Requests Marketplace</h2>
-                <p className="page-sub">Post what you need done, set the USDC reward, match with a worker, then settle through Arc escrow.</p>
+                <p className="page-sub">Post a request with USDC locked immediately. Workers claim on-chain. AI-assisted review. Settlement on Arc.</p>
               </div>
               <div className="marketplace-tabs">
                 <button className={marketTab === 'browse' ? 'active' : ''} onClick={() => setMarketTab('browse')}>Browse</button>
@@ -2900,8 +2896,8 @@ export default function App() {
             <div className="marketplace-hero">
               <div>
                 <span className="market-kicker">Agentic escrow marketplace</span>
-                <h3>If someone handles this, I will pay this much.</h3>
-                <p>Clients publish a request with scope, reward, and deadline. Workers accept without funding anything. The client locks USDC only after a match, then AI-assisted review helps approve the final payout.</p>
+                <h3>Post work. Lock USDC. Release on approval.</h3>
+                <p>Clients publish a request with scope, reward, and deadline. USDC is locked at posting time. Workers accept and claim the job on-chain. AI-assisted review then helps the client approve or reject the final payout.</p>
                 <div className="market-hero-actions">
                   <button className="btn-primary" onClick={() => setMarketTab('create')}>
                     <Plus size={14} /> Post Request
@@ -2919,11 +2915,11 @@ export default function App() {
                 <div className="market-stat-grid">
                   <div><span>Open</span><strong>{requestStats.open}</strong></div>
                   <div><span>Matched</span><strong>{requestStats.matched}</strong></div>
-                  <div><span>Funded</span><strong>{requestStats.funded}</strong></div>
+                  <div><span>Complete</span><strong>{marketRequests.filter((r) => r.status === 'completed').length}</strong></div>
                   <div><span>Mine</span><strong>{requestStats.mine}</strong></div>
                 </div>
                 <div className="market-flow-mini">
-                  {['Post', 'Match', 'Fund', 'Submit', 'Release'].map((step, i) => (
+                  {['Post+Fund', 'Match', 'Submit', 'Review', 'Release'].map((step, i) => (
                     <div className="market-flow-step" key={step}>
                       <span>{String(i + 1).padStart(2, '0')}</span>
                       <strong>{step}</strong>
@@ -2936,11 +2932,11 @@ export default function App() {
             <div className="market-role-strip">
               <div>
                 <span>Client path</span>
-                <strong>Post the request, choose the worker, lock USDC, review the result with AI, release payment.</strong>
+                <strong>Post the request with USDC locked immediately. Worker matches and claims. Review with AI, release payment.</strong>
               </div>
               <div>
                 <span>Worker path</span>
-                <strong>Accept open work, submit the result after escrow is funded, receive USDC after approval.</strong>
+                <strong>Accept & claim open requests on-chain. Submit deliverable. Receive USDC after client approval.</strong>
               </div>
             </div>
 
@@ -3314,7 +3310,7 @@ export default function App() {
               <Bot size={20} style={{ color: 'var(--accent)' }} />
               <div>
                 <h2 className="page-title">Escrow Payment</h2>
-                <p className="page-sub">Lock USDC for a worker, review the result, then release payment on Arc Testnet.</p>
+                <p className="page-sub">Manage Arc escrow jobs and ERC-8183 agentic commerce contracts on Arc Testnet.</p>
               </div>
             </div>
             <div className="section-layout">
@@ -3323,17 +3319,17 @@ export default function App() {
                   <div className="escrow-workspace-head">
                     <div>
                       <span>Escrow Workspace</span>
-                      <strong>Use Requests for new work. Use this page to manage funded jobs.</strong>
+                      <strong>Look up and manage on-chain escrow jobs. New requests are posted from the Marketplace.</strong>
                     </div>
                     <button className="btn-outline" onClick={() => setActivePage('marketplace')}>
                       <BookUser size={13} /> Open Requests
                     </button>
                   </div>
                   <div className="escrow-flow-note">
-                    <div><span>01</span><strong>Client funds escrow</strong></div>
-                    <div><span>02</span><strong>Worker submits result</strong></div>
-                    <div><span>03</span><strong>AI helps review</strong></div>
-                    <div><span>04</span><strong>Client releases USDC</strong></div>
+                    <div><span>01</span><strong>USDC locked at post</strong></div>
+                    <div><span>02</span><strong>Worker claims on-chain</strong></div>
+                    <div><span>03</span><strong>Worker submits result</strong></div>
+                    <div><span>04</span><strong>AI review + release</strong></div>
                   </div>
 
                   {escrowProtocol === 'erc8183' && (
@@ -3396,7 +3392,9 @@ export default function App() {
                             <Lock size={13} /> {e8183Loading ? (e8183Step === 'creating' ? 'Creating...' : 'Funding...') : 'Create & Fund Job'}
                           </button>
                           <div className="escrow-hint">
-                            ERC-8183 is the advanced agent-commerce standard. For normal testing, use ArcEscrow; use this tab only when you want to test the standard interface.
+                            ERC-8183 is Arc's official agentic commerce standard for autonomous job-based payments.
+                            Requests from the marketplace automatically route through ArcEscrow.
+                            Use this tab to directly test the ERC-8183 interface or integrate agent-based automation.
                           </div>
                           {e8183JobId && (
                             <div className="e8183-job-id-pill">Job ID: <strong>#{e8183JobId}</strong></div>
@@ -3829,10 +3827,10 @@ export default function App() {
                       </a>
                     </div>
                     <div className="contract-item">
-                      <div className="contract-name">USDCPaymentHub</div>
-                      <div className="contract-chain">Arc Testnet</div>
-                      <a className="contract-addr" href={`https://testnet.arcscan.app/address/${PAYMENT_HUB_ADDRESS}`} target="_blank" rel="noreferrer">
-                        {PAYMENT_HUB_ADDRESS.slice(0,8)}…{PAYMENT_HUB_ADDRESS.slice(-6)} <ExternalLink size={10} />
+                      <div className="contract-name">NFTOTCEscrow</div>
+                      <div className="contract-chain">Arc Testnet · NFT OTC</div>
+                      <a className="contract-addr" href={`https://testnet.arcscan.app/address/${NFT_OTC_ESCROW}`} target="_blank" rel="noreferrer">
+                        {NFT_OTC_ESCROW.slice(0,8)}…{NFT_OTC_ESCROW.slice(-6)} <ExternalLink size={10} />
                       </a>
                     </div>
                   </div>
@@ -3849,7 +3847,7 @@ export default function App() {
               <ArrowRightLeft size={20} style={{ color: 'var(--accent)' }} />
               <div>
                 <h2 className="page-title">Move Funds to Arc</h2>
-                <p className="page-sub">Bridge via CCTP V2 · Cross-chain route via LI.FI · Send USDC directly</p>
+                <p className="page-sub">Circle CCTP V2 bridge (0 slippage) · LI.FI cross-chain swap · Direct USDC send to Arc</p>
               </div>
             </div>
 
@@ -4372,7 +4370,7 @@ export default function App() {
               <Network size={20} style={{ color: 'var(--accent)' }} />
               <div>
                 <h2 className="page-title">Settlement Activity</h2>
-                <p className="page-sub">Escrow funding, submissions, releases, refunds, and supporting USDC movement.</p>
+                <p className="page-sub">On-chain settlement history — USDC releases, refunds, NFT OTC settlements, and bridge activity.</p>
               </div>
             </div>
             <div className="activity-summary-grid">
@@ -4476,7 +4474,7 @@ export default function App() {
               <BookOpen size={20} style={{ color: 'var(--accent)' }} />
               <div>
                 <h2 className="page-title">Docs & Contracts</h2>
-                <p className="page-sub">Deployed contracts, architecture overview, and external resources</p>
+                <p className="page-sub">Live Arc Testnet contracts, Circle CCTP infrastructure, ERC-8183 agentic commerce standard, and resources</p>
               </div>
             </div>
 
@@ -4499,10 +4497,17 @@ export default function App() {
                     </a>
                   </div>
                   <div className="contract-item">
-                    <div className="contract-name">USDCPaymentHub</div>
-                    <div className="contract-chain">Arc Testnet</div>
-                    <a className="contract-addr" href={`https://testnet.arcscan.app/address/${PAYMENT_HUB_ADDRESS}`} target="_blank" rel="noreferrer">
-                      {PAYMENT_HUB_ADDRESS} <ExternalLink size={10} />
+                    <div className="contract-name">NFTOTCEscrow</div>
+                    <div className="contract-chain">Arc Testnet · NFT OTC settlement</div>
+                    <a className="contract-addr" href={`https://testnet.arcscan.app/address/${NFT_OTC_ESCROW}`} target="_blank" rel="noreferrer">
+                      {NFT_OTC_ESCROW} <ExternalLink size={10} />
+                    </a>
+                  </div>
+                  <div className="contract-item">
+                    <div className="contract-name">ERC-8183 AgenticCommerce</div>
+                    <div className="contract-chain">Arc Testnet · official agentic standard</div>
+                    <a className="contract-addr" href={`https://testnet.arcscan.app/address/${ERC8183_CONTRACT}`} target="_blank" rel="noreferrer">
+                      {ERC8183_CONTRACT} <ExternalLink size={10} />
                     </a>
                   </div>
                 </div>
@@ -4570,6 +4575,15 @@ export default function App() {
                   <a className="docs-link" href="https://li.fi/sdk" target="_blank" rel="noreferrer">
                     <ExternalLink size={13} /> LI.FI SDK Docs
                   </a>
+                  <a className="docs-link" href="https://developers.circle.com/w3s/programmable-wallets" target="_blank" rel="noreferrer">
+                    <ExternalLink size={13} /> Circle Programmable Wallets
+                  </a>
+                  <a className="docs-link" href="https://eips.ethereum.org/EIPS/eip-8183" target="_blank" rel="noreferrer">
+                    <ExternalLink size={13} /> ERC-8183 Agentic Commerce
+                  </a>
+                  <a className="docs-link" href="https://docs.arc.network" target="_blank" rel="noreferrer">
+                    <ExternalLink size={13} /> Arc Network Docs
+                  </a>
                   <a className="docs-link" href="https://github.com/ds4316/usdc-portal" target="_blank" rel="noreferrer">
                     <ExternalLink size={13} /> GitHub Repository
                   </a>
@@ -4577,13 +4591,27 @@ export default function App() {
               </div>
 
               <div className="docs-section">
-                <div className="docs-section-title">NFT OTC Test Path</div>
+                <div className="docs-section-title">ERC-8183 Standard</div>
                 <div className="docs-note-list">
-                  <p>Testnet NFT OTC is possible with the included contracts:</p>
-                  <span>1. Deploy MockArcNFT and mint a token to the seller.</span>
-                  <span>2. Deploy NFTOTCEscrow with Arc USDC.</span>
-                  <span>3. Buyer funds USDC, seller approves the NFT, then either side settles.</span>
-                  <span>4. The contract checks ownerOf(tokenId) and approval before swapping NFT for USDC.</span>
+                  <p>Arc adopts ERC-8183 as the agentic commerce standard. This app implements it alongside custom ArcEscrow contracts:</p>
+                  <span>1. <strong>createJob</strong> — client defines task, evaluator, expiry, and optional hook</span>
+                  <span>2. <strong>setBudget + fund</strong> — USDC locked in escrow via ERC-20 approval</span>
+                  <span>3. <strong>submit</strong> — worker posts deliverable as bytes32 hash on-chain</span>
+                  <span>4. <strong>complete</strong> — evaluator (or AI) approves and releases USDC to worker</span>
+                  <a className="docs-link" href="https://eips.ethereum.org/EIPS/eip-8183" target="_blank" rel="noreferrer">
+                    <ExternalLink size={13} /> ERC-8183 Specification
+                  </a>
+                </div>
+              </div>
+
+              <div className="docs-section">
+                <div className="docs-section-title">NFT OTC Settlement</div>
+                <div className="docs-note-list">
+                  <p>Atomic NFT ↔ USDC swap via NFTOTCEscrow:</p>
+                  <span>1. Buyer posts deal with USDC locked immediately (seller=0x0 for open market)</span>
+                  <span>2. NFT holder calls <strong>claimDeal</strong> — ownerOf check proves ownership on-chain</span>
+                  <span>3. Seller calls <strong>approve</strong> on NFT contract (NFTOTCEscrow as spender)</span>
+                  <span>4. Either party calls <strong>settle</strong> — NFT transfers to buyer, USDC releases to seller atomically</span>
                 </div>
               </div>
             </div>
@@ -4600,7 +4628,7 @@ export default function App() {
               <CircleDollarSign size={14} style={{ verticalAlign: 'middle', marginRight: 4, color: 'var(--accent)' }} />
               ArcEscrow Market
             </span>
-            <span className="footer-tag">Circle + Arc Stablecoin Commerce Hackathon · Agentic Economy Track</span>
+            <span className="footer-tag">Arc × Circle Stablecoin Hackathon · Agentic Commerce Track</span>
           </div>
           <div className="footer-links">
             <a href="https://testnet.arcscan.app" target="_blank" rel="noreferrer">ArcScan</a>

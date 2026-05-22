@@ -5177,3 +5177,475 @@ html {
   border-top: 1px solid var(--border);
   margin-top: 4px;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PREMIUM VISUAL UPGRADE — ArcEscrow Market v2
+   Glow effects, animated gradients, hover lifts, visual hierarchy
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Animated gradient keyframes */
+@keyframes gradient-flow {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.55; }
+  50%       { opacity: 1; }
+}
+@keyframes float-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes border-glow-anim {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(39,117,202,0.15), 0 24px 60px rgba(0,0,0,0.35), 0 0 60px rgba(39,117,202,0.06); }
+  50%       { box-shadow: 0 0 0 1px rgba(29,216,255,0.25), 0 24px 60px rgba(0,0,0,0.35), 0 0 80px rgba(29,216,255,0.12); }
+}
+
+/* Hero heading — animated gradient text */
+.overview-page .ov-h1 {
+  font-size: clamp(38px, 5.2vw, 60px);
+  font-weight: 800;
+  letter-spacing: -2px;
+  line-height: 1.06;
+  background: linear-gradient(135deg,
+    #ffffff 0%,
+    #b8d4ff 22%,
+    #56a7ff 42%,
+    #1dd8ff 60%,
+    #b8d4ff 80%,
+    #ffffff 100%);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-flow 7s ease infinite;
+}
+
+/* Eyebrow pill */
+.ov-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(39,117,202,0.12);
+  border: 1px solid rgba(39,117,202,0.28);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #56a7ff;
+  margin-bottom: 20px;
+  animation: float-up 0.6s ease both;
+}
+.ov-eyebrow::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #1dd8ff;
+  animation: pulse-glow 2.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+/* Hero text entrance animations */
+.overview-page .ov-hero-text .ov-eyebrow  { animation: float-up 0.6s ease 0.05s both; }
+.overview-page .ov-hero-text .ov-h1       { animation: float-up 0.7s ease 0.12s both; }
+.overview-page .ov-hero-text .ov-lead     { animation: float-up 0.7s ease 0.22s both; }
+.overview-page .ov-hero-text .ov-metrics  { animation: float-up 0.7s ease 0.30s both; }
+.overview-page .ov-hero-text .ov-status-row { animation: float-up 0.7s ease 0.38s both; }
+.overview-page .ov-hero-text .ov-ctas     { animation: float-up 0.7s ease 0.45s both; }
+
+/* Primary button — stronger glow */
+.btn-primary {
+  background: linear-gradient(135deg, #2775ca 0%, #1099c4 100%);
+  box-shadow:
+    0 0 0 1px rgba(39,117,202,0.35),
+    0 8px 24px rgba(39,117,202,0.28),
+    0 0 40px rgba(39,117,202,0.12);
+  transition: opacity 0.18s, transform 0.22s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.22s;
+}
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow:
+    0 0 0 1px rgba(29,216,255,0.45),
+    0 12px 32px rgba(39,117,202,0.38),
+    0 0 60px rgba(29,216,255,0.18);
+}
+
+/* Feature cards — lift + glow on hover */
+.ov-grant-card,
+.ov-explain-card,
+.ov-service-card,
+.ov-audience-card {
+  transition: transform 0.28s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.28s, border-color 0.28s;
+}
+.ov-grant-card:hover,
+.ov-explain-card:hover,
+.ov-service-card:hover,
+.ov-audience-card:hover {
+  transform: translateY(-6px) scale(1.015);
+  box-shadow: 0 28px 60px rgba(0,0,0,0.42), 0 0 40px rgba(39,117,202,0.1);
+  border-color: rgba(39,117,202,0.32) !important;
+}
+
+/* Market request card — enhanced */
+.market-request-card {
+  border-radius: 18px;
+  transition: transform 0.24s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.24s, border-color 0.24s;
+}
+.market-request-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, #2775ca 30%, #1dd8ff 70%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.24s;
+  border-radius: 18px 18px 0 0;
+}
+.market-request-card:hover::after { opacity: 1; }
+.market-request-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 22px 50px rgba(0,0,0,0.38), 0 0 30px rgba(39,117,202,0.08);
+  border-color: rgba(39,117,202,0.28) !important;
+}
+
+/* Status badges — colored */
+.market-status.open {
+  background: rgba(34,197,94,0.14);
+  color: #4ade80;
+  border: 1px solid rgba(34,197,94,0.28);
+}
+.market-status.matched {
+  background: rgba(39,117,202,0.14);
+  color: #56a7ff;
+  border: 1px solid rgba(39,117,202,0.28);
+}
+.market-status.completed {
+  background: rgba(139,92,246,0.14);
+  color: #a78bfa;
+  border: 1px solid rgba(139,92,246,0.28);
+}
+.market-status.cancelled {
+  background: rgba(239,68,68,0.12);
+  color: #f87171;
+  border: 1px solid rgba(239,68,68,0.24);
+}
+
+/* Deal type badges */
+.deal-badge.work {
+  background: rgba(29,216,255,0.12);
+  color: #22d3ee;
+  border: 1px solid rgba(29,216,255,0.24);
+}
+.deal-badge.milestone {
+  background: rgba(245,158,11,0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245,158,11,0.24);
+}
+.deal-badge.nft-otc {
+  background: rgba(139,92,246,0.12);
+  color: #a78bfa;
+  border: 1px solid rgba(139,92,246,0.24);
+}
+
+/* Progress steps — done highlight */
+.market-progress-step.done {
+  background: rgba(39,117,202,0.14);
+  border-color: rgba(39,117,202,0.32);
+}
+.market-progress-step.done span {
+  background: #2775ca;
+  color: #fff;
+}
+.market-progress-step.done strong { color: #56a7ff; }
+
+/* Filter bar — pill buttons */
+.market-filter-bar button {
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(148,163,184,0.18);
+  background: transparent;
+  color: #b8c2d2;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+}
+.market-filter-bar button:hover {
+  border-color: #2775ca;
+  color: #56a7ff;
+}
+.market-filter-bar button.active {
+  background: rgba(39,117,202,0.18);
+  border-color: #2775ca;
+  color: #56a7ff;
+}
+
+/* Navbar logo — gradient */
+.nav-logo {
+  background: linear-gradient(135deg, #f8fafc 0%, #56a7ff 50%, #1dd8ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 800;
+}
+
+/* Status dot — pulsing */
+.status-dot.green { animation: pulse-glow 2.2s ease-in-out infinite; }
+
+/* Grant cards entrance animation */
+.ov-grant-card   { animation: float-up 0.6s ease calc(var(--step-i, 0) * 0.12s + 0.1s) both; }
+.ov-explain-card { animation: float-up 0.5s ease calc(var(--step-i, 0) * 0.10s + 0.1s) both; }
+.ov-service-card { animation: float-up 0.5s ease calc(var(--step-i, 0) * 0.08s + 0.1s) both; }
+.ov-audience-card{ animation: float-up 0.5s ease calc(var(--step-i, 0) * 0.10s + 0.1s) both; }
+
+/* Showcase cards */
+.showcase-card.accent {
+  border-color: rgba(39,117,202,0.35);
+  background: rgba(39,117,202,0.08);
+  box-shadow: 0 0 30px rgba(39,117,202,0.10);
+}
+
+/* Framer-style status panel */
+.framer-style-panel {
+  border: 1px solid rgba(39,117,202,0.22);
+  animation: border-glow-anim 5s ease-in-out infinite;
+}
+
+/* Architecture items entrance */
+.ov-arch-item { animation: float-up 0.5s ease calc(var(--step-i, 0) * 0.07s) both; }
+
+/* Pipeline steps */
+.ov-pipeline-step {
+  transition: transform 0.2s, box-shadow 0.2s;
+  animation: float-up 0.5s ease calc(var(--step-i, 0) * 0.1s) both;
+}
+.ov-pipeline-step:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 32px rgba(0,0,0,0.28);
+}
+
+/* Flow boxes — glow per color */
+.ov-flow-box.blue  { box-shadow: 0 0 18px rgba(39,117,202,0.18); }
+.ov-flow-box.green { box-shadow: 0 0 18px rgba(34,197,94,0.18); }
+.ov-flow-box.gold  { box-shadow: 0 0 18px rgba(245,158,11,0.18); }
+.ov-flow-box:hover { transform: translateY(-2px); }
+
+/* Market budget — gradient text */
+.market-budget {
+  font-size: 15px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #1dd8ff, #56a7ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Section headings */
+.ov-section-heading h2 {
+  font-size: clamp(24px, 3.2vw, 36px);
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  background: linear-gradient(135deg, #f8fafc 0%, #b8c2d2 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* CTA final section */
+.ov-final-inner {
+  background: linear-gradient(135deg,
+    rgba(39,117,202,0.08),
+    rgba(29,216,255,0.05));
+  border: 1px solid rgba(39,117,202,0.22);
+  box-shadow: 0 0 60px rgba(39,117,202,0.08), 0 30px 80px rgba(0,0,0,0.28);
+}
+
+/* Stat grid large numbers */
+.market-stat-grid div strong {
+  font-size: 22px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #f8fafc, #56a7ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Role strip hover */
+.market-role-strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.market-role-strip > div {
+  border: 1px solid rgba(148,163,184,0.12);
+  border-radius: 14px;
+  padding: 14px 18px;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+.market-role-strip > div:hover {
+  border-color: rgba(39,117,202,0.28);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+/* Market kicker */
+.market-kicker {
+  display: inline-block;
+  padding: 4px 12px;
+  background: rgba(29,216,255,0.10);
+  border: 1px solid rgba(29,216,255,0.22);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #1dd8ff;
+  margin-bottom: 12px;
+}
+
+/* History rows */
+.history-row {
+  transition: background 0.15s, transform 0.15s;
+}
+.history-row:hover {
+  background: rgba(39,117,202,0.05);
+  transform: translateX(3px);
+}
+
+/* Docs contract items */
+.contract-item {
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.contract-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+}
+
+/* Activity summary card primary */
+.activity-summary-card.primary {
+  background: linear-gradient(135deg,
+    rgba(39,117,202,0.10),
+    rgba(29,216,255,0.06));
+  border-color: rgba(39,117,202,0.22);
+  box-shadow: 0 0 28px rgba(39,117,202,0.08);
+}
+
+/* btn-outline enhanced */
+.btn-outline:hover:not(:disabled) {
+  border-color: #2775ca;
+  color: #56a7ff;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(39,117,202,0.14);
+}
+
+/* Page header icon */
+.page-header > svg {
+  filter: drop-shadow(0 0 6px currentColor);
+  opacity: 0.9;
+}
+
+/* Escrow checklist done */
+.checklist-item.done .checklist-icon {
+  background: #22c55e;
+  color: #fff;
+  border-color: #22c55e;
+}
+
+/* Sidebar / action card hover */
+.sidebar-card,
+.action-card {
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+.sidebar-card:hover,
+.action-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.22);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .overview-page .ov-h1,
+  .ov-eyebrow,
+  .ov-eyebrow::before,
+  .status-dot.green,
+  .framer-style-panel,
+  .ov-grant-card,
+  .ov-explain-card,
+  .ov-service-card,
+  .ov-audience-card,
+  .ov-arch-item,
+  .ov-pipeline-step { animation: none; }
+  .ov-grant-card:hover,
+  .ov-explain-card:hover,
+  .ov-service-card:hover,
+  .ov-audience-card:hover,
+  .market-request-card:hover,
+  .ov-pipeline-step:hover { transform: none; }
+}
+
+
+/* ── Arch rail — 6 nodes (was 5) ── */
+.ov-arch-rail {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ── Grant strip — Circle/Arc themed cards ── */
+.ov-grant-card:nth-child(1) .ov-grant-label { color: #2775ca; }
+.ov-grant-card:nth-child(2) .ov-grant-label { color: #8b5cf6; }
+.ov-grant-card:nth-child(3) .ov-grant-label { color: #f59e0b; }
+
+/* ── NFT OTC escrow arch node ── */
+.ov-arch-name { font-weight: 700; font-size: 13px; }
+.ov-arch-tech { font-size: 11px; opacity: 0.85; }
+
+/* ── Status row badges ── */
+.ov-status-row .status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+}
+
+/* ── CTA buttons in final section ── */
+.ov-final-btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.ov-final-btns .btn-primary,
+.ov-final-btns .btn-outline,
+.ov-final-btns .btn-ghost { width: auto; }
+
+/* ── Showcase wall — improved animation ── */
+@keyframes scroll-down  { 0% { transform: translateY(0); }  100% { transform: translateY(-50%); } }
+@keyframes scroll-up    { 0% { transform: translateY(-50%); } 100% { transform: translateY(0); } }
+
+/* ── Market create card — better visual ── */
+.market-create-card {
+  border: 1px solid rgba(39,117,202,0.18);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18), 0 0 40px rgba(39,117,202,0.06);
+}
+
+/* ── Deal type grid — better hover ── */
+.deal-type-tile {
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.deal-type-tile:hover {
+  transform: translateY(-2px);
+  border-color: rgba(39,117,202,0.35);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+.deal-type-tile.selected {
+  border-color: #2775ca;
+  background: rgba(39,117,202,0.08);
+  box-shadow: 0 0 0 1px rgba(39,117,202,0.25), 0 8px 24px rgba(39,117,202,0.12);
+}
+
+/* ── Section reveal animation ── */
+.reveal-section {
+  animation: float-up 0.6s ease both;
+}
