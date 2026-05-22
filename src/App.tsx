@@ -1209,7 +1209,7 @@ export default function App() {
       await fetch('/api/requests', { method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: requestId, action: 'complete' }) })
-      await loadMarketRequests()
+      await loadMarketRequestsFromApi()
       addToast({ type: 'success', message: 'Deal settled — NFT sent to buyer, USDC released to seller' })
     } catch (e) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Settle failed' })
@@ -3430,12 +3430,33 @@ export default function App() {
                       <BookUser size={13} /> Open Requests
                     </button>
                   </div>
-                  <div className="escrow-flow-note">
-                    <div><span>01</span><strong>USDC locked at post</strong></div>
-                    <div><span>02</span><strong>Worker claims on-chain</strong></div>
-                    <div><span>03</span><strong>Worker submits result</strong></div>
-                    <div><span>04</span><strong>AI review + release</strong></div>
+                  <div className="escrow-protocol-tabs">
+                    <button
+                      className={`escrow-protocol-tab ${escrowProtocol === 'arc-escrow' ? 'active' : ''}`}
+                      onClick={() => setEscrowProtocol('arc-escrow')}>
+                      <Lock size={12} /> ArcEscrow
+                    </button>
+                    <button
+                      className={`escrow-protocol-tab ${escrowProtocol === 'erc8183' ? 'active' : ''}`}
+                      onClick={() => setEscrowProtocol('erc8183')}>
+                      <Bot size={12} /> ERC-8183
+                    </button>
                   </div>
+                  {escrowProtocol === 'arc-escrow' ? (
+                    <div className="escrow-flow-note">
+                      <div><span>01</span><strong>USDC locked at post</strong></div>
+                      <div><span>02</span><strong>Worker claims on-chain</strong></div>
+                      <div><span>03</span><strong>Worker submits result</strong></div>
+                      <div><span>04</span><strong>AI review + release</strong></div>
+                    </div>
+                  ) : (
+                    <div className="escrow-flow-note">
+                      <div><span>01</span><strong>createJob</strong></div>
+                      <div><span>02</span><strong>setBudget + fund</strong></div>
+                      <div><span>03</span><strong>submit</strong></div>
+                      <div><span>04</span><strong>complete</strong></div>
+                    </div>
+                  )}
 
                   {escrowProtocol === 'erc8183' && (
                     <div className="e8183-panel">
