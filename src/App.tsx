@@ -3566,8 +3566,8 @@ export default function App() {
                           </button>
                           <div className="escrow-hint">
                             ERC-8183 is Arc's official agentic commerce standard for autonomous job-based payments.
-                            Requests from the marketplace automatically route through ArcEscrow.
-                            Use this tab to directly test the ERC-8183 interface or integrate agent-based automation.
+                            An AI agent (LLM + wallet) can call <code>createJob → setBudget → fund → submit → complete</code> without any human in the loop.
+                            The evaluator address receives the approval call — wire it to a trusted AI endpoint for fully autonomous escrow.
                           </div>
                           {e8183JobId && (
                             <div className="e8183-job-id-pill">Job ID: <strong>#{e8183JobId}</strong></div>
@@ -4796,6 +4796,20 @@ export default function App() {
                   <span>2. NFT holder calls <strong>claimDeal</strong> — ownerOf check proves ownership on-chain</span>
                   <span>3. Seller calls <strong>approve</strong> on NFT contract (NFTOTCEscrow as spender)</span>
                   <span>4. Either party calls <strong>settle</strong> — NFT transfers to buyer, USDC releases to seller atomically</span>
+                </div>
+              </div>
+
+              <div className="docs-section">
+                <div className="docs-section-title">Circle Programmable Wallets</div>
+                <div className="docs-note-list">
+                  <p>Server-side custodial wallets for autonomous agent-to-agent commerce on Arc:</p>
+                  <span>1. <strong>Create a wallet via API</strong> — Circle provisions an EVM wallet server-side (no browser wallet needed)</span>
+                  <span>2. <strong>Fund with USDC</strong> — send Arc USDC to the programmable wallet address via CCTP V2 or direct transfer</span>
+                  <span>3. <strong>Agent signs transactions</strong> — the server signs ERC-8183 <code>createJob</code> and <code>fund</code> calls without MetaMask</span>
+                  <span>4. <strong>Full autonomy</strong> — an AI agent can post requests, fund escrow, and complete jobs with no human approval flow</span>
+                  <a className="docs-link" href="https://developers.circle.com/w3s/programmable-wallets" target="_blank" rel="noreferrer">
+                    <ExternalLink size={13} /> Circle Programmable Wallets Docs
+                  </a>
                 </div>
               </div>
 
