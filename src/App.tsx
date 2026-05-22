@@ -1075,11 +1075,12 @@ export default function App() {
       const deadline = BigInt(Math.floor(Date.now() / 1000) + parseInt(requestDays) * 86400)
       const arcClient = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
       let escrowJobId: number
+      let txHash: string | undefined
       if (requestDealType === 'nft-otc') {
         await sendTransactionAsync({ to: ARC_TESTNET_USDC,
           data: encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve', args: [NFT_OTC_ESCROW, usdcAmt] }) })
         const sellerAddr = (requestNftSeller && isAddress(requestNftSeller) ? requestNftSeller : '0x0000000000000000000000000000000000000000') as `0x${string}`
-        await sendTransactionAsync({ to: NFT_OTC_ESCROW,
+        txHash = await sendTransactionAsync({ to: NFT_OTC_ESCROW,
           data: encodeFunctionData({ abi: NFT_OTC_ESCROW_ABI, functionName: 'fundDeal',
             args: [sellerAddr, requestNftContract as `0x${string}`, BigInt(requestNftTokenId), usdcAmt, deadline] }) })
         const nextId = await arcClient.readContract({ address: NFT_OTC_ESCROW, abi: NFT_OTC_ESCROW_ABI, functionName: 'nextDealId' })
@@ -1087,7 +1088,7 @@ export default function App() {
       } else {
         await sendTransactionAsync({ to: ARC_TESTNET_USDC,
           data: encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve', args: [ARC_ESCROW, usdcAmt] }) })
-        await sendTransactionAsync({ to: ARC_ESCROW,
+        txHash = await sendTransactionAsync({ to: ARC_ESCROW,
           data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'createJob',
             args: ['0x0000000000000000000000000000000000000000' as `0x${string}`, usdcAmt, deadline, `${requestTitle}: ${requestDeliverable}`] }) })
         const nextId = await arcClient.readContract({ address: ARC_ESCROW, abi: NEXT_JOB_ID_ABI, functionName: 'nextJobId' })
@@ -1118,7 +1119,7 @@ export default function App() {
       setRequestDealType('work'); setRequestUpfront('10'); setRequestCompletion('10')
       setRequestNftChain('Arc Testnet'); setRequestNftContract(''); setRequestNftTokenId(''); setRequestNftSeller(''); setRequestNftCollection('')
       setMarketTab('browse')
-      addToast({ type: 'success', message: `Posted — ${budget} USDC locked in escrow (job #${escrowJobId})` })
+      addToast({ type: 'success', message: `Posted — ${budget} USDC locked in escrow (job #${escrowJobId})`, txHash, explorerBase: 'https://testnet.arcscan.app' })
     } catch (e) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Could not post request' })
     } finally {
@@ -1133,11 +1134,12 @@ export default function App() {
     setMarketLoading(true)
     try {
       await switchChain({ chainId: arcTestnet.id })
+      let claimHash: string
       if (dealType === 'nft-otc') {
-        await sendTransactionAsync({ to: NFT_OTC_ESCROW,
+        claimHash = await sendTransactionAsync({ to: NFT_OTC_ESCROW,
           data: encodeFunctionData({ abi: NFT_OTC_ESCROW_ABI, functionName: 'claimDeal', args: [BigInt(escrowJobId)] }) })
       } else {
-        await sendTransactionAsync({ to: ARC_ESCROW,
+        claimHash = await sendTransactionAsync({ to: ARC_ESCROW,
           data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'claimJob', args: [BigInt(escrowJobId)] }) })
       }
       const res = await fetch('/api/requests', {
@@ -1148,7 +1150,7 @@ export default function App() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Could not accept request')
       if (Array.isArray(json.requests)) setMarketRequests(json.requests)
-      addToast({ type: 'success', message: 'Accepted — you are now the matched worker' })
+      addToast({ type: 'success', message: 'Accepted — you are now the matched worker', txHash: claimHash, explorerBase: 'https://testnet.arcscan.app' })
     } catch (e) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Could not accept request' })
     } finally {
@@ -1163,11 +1165,12 @@ export default function App() {
     setMarketLoading(true)
     try {
       await switchChain({ chainId: arcTestnet.id })
+      let cancelHash: string
       if (dealType === 'nft-otc') {
-        await sendTransactionAsync({ to: NFT_OTC_ESCROW,
+        cancelHash = await sendTransactionAsync({ to: NFT_OTC_ESCROW,
           data: encodeFunctionData({ abi: NFT_OTC_ESCROW_ABI, functionName: 'cancelDeal', args: [BigInt(escrowJobId)] }) })
       } else {
-        await sendTransactionAsync({ to: ARC_ESCROW,
+        cancelHash = await sendTransactionAsync({ to: ARC_ESCROW,
           data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'cancelJob', args: [BigInt(escrowJobId)] }) })
       }
       const res = await fetch('/api/requests', {
@@ -1177,7 +1180,7 @@ export default function App() {
       })
       const json = await res.json()
       if (res.ok && Array.isArray(json.requests)) setMarketRequests(json.requests)
-      addToast({ type: 'success', message: 'Cancelled — USDC refunded (5% fee to worker if already matched)' })
+      addToast({ type: 'success', message: 'Cancelled — USDC refunded (5% fee to worker if already matched)', txHash: cancelHash, explorerBase: 'https://testnet.arcscan.app' })
     } catch (e) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Cancel failed' })
     } finally {
@@ -1190,9 +1193,9 @@ export default function App() {
     const { encodeFunctionData } = await import('viem')
     try {
       await switchChain({ chainId: arcTestnet.id })
-      await sendTransactionAsync({ to: nftContract as `0x${string}`,
+      const approveHash = await sendTransactionAsync({ to: nftContract as `0x${string}`,
         data: encodeFunctionData({ abi: ERC721_ABI, functionName: 'approve', args: [NFT_OTC_ESCROW, BigInt(tokenId)] }) })
-      addToast({ type: 'success', message: 'NFT approved for escrow — either side can now settle' })
+      addToast({ type: 'success', message: 'NFT approved for escrow — either side can now settle', txHash: approveHash, explorerBase: 'https://testnet.arcscan.app' })
     } catch (e) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Approve failed' })
     }
@@ -1203,14 +1206,14 @@ export default function App() {
     const { encodeFunctionData } = await import('viem')
     try {
       await switchChain({ chainId: arcTestnet.id })
-      await sendTransactionAsync({ to: NFT_OTC_ESCROW,
+      const settleHash = await sendTransactionAsync({ to: NFT_OTC_ESCROW,
         data: encodeFunctionData({ abi: NFT_OTC_ESCROW_ABI, functionName: 'settle', args: [BigInt(escrowJobId)] }) })
       // Mark request as completed in the shared board
       await fetch('/api/requests', { method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: requestId, action: 'complete' }) })
       await loadMarketRequestsFromApi()
-      addToast({ type: 'success', message: 'Deal settled — NFT sent to buyer, USDC released to seller' })
+      addToast({ type: 'success', message: 'Deal settled — NFT sent to buyer, USDC released to seller', txHash: settleHash, explorerBase: 'https://testnet.arcscan.app' })
     } catch (e) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Settle failed' })
     }
@@ -3011,6 +3014,18 @@ export default function App() {
               </div>
             </div>
 
+            {!isConnected && (
+              <div className="market-connect-banner">
+                <div className="market-connect-icon"><Wallet size={22} /></div>
+                <div className="market-connect-body">
+                  <strong>Connect a wallet to post requests and claim work</strong>
+                  <p>You can browse open requests without a wallet. To post, accept, or submit work, connect a wallet on Arc Testnet.</p>
+                </div>
+                <button className="btn-primary" onClick={() => setShowConnectors(true)}>
+                  Connect Wallet
+                </button>
+              </div>
+            )}
             <div className="market-role-strip">
               <div>
                 <span>Client path</span>
@@ -3033,7 +3048,21 @@ export default function App() {
                     <span>Create request</span>
                     <strong>Say what you need done and how much you will pay.</strong>
                   </div>
-                  <small>Clear deliverables make AI review and client approval easier.</small>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <small>Clear deliverables make AI review and client approval easier.</small>
+                    <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px', borderRadius: 8 }}
+                      onClick={() => {
+                        setRequestTitle('Write a 300-word summary of the Arc escrow architecture')
+                        setRequestDescription('I need a concise technical summary (300 words) explaining how ArcEscrow works: the create→claim→submit→approve flow, how USDC is locked, and why AI review is useful.')
+                        setRequestDeliverable('A plain text document of exactly 300 words submitted as a text block.')
+                        setRequestBudget('1')
+                        setRequestDays('3')
+                        setRequestCategory('AI Work')
+                        setRequestDealType('work')
+                      }}>
+                      ✨ Try demo request
+                    </button>
+                  </div>
                 </div>
                 <div className="deal-type-grid">
                   {([
@@ -4749,6 +4778,33 @@ export default function App() {
                   <span>2. NFT holder calls <strong>claimDeal</strong> — ownerOf check proves ownership on-chain</span>
                   <span>3. Seller calls <strong>approve</strong> on NFT contract (NFTOTCEscrow as spender)</span>
                   <span>4. Either party calls <strong>settle</strong> — NFT transfers to buyer, USDC releases to seller atomically</span>
+                </div>
+              </div>
+
+              <div className="docs-section docs-hackathon">
+                <div className="docs-section-title">Circle + Arc · Feature Map</div>
+                <div className="docs-feature-map">
+                  {([
+                    { tool: 'Circle CCTP V2', usage: 'Sepolia → Arc bridge, 0 slippage', page: 'funds', badge: 'Live' },
+                    { tool: 'Circle USDC', usage: 'Settlement asset for all escrow flows', page: 'marketplace', badge: 'Live' },
+                    { tool: 'Circle App Kit', usage: 'Wallet connect, chain switching, UI', page: 'overview', badge: 'Live' },
+                    { tool: 'Circle Programmable Wallets', usage: 'Server-controlled agent wallets (custodial)', page: 'docs', badge: 'UI' },
+                    { tool: 'Circle Gateway / x402', usage: 'Nanopayment layer for micropayments', page: 'marketplace', badge: 'Arch' },
+                    { tool: 'ArcEscrow', usage: 'Work + Milestone escrow, AI release', page: 'escrow', badge: 'Live' },
+                    { tool: 'NFTOTCEscrow', usage: 'Atomic NFT ↔ USDC atomic swap', page: 'marketplace', badge: 'Live' },
+                    { tool: 'ERC-8183', usage: 'Arc agentic commerce standard', page: 'escrow', badge: 'Live' },
+                    { tool: 'Claude Haiku AI', usage: 'Deliverable evaluation before payout', page: 'escrow', badge: 'Live' },
+                    { tool: 'Vercel Blob', usage: 'Work result storage (URI proof on-chain)', page: 'escrow', badge: 'Live' },
+                  ] as const).map((item, i) => (
+                    <div key={i} className="docs-feature-row">
+                      <span className={`docs-feature-badge ${item.badge.toLowerCase()}`}>{item.badge}</span>
+                      <div className="docs-feature-name">{item.tool}</div>
+                      <div className="docs-feature-usage">{item.usage}</div>
+                      <button className="docs-feature-goto" onClick={() => navigatePage(item.page as Parameters<typeof navigatePage>[0])}>
+                        Try → <ExternalLink size={10} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

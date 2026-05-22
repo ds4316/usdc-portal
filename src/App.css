@@ -6005,3 +6005,158 @@ html {
 .root[data-theme="light"] .status-dot.green { background: #16a34a; }
 .root[data-theme="light"] .status-dot.yellow { background: #d97706; }
 .root[data-theme="light"] .status-dot.red { background: #dc2626; }
+
+/* ─── MARKETPLACE CONNECT BANNER ─────────────────────────────────────────── */
+.market-connect-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 22px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(39,117,202,0.28);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(39,117,202,0.08), rgba(29,216,255,0.05));
+  animation: surface-rise 0.5s cubic-bezier(.16,1,.3,1) both;
+}
+
+.market-connect-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(39,117,202,0.15);
+  border: 1px solid rgba(39,117,202,0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-light);
+}
+
+.market-connect-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.market-connect-body strong {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+
+.market-connect-body p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-sub);
+  line-height: 1.45;
+}
+
+@media (max-width: 600px) {
+  .market-connect-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
+
+/* ─── DOCS FEATURE MAP (Hackathon) ────────────────────────────────────────── */
+.docs-hackathon {
+  grid-column: 1 / -1;
+}
+
+.docs-feature-map {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.docs-feature-row {
+  display: grid;
+  grid-template-columns: 52px 1fr 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface2);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.docs-feature-row:hover {
+  border-color: var(--border2);
+  background: var(--surface3);
+}
+
+.docs-feature-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.docs-feature-badge.live {
+  background: rgba(34,197,94,0.14);
+  color: #4ade80;
+  border: 1px solid rgba(34,197,94,0.28);
+}
+
+.docs-feature-badge.ui {
+  background: rgba(39,117,202,0.14);
+  color: #56a7ff;
+  border: 1px solid rgba(39,117,202,0.28);
+}
+
+.docs-feature-badge.arch {
+  background: rgba(245,158,11,0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245,158,11,0.24);
+}
+
+.docs-feature-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.docs-feature-usage {
+  font-size: 12px;
+  color: var(--text-sub);
+  line-height: 1.35;
+}
+
+.docs-feature-goto {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.docs-feature-goto:hover {
+  border-color: var(--accent);
+  background: rgba(39,117,202,0.08);
+}
+
+@media (max-width: 700px) {
+  .docs-feature-row {
+    grid-template-columns: 52px 1fr;
+    grid-template-rows: auto auto;
+  }
+  .docs-feature-usage { grid-column: 2; }
+  .docs-feature-goto { grid-column: 1 / -1; justify-self: start; }
+}
