@@ -1892,14 +1892,14 @@ export default function App() {
         data: encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve',
           args: [ERC8183_CONTRACT, usdcAmt] }),
       })
-      await sendTransactionAsync({
+      const fundHash = await sendTransactionAsync({
         to: ERC8183_CONTRACT,
         data: encodeFunctionData({ abi: ERC8183_ABI, functionName: 'fund',
           args: [jobId, '0x' as `0x${string}`] }),
       })
 
       setE8183Step('done')
-      addToast({ type: 'success', message: `Job #${jobId} funded with ${amt} USDC!` })
+      addToast({ type: 'success', message: `Job #${jobId} funded with ${amt} USDC!`, txHash: fundHash, explorerBase: 'https://testnet.arcscan.app' })
       await e8183LookupJob(jobId.toString())
 
     } catch (e: unknown) {
@@ -1921,12 +1921,12 @@ export default function App() {
     try {
       await switchChain({ chainId: arcTestnet.id })
       addToast({ type: 'loading', message: 'Submitting deliverable on-chain...' })
-      await sendTransactionAsync({
+      const submitHash = await sendTransactionAsync({
         to: ERC8183_CONTRACT,
         data: encodeFunctionData({ abi: ERC8183_ABI, functionName: 'submit',
           args: [BigInt(e8183JobId), delivHash, '0x' as `0x${string}`] }),
       })
-      addToast({ type: 'success', message: 'Deliverable submitted!' })
+      addToast({ type: 'success', message: 'Deliverable submitted!', txHash: submitHash, explorerBase: 'https://testnet.arcscan.app' })
       await e8183LookupJob(e8183JobId)
     } catch (e: unknown) {
       setE8183Step('error')
@@ -1946,12 +1946,12 @@ export default function App() {
     try {
       await switchChain({ chainId: arcTestnet.id })
       addToast({ type: 'loading', message: approved ? 'Approving job...' : 'Rejecting job...' })
-      await sendTransactionAsync({
+      const completeHash = await sendTransactionAsync({
         to: ERC8183_CONTRACT,
         data: encodeFunctionData({ abi: ERC8183_ABI, functionName: 'complete',
           args: [BigInt(e8183JobId), reason, '0x' as `0x${string}`] }),
       })
-      addToast({ type: 'success', message: approved ? 'Job approved - provider paid!' : 'Job rejected - funds returned!' })
+      addToast({ type: 'success', message: approved ? 'Job approved - provider paid!' : 'Job rejected - funds returned!', txHash: completeHash, explorerBase: 'https://testnet.arcscan.app' })
       await e8183LookupJob(e8183JobId)
     } catch (e: unknown) {
       setE8183Step('error')
@@ -2005,7 +2005,7 @@ export default function App() {
       })
 
       // createJob
-      await sendTransactionAsync({
+      const createHash = await sendTransactionAsync({
         to: ARC_ESCROW,
         data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'createJob',
           args: [workerAddress as `0x${string}`, usdcAmt, deadline, escrowDesc] }),
@@ -2036,8 +2036,8 @@ export default function App() {
           addToast({ type: 'error', message: 'Escrow created, but request board was not updated' })
         }
       }
-      addToast({ type: 'success', message: `Job #${newJobId} created! ${amt} USDC locked in escrow.` })
-      setHistory((prev) => addHistory(prev, { type: 'escrow', summary: `Escrow funded: Job #${newJobId} · ${amt.toFixed(2)} USDC`, txHash: '', timestamp: Date.now(), status: 'success' }))
+      addToast({ type: 'success', message: `Job #${newJobId} created! ${amt} USDC locked in escrow.`, txHash: createHash, explorerBase: 'https://testnet.arcscan.app' })
+      setHistory((prev) => addHistory(prev, { type: 'escrow', summary: `Escrow funded: Job #${newJobId} · ${amt.toFixed(2)} USDC`, txHash: createHash, timestamp: Date.now(), status: 'success' }))
       setEscrowAgent(''); setEscrowAmount(''); setEscrowDesc('')
     } catch (e: unknown) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Transaction failed' })
@@ -2167,13 +2167,13 @@ export default function App() {
       setEscrowWorkUploading(false)
       setEscrowLoading(true)
       await switchChain({ chainId: arcTestnet.id })
-      await sendTransactionAsync({
+      const submitHash = await sendTransactionAsync({
         to: ARC_ESCROW,
         data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'submitWork',
           args: [BigInt(parseInt(escrowJobId)), resultUrl] }),
       })
-      addToast({ type: 'success', message: 'Work submitted! Claude will read the actual content.' })
-      setHistory((prev) => addHistory(prev, { type: 'escrow', summary: `Result submitted: Job #${escrowJobId}`, txHash: '', timestamp: Date.now(), status: 'success' }))
+      addToast({ type: 'success', message: 'Work submitted — URI stored on-chain. Client can now run AI review.', txHash: submitHash, explorerBase: 'https://testnet.arcscan.app' })
+      setHistory((prev) => addHistory(prev, { type: 'escrow', summary: `Result submitted: Job #${escrowJobId}`, txHash: submitHash, timestamp: Date.now(), status: 'success' }))
       setEscrowWorkText('')
       setEscrowWorkFile(null)
       await escrowLookupJob()
