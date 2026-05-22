@@ -4342,6 +4342,24 @@ html {
   font-size: 11px;
 }
 
+.deal-cancelled-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--error) 10%, transparent);
+  color: var(--error);
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid color-mix(in srgb, var(--error) 25%, transparent);
+}
+.deal-cancelled-badge::before {
+  content: '✕';
+  font-weight: 700;
+  font-size: 11px;
+}
+
 .market-status,
 .market-budget {
   display: inline-flex;

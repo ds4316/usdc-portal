@@ -3355,6 +3355,8 @@ export default function App() {
                               ? (isOwner ? 'NFT received' : isAgent ? 'USDC received' : 'Deal settled')
                               : 'Deal complete'}
                           </span>
+                        ) : isCancelled ? (
+                          <span className="deal-cancelled-badge">Cancelled — refund processed</span>
                         ) : (
                           <>
                             {/* Accept / Claim on-chain — only for open requests, not owner */}
