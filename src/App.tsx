@@ -2616,9 +2616,9 @@ export default function App() {
                   </div>
                   <div className="showcase-column reverse">
                     {[
-                      ['Submit', 'Deliverable', 'Text, file, or link'],
-                      ['Review', 'AI verdict', 'Claude evaluation'],
-                      ['Release', 'USDC payout', 'Client approval'],
+                      ['CCTP V2', 'Circle bridge', 'Sepolia → Arc, 0 slippage'],
+                      ['NFT OTC', 'Atomic swap', 'USDC ↔ NFT settlement'],
+                      ['ERC-8183', 'Agentic jobs', 'Agent-to-agent payments'],
                     ].map((item, i) => (
                       <div className="showcase-card accent" key={`b-${i}`}>
                         <span>{item[0]}</span>
@@ -2690,6 +2690,37 @@ export default function App() {
                       <ArrowRightLeft size={16} />
                       <span>Move</span>
                     </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Quick Start */}
+            <section className="ov-quickstart reveal-section">
+              <div className="ov-section-heading compact" style={{ marginBottom: 20 }}>
+                <div className="ov-label">Quick Start</div>
+                <h2>Try it in 3 steps</h2>
+              </div>
+              <div className="ov-qs-steps">
+                <div className="ov-qs-step">
+                  <div className="ov-qs-num">01</div>
+                  <div className="ov-qs-body">
+                    <strong>Get testnet USDC on Arc</strong>
+                    <p>Use the <button className="ov-qs-link" onClick={() => { navigatePage('funds'); }}>CCTP Bridge</button> to move Sepolia USDC to Arc Testnet, or use the faucet in your profile.</p>
+                  </div>
+                </div>
+                <div className="ov-qs-step">
+                  <div className="ov-qs-num">02</div>
+                  <div className="ov-qs-body">
+                    <strong>Post a request with USDC locked</strong>
+                    <p>Go to <button className="ov-qs-link" onClick={() => { navigatePage('marketplace'); }}>Requests</button>, click Create Request, fill in your task, and post. USDC is locked instantly in ArcEscrow on-chain.</p>
+                  </div>
+                </div>
+                <div className="ov-qs-step">
+                  <div className="ov-qs-num">03</div>
+                  <div className="ov-qs-body">
+                    <strong>Accept, submit, and release</strong>
+                    <p>A second wallet can click "Accept &amp; Claim". After claiming, submit work. The client runs AI review and releases USDC with one click.</p>
                   </div>
                 </div>
               </div>
