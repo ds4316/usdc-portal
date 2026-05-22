@@ -783,12 +783,6 @@ export default function App() {
   const [lifiError, setLifiError]             = useState('')
   const [lifiExecuting, setLifiExecuting]     = useState(false)
 
-  // Payment Hub
-  const [payNote, setPayNote]                 = useState('')
-  const [payAmount, setPayAmount]             = useState('')
-  const [contractBalance, setContractBalance] = useState<string>('')
-  const [contractOwner, setContractOwner]     = useState<string>('')
-  const [withdrawLoading, setWithdrawLoading] = useState(false)
 
   const allAddresses = [...new Set(connections.flatMap((c) => c.accounts))]
   const isConnected  = connections.length > 0
@@ -1342,57 +1336,6 @@ export default function App() {
     URL.revokeObjectURL(url)
   }
 
-// ── Payment Hub ─
-  async function loadContractInfo() {
-    try {
-      const client = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
-      const [bal, owner] = await Promise.all([
-        client.readContract({ address: PAYMENT_HUB_ADDRESS, abi: PAYMENT_HUB_ABI, functionName: 'getBalance' }),
-        client.readContract({ address: PAYMENT_HUB_ADDRESS, abi: PAYMENT_HUB_ABI, functionName: 'owner' }),
-      ])
-      setContractBalance(formatUnits(bal as bigint, 6))
-      setContractOwner((owner as string).toLowerCase())
-    } catch { /* ignore */ }
-  }
-
-  async function payToContract() {
-    if (!payAmount || parseFloat(payAmount) <= 0) return addToast({ type: 'error', message: 'Enter an amount' })
-    const addrs = connections.flatMap((c) => [...c.accounts] as string[])
-    if (!addrs.length) return addToast({ type: 'error', message: 'Connect a wallet first' })
-    const loadId = addToast({ type: 'loading', message: 'Processing payment...' })
-    setTxLoading(true)
-    try {
-      await switchChain({ chainId: arcTestnet.id })
-      const amountWei = BigInt(Math.round(parseFloat(payAmount) * 1e6))
-      const { encodeFunctionData } = await import('viem')
-      const data = encodeFunctionData({ abi: PAYMENT_HUB_ABI, functionName: 'pay', args: [payNote || ''] })
-      const hash = await sendTransactionAsync({ to: PAYMENT_HUB_ADDRESS, data, value: amountWei })
-      removeToast(loadId)
-      addToast({ type: 'success', message: `Paid ${payAmount} USDC to contract`, txHash: hash, explorerBase: 'https://testnet.arcscan.app' })
-      setPayAmount(''); setPayNote('')
-      setTimeout(loadContractInfo, 3000)
-    } catch (e: unknown) {
-      removeToast(loadId)
-      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Payment failed' })
-    } finally { setTxLoading(false) }
-  }
-
-  async function withdrawFromContract() {
-    setWithdrawLoading(true)
-    const loadId = addToast({ type: 'loading', message: 'Withdrawing...' })
-    try {
-      await switchChain({ chainId: arcTestnet.id })
-      const { encodeFunctionData } = await import('viem')
-      const data = encodeFunctionData({ abi: PAYMENT_HUB_ABI, functionName: 'withdraw', args: [] })
-      const hash = await sendTransactionAsync({ to: PAYMENT_HUB_ADDRESS, data })
-      removeToast(loadId)
-      addToast({ type: 'success', message: 'Withdrawal successful', txHash: hash, explorerBase: 'https://testnet.arcscan.app' })
-      setTimeout(loadContractInfo, 3000)
-    } catch (e: unknown) {
-      removeToast(loadId)
-      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Withdrawal failed' })
-    } finally { setWithdrawLoading(false) }
-  }
 
 // ── LI.FI ─
   function getLifiTokenAddress(chainId: number, symbol: string): string {
@@ -2758,18 +2701,18 @@ export default function App() {
                 <div className="ov-label">What It Does</div>
                 <h2>A request marketplace with USDC escrow</h2>
                 <p>
-                  ArcEscrow Market focuses on one clear workflow: post a request, match with a worker,
-                  lock USDC on Arc, submit the result, use AI-assisted review, and release payment.
-                  Wallet, faucet, and portfolio tools live in the profile menu so the main product stays focused on settlement.
+                  ArcEscrow Market combines Arc escrow, Circle CCTP, and AI review into one workflow.
+                  USDC locks when you post — not after matching. Workers claim on-chain, submit proof,
+                  and AI-assisted review helps approve every payout. NFT OTC swaps and ERC-8183 agentic jobs run in the same marketplace.
                 </p>
               </div>
               <div className="ov-explain-grid">
                 {([
-                  { icon: <BookUser size={18} />, title: 'Request', desc: 'Clients publish work with a budget, deadline, expected deliverable, and visibility window.' },
-                  { icon: <Lock size={18} />, title: 'Escrow', desc: 'After a worker accepts, the client locks USDC in ArcEscrow for that worker address.' },
-                  { icon: <Upload size={18} />, title: 'Submit', desc: 'Workers submit text or files as proof of completion once escrow is funded.' },
-                  { icon: <Bot size={18} />, title: 'Review', desc: 'Claude summarizes the deliverable, flags risk, and recommends whether the client should release payment.' },
-                  { icon: <Zap size={18} />, title: 'Nanopay', desc: 'Gateway/x402 can handle sub-cent usage fees for listings, reviews, APIs, and repeated agent steps.' },
+                  { icon: <BookUser size={18} />, title: 'Post & Lock', desc: 'Clients post requests with USDC locked immediately in ArcEscrow. Work, Milestone, and NFT OTC deal types supported.' },
+                  { icon: <Lock size={18} />, title: 'On-chain Match', desc: 'Workers call claimJob on Arc Testnet to accept open requests. The escrow contract records the match immutably.' },
+                  { icon: <Upload size={18} />, title: 'Submit Work', desc: 'Workers upload deliverables to Vercel Blob. The URI is stored on-chain via submitWork() to ensure proof integrity.' },
+                  { icon: <Bot size={18} />, title: 'AI + Release', desc: 'Claude Haiku evaluates the submission and returns approve/reject with reasoning. Client releases USDC after review.' },
+                  { icon: <Zap size={18} />, title: 'Nanopayments', desc: 'Circle Gateway / x402 enables sub-cent per-request fees for listings, AI evaluations, API calls, and agent micropayments.' },
                 ] as const).map((item, i) => (
                   <div className="ov-explain-card" key={item.title} style={{ '--step-i': i } as React.CSSProperties}>
                     <div className="ov-explain-icon">{item.icon}</div>
@@ -2786,8 +2729,9 @@ export default function App() {
                 <div className="ov-label">How Funds Move</div>
                 <h2>From request to verified payout</h2>
                 <p>
-                  The app separates roles clearly. Workers never fund jobs. Clients lock USDC only after
-                  a match, workers submit deliverables, and AI review helps the client decide whether to release.
+                  USDC is locked at post time — no separate funding step. Workers claim on-chain,
+                  submit proof, and AI review helps the client decide whether to release or refund.
+                  Circle CCTP V2 routes USDC from any chain to Arc with zero slippage.
                 </p>
               </div>
               <div className="ov-flow-diagram">
@@ -2817,13 +2761,13 @@ export default function App() {
               </div>
               <div className="ov-service-grid">
                 {([
-                  { name: 'Requests Board', detail: 'Public work posts with budgets, deadlines, expiration, and role-aware actions.' },
-                  { name: 'ArcEscrow Settlement', detail: 'Client-funded USDC escrow, worker submission, release, and refund paths.' },
-                  { name: 'Gateway Nanopayments', detail: 'Planned x402 layer for listing fees, API calls, premium unlocks, and small repeated agent actions.' },
-                  { name: 'AI Review Layer', detail: 'Claude-assisted evaluation before payout, with the client keeping final control.' },
-                  { name: 'Circle Funding Rails', detail: 'Move USDC toward Arc through App Kit, CCTP, swap, bridge, and send flows.' },
-                  { name: 'Wallet Profile', detail: 'Portfolio, faucet links, QR receive, address book, and CSV export stay available but tucked away.' },
-                  { name: 'Grant-Ready Docs', detail: 'Circle and Arc product usage, architecture, and contract links are easy to evaluate.' },
+                  { name: 'Requests Marketplace', detail: 'Shared request board with deal types: Work, Milestone, NFT OTC. USDC locked at post, role-aware card actions.' },
+                  { name: 'ArcEscrow', detail: 'Work and Milestone escrow: claimJob, submitWork, approveWork, cancelJob (5% fee if matched), claimRefund.' },
+                  { name: 'NFTOTCEscrow', detail: 'Atomic NFT ↔ USDC swap. Buyer locks USDC, seller proves ownership via ownerOf, either side settles atomically.' },
+                  { name: 'ERC-8183 Agentic Commerce', detail: 'Arc official standard: createJob, setBudget, fund, submit, complete. Enables fully autonomous agent-to-agent workflows.' },
+                  { name: 'Circle CCTP V2', detail: 'Bridge USDC Sepolia → Arc (and reverse) via Circle CCTP V2. Zero slippage. Also App Kit, LI.FI swap, and direct send.' },
+                  { name: 'AI Review (Claude)', detail: 'Claude Haiku evaluates submitted work: approve/reject verdict with one-sentence reasoning before every payout.' },
+                  { name: 'Gateway Nanopayments', detail: 'x402-compatible Circle Gateway layer for sub-cent listing, review, API, and agent micropayment flows.' },
                 ] as const).map((service, i) => (
                   <div className="ov-service-card" key={service.name} style={{ '--step-i': i } as React.CSSProperties}>
                     <span>{String(i + 1).padStart(2, '0')}</span>
@@ -2839,11 +2783,11 @@ export default function App() {
               <div className="ov-label">Settlement Workflow</div>
               <div className="ov-pipeline">
                 {([
-                  { n: '01', title: 'Post + Match',    sub: 'Requests board',          desc: 'Client posts work. Worker accepts without paying anything, then waits for the client to fund escrow.' },
-                  { n: '02', title: 'Meter Small Usage', sub: 'Gateway + x402',        desc: 'Tiny listing, review, API, or agent-action fees can be authorized offchain and settled in batches.' },
-                  { n: '03', title: 'Fund Escrow',     sub: 'ArcEscrow.createJob()',   desc: 'Client deposits the main reward into ArcEscrow with worker address, deadline, and deliverable spec.' },
-                  { n: '04', title: 'Submit + Review', sub: 'submitWork + /api/evaluate', desc: 'Worker submits the result. Claude evaluates the deliverable and returns a structured recommendation.' },
-                  { n: '05', title: 'Release Payout',  sub: 'ArcEscrow.approveWork()', desc: 'Client confirms the recommendation. USDC transfers from escrow to the worker wallet on Arc Testnet.' },
+                  { n: '01', title: 'Post & Lock',     sub: 'Marketplace → escrow',    desc: 'Client posts request — USDC is locked in ArcEscrow immediately via USDC approve + createJob. No separate funding step.' },
+                  { n: '02', title: 'Claim On-chain',  sub: 'claimJob() on Arc',      desc: 'Worker finds the open request and calls claimJob on-chain. Escrow records the worker address and marks the job matched.' },
+                  { n: '03', title: 'Submit + AI',     sub: 'submitWork + Claude',    desc: 'Worker uploads the deliverable to Vercel Blob. Claude Haiku evaluates quality and returns a structured verdict.' },
+                  { n: '04', title: 'Release',         sub: 'approveWork() → USDC',   desc: 'Client sees the AI verdict and approves. USDC transfers directly from ArcEscrow to the worker wallet on Arc Testnet.' },
+                  { n: '05', title: 'NFT & Agents',    sub: 'NFTOTCEscrow / ERC-8183', desc: 'NFT OTC atomic swaps and ERC-8183 agentic jobs run in parallel. Circle CCTP V2 bridges USDC from any chain.' },
                 ] as const).map((s, i) => (
                   <div key={i} className="ov-pipeline-step" style={{ '--step-i': i } as React.CSSProperties}>
                     <div className="ov-step-n">{s.n}</div>
