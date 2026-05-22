@@ -6153,3 +6153,59 @@ html {
   .docs-feature-usage { grid-column: 2; }
   .docs-feature-goto { grid-column: 1 / -1; justify-self: start; }
 }
+
+/* ── Mobile bottom navigation ── */
+.mobile-nav {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .mobile-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 110;
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border2);
+    padding: 6px 4px max(env(safe-area-inset-bottom), 6px);
+    gap: 2px;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
+  }
+  .mobile-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 4px;
+    background: none;
+    border: none;
+    border-radius: 10px;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 700;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+  }
+  .mobile-nav-item:hover {
+    color: var(--text);
+    background: var(--surface2);
+  }
+  .mobile-nav-item.active {
+    color: var(--accent);
+    background: rgba(39,117,202,0.1);
+  }
+  .mobile-nav-item svg {
+    width: 18px;
+    height: 18px;
+  }
+  /* Add bottom padding to main so content isn't hidden behind mobile nav */
+  .page-container {
+    padding-bottom: 80px;
+  }
+}

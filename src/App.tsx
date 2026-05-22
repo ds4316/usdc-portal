@@ -2539,6 +2539,16 @@ export default function App() {
         </div>
       </nav>
 
+      {/* Mobile bottom nav */}
+      <nav className="mobile-nav">
+        {NAV_ITEMS.map((item) => (
+          <button key={item.id} className={`mobile-nav-item ${activePage === item.id ? 'active' : ''}`}
+            onClick={() => navigatePage(item.id)}>
+            {item.icon}
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </nav>
 
       <main className="page-container">
 
