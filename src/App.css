@@ -2575,10 +2575,29 @@ html {
 .overview-page .ov-workflow,
 .overview-page .ov-audiences,
 .overview-page .ov-arch,
+.overview-page .ov-quickstart,
+.overview-page .ov-live-board,
 .overview-page .ov-final-cta {
   max-width: 1180px;
   margin-left: auto;
   margin-right: auto;
+}
+
+/* Light mode: use dark gradient so text stays visible */
+.root[data-theme="light"] .overview-page .ov-h1 {
+  background: linear-gradient(135deg,
+    #0a1628 0%,
+    #1a3a6c 22%,
+    #1a6bcc 42%,
+    #0099cc 60%,
+    #1a3a6c 80%,
+    #0a1628 100%);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: gradient-flow 7s ease infinite;
 }
 
 .overview-page .ov-hero {
@@ -4227,12 +4246,9 @@ html {
 
 .market-loading {
   grid-column: 1 / -1;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface2);
-  color: var(--text-sub);
-  font-size: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 }
 
 .market-empty {
@@ -5267,11 +5283,8 @@ html {
 }
 
 /* Hero heading — animated gradient text */
+/* Override earlier .overview-page .ov-h1 with animated gradient — keep large size */
 .overview-page .ov-h1 {
-  font-size: clamp(38px, 5.2vw, 60px);
-  font-weight: 800;
-  letter-spacing: -2px;
-  line-height: 1.06;
   background: linear-gradient(135deg,
     #ffffff 0%,
     #b8d4ff 22%,
@@ -5283,6 +5296,7 @@ html {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+  color: transparent;
   animation: gradient-flow 7s ease infinite;
 }
 
