@@ -2482,7 +2482,7 @@ export default function App() {
                   <div className="profile-avatar"><UserCircle size={24} /></div>
                   <div>
                     <span>{isConnected ? 'Connected wallet' : 'Wallet not connected'}</span>
-                    <strong>{isConnected ? activeWalletShort : 'Connect to post or fund escrow'}</strong>
+                    <strong>{isConnected ? activeWalletShort : 'Connect to post or manage escrow'}</strong>
                   </div>
                 </div>
                 {isConnected && (
@@ -2872,6 +2872,37 @@ export default function App() {
                 ))}
               </div>
             </section>
+
+            {/* Live Board Teaser */}
+            {marketRequests.length > 0 && (
+              <section className="ov-live-board reveal-section">
+                <div className="ov-section-heading compact">
+                  <div className="ov-label">
+                    <span className="ov-live-dot" />
+                    Live Board
+                  </div>
+                  <h2>Recent requests on Arc</h2>
+                </div>
+                <div className="ov-live-cards">
+                  {marketRequests.slice(0, 3).map((req) => (
+                    <div key={req.id} className="ov-live-card" onClick={() => navigatePage('marketplace')}>
+                      <div className="ov-live-card-top">
+                        <span className={`market-status ${req.status}`}>{req.status}</span>
+                        <span className="ov-live-budget">{req.budget} USDC</span>
+                      </div>
+                      <div className="ov-live-title">{req.title}</div>
+                      <div className="ov-live-meta">
+                        <span>{req.category}</span>
+                        <span>{req.deadlineDays}d deadline</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button className="btn-outline" style={{ marginTop: 16, alignSelf: 'center' }} onClick={() => navigatePage('marketplace')}>
+                  <BookUser size={13} /> View all {marketRequests.length} requests
+                </button>
+              </section>
+            )}
 
             {/* Final CTA */}
             <section className="ov-final-cta reveal-section">
@@ -3842,10 +3873,10 @@ export default function App() {
                   <div className="demo-checklist">
                     {[
                       { label: 'Connect wallet on Arc Testnet', done: isConnected && activeChainId === arcTestnet.id },
-                      { label: 'Choose payout wallet', done: Boolean(escrowWorkerAddress || e8183WorkerAddress) },
-                      { label: 'Client locks USDC in escrow', done: recentJobIds.length > 0 },
-                      { label: 'Worker submits result', done: escrowJob?.status === 1 || escrowJob?.status === 2 },
-                      { label: 'AI review, then client releases', done: escrowJob?.status === 2 },
+                      { label: 'Post request — USDC locked at creation', done: recentJobIds.length > 0 },
+                      { label: 'Worker calls claimJob on-chain', done: Boolean(escrowJob?.agent && escrowJob.agent !== '0x0000000000000000000000000000000000000000') },
+                      { label: 'Worker submits result (Vercel Blob URI)', done: Boolean(escrowJob?.resultUri) },
+                      { label: 'AI review → client releases USDC', done: Boolean(escrowJob?.status && escrowJob.status >= 2) },
                     ].map((item, i) => (
                       <div key={i} className={`checklist-item ${item.done ? 'done' : ''}`}>
                         <span className="checklist-icon">{item.done ? '✓' : ''}</span>
