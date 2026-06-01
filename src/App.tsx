@@ -348,6 +348,7 @@ type Page        = 'overview' | 'marketplace' | 'portfolio' | 'pay' | 'funds' | 
 type InAppFaucetChain = 'ARC-TESTNET' | 'ETH-SEPOLIA' | 'BASE-SEPOLIA'
 type MarketRequestStatus = 'open' | 'matched' | 'cancelled' | 'completed'
 type DealType = 'work' | 'milestone' | 'nft-otc'
+type DemoRole = 'client' | 'worker'
 
 const PAGE_IDS: Page[] = ['overview', 'marketplace', 'portfolio', 'pay', 'funds', 'escrow', 'activity', 'docs']
 
@@ -380,6 +381,8 @@ interface MarketRequest {
   client: string
   agent?: string
   escrowJobId?: string
+  resultSummary?: string
+  resultSubmittedAt?: string
   status: MarketRequestStatus
   createdAt: string
   acceptedAt?: string
@@ -389,6 +392,10 @@ interface MarketRequest {
 
 const CONTACTS_KEY = 'usdc_portal_contacts'
 const REQUESTS_KEY = 'usdc_portal_requests'
+const DEMO_MODE_KEY = 'usdc_portal_demo_mode'
+const DEMO_CLIENT = '0x1111111111111111111111111111111111111111'
+const DEMO_WORKER = '0x2222222222222222222222222222222222222222'
+const isDemoRequest = (request: MarketRequest) => request.id.startsWith('demo-') || request.escrowJobId?.startsWith('demo-')
 function loadContacts(): Contact[] {
   try { return JSON.parse(localStorage.getItem(CONTACTS_KEY) ?? '[]') } catch { return [] }
 }
@@ -686,6 +693,8 @@ export default function App() {
   const [marketTab, setMarketTab] = useState<'browse' | 'create'>('browse')
   const [marketDealFilter, setMarketDealFilter] = useState<'all' | DealType>('all')
   const [marketScopeFilter, setMarketScopeFilter] = useState<'open' | 'mine' | 'all'>('all')
+  const [demoMode, setDemoModeState] = useState(() => localStorage.getItem(DEMO_MODE_KEY) === '1')
+  const [demoRole, setDemoRole] = useState<DemoRole>('client')
   const [activeEscrowRequestId, setActiveEscrowRequestId] = useState<string | null>(null)
   const [requestDealType, setRequestDealType] = useState<DealType>('work')
   const [requestTitle, setRequestTitle] = useState('')
@@ -791,29 +800,41 @@ export default function App() {
   const activeChainId = connections[0]?.chainId
   const activeWallet = allAddresses[0]
   const activeWalletShort = activeWallet ? `${activeWallet.slice(0, 6)}...${activeWallet.slice(-4)}` : 'Not connected'
+  const demoWallet = demoRole === 'client' ? DEMO_CLIENT : DEMO_WORKER
+  const demoWalletShort = `${demoWallet.slice(0, 6)}...${demoWallet.slice(-4)}`
+  const marketWallet = demoMode ? demoWallet : activeWallet
+  const marketWalletShort = demoMode ? demoWalletShort : activeWalletShort
+  const marketCanAct = demoMode || Boolean(isConnected && activeWallet)
   const activeChainMeta = activeChainId ? CHAIN_META[activeChainId] : undefined
   const escrowWorkerAddress = escrowPayoutMode === 'connected' ? (activeWallet ?? '') : escrowAgent
   const e8183WorkerAddress = e8183PayoutMode === 'connected' ? (activeWallet ?? '') : e8183Provider
   const settlementHistory = history.filter((h) => h.type === 'escrow')
   const completedSettlementCount = settlementHistory.filter((h) => h.status === 'success' && /released|approved|refund/i.test(h.summary)).length
+  const activeMarketRequests = demoMode ? marketRequests : marketRequests.filter((request) => !isDemoRequest(request))
   const requestStats = {
-    open: marketRequests.filter((r) => r.status === 'open').length,
-    matched: marketRequests.filter((r) => r.agent && !r.escrowJobId).length,
-    funded: marketRequests.filter((r) => r.escrowJobId).length,
-    mine: marketRequests.filter((r) => activeWallet && (r.client.toLowerCase() === activeWallet.toLowerCase() || r.agent?.toLowerCase() === activeWallet.toLowerCase())).length,
+    open: activeMarketRequests.filter((r) => r.status === 'open').length,
+    matched: activeMarketRequests.filter((r) => r.status === 'matched').length,
+    funded: activeMarketRequests.filter((r) => r.escrowJobId && r.status !== 'cancelled').length,
+    mine: activeMarketRequests.filter((r) => marketWallet && (r.client.toLowerCase() === marketWallet.toLowerCase() || r.agent?.toLowerCase() === marketWallet.toLowerCase())).length,
   }
   const escrowRelatedRequests = marketRequests.filter((request) =>
     activeWallet
     && (request.client.toLowerCase() === activeWallet.toLowerCase() || request.agent?.toLowerCase() === activeWallet.toLowerCase())
     && Boolean(request.agent || request.escrowJobId)
   )
-  const filteredMarketRequests = marketRequests.filter((request) => {
+  const filteredMarketRequests = activeMarketRequests.filter((request) => {
     const matchesDeal = marketDealFilter === 'all' || (request.dealType ?? 'work') === marketDealFilter
     const matchesScope = marketScopeFilter === 'all'
       || (marketScopeFilter === 'open' && request.status === 'open')
-      || (marketScopeFilter === 'mine' && Boolean(activeWallet && (request.client.toLowerCase() === activeWallet.toLowerCase() || request.agent?.toLowerCase() === activeWallet.toLowerCase())))
+      || (marketScopeFilter === 'mine' && Boolean(marketWallet && (request.client.toLowerCase() === marketWallet.toLowerCase() || request.agent?.toLowerCase() === marketWallet.toLowerCase())))
     return matchesDeal && matchesScope
   })
+
+  function setDemoMode(next: boolean) {
+    setDemoModeState(next)
+    localStorage.setItem(DEMO_MODE_KEY, next ? '1' : '0')
+    if (next) setMarketScopeFilter('all')
+  }
 
 // ── Toast manager ─
   function addToast(t: Omit<Toast, 'id'>): string {
@@ -1039,7 +1060,13 @@ export default function App() {
       if (!contentType.includes('application/json')) return
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Could not load requests')
-      if (Array.isArray(json.requests)) setMarketRequests(json.requests)
+      if (Array.isArray(json.requests)) {
+        setMarketRequests((prev) => {
+          const localDemo = prev.filter(isDemoRequest)
+          const remoteIds = new Set(json.requests.map((request: MarketRequest) => request.id))
+          return [...localDemo.filter((request) => !remoteIds.has(request.id)), ...json.requests]
+        })
+      }
     } catch {
       // Local Vite dev does not serve Vercel API routes; keep the local fallback quiet.
     } finally {
@@ -1048,7 +1075,7 @@ export default function App() {
   }
 
   async function createMarketRequest() {
-    if (!isConnected || !activeWallet) return addToast({ type: 'error', message: 'Connect a wallet first' })
+    if (!marketCanAct || !marketWallet) return addToast({ type: 'error', message: 'Connect a wallet first or turn on Demo mode' })
     if (!requestTitle.trim()) return addToast({ type: 'error', message: 'Enter a request title' })
     if (!requestDescription.trim()) return addToast({ type: 'error', message: 'Describe the work request' })
     if (!requestDeliverable.trim()) return addToast({ type: 'error', message: 'Define the expected deliverable' })
@@ -1064,8 +1091,49 @@ export default function App() {
       if (!requestNftTokenId.trim()) return addToast({ type: 'error', message: 'Enter the NFT token ID' })
       if (requestNftSeller && !isAddress(requestNftSeller)) return addToast({ type: 'error', message: 'Seller wallet must be a valid address' })
       if (NFT_OTC_ESCROW === '0x0000000000000000000000000000000000000000') {
-        return addToast({ type: 'error', message: 'NFT OTC Escrow not deployed yet — update NFT_OTC_ESCROW address' })
+        return addToast({ type: 'error', message: 'NFT OTC escrow is experimental. Use Demo mode or verify NFT_OTC_ESCROW before posting.' })
       }
+    }
+    if (demoMode) {
+      const visibleDays = Math.max(1, Math.min(7, Number(requestListingDays) || 3))
+      const createdAt = new Date()
+      const escrowJobId = `demo-${Date.now().toString().slice(-5)}`
+      const next: MarketRequest = {
+        id: `demo-req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        dealType: requestDealType,
+        title: requestTitle.trim(),
+        category: requestCategory.trim() || 'AI Work',
+        budget: budget.toFixed(2),
+        upfrontAmount: requestDealType === 'milestone' ? upfront.toFixed(2) : undefined,
+        completionAmount: requestDealType === 'milestone' ? completion.toFixed(2) : undefined,
+        nftChain: requestDealType === 'nft-otc' ? requestNftChain : undefined,
+        nftContract: requestDealType === 'nft-otc' ? requestNftContract : undefined,
+        nftTokenId: requestDealType === 'nft-otc' ? requestNftTokenId : undefined,
+        nftSeller: requestDealType === 'nft-otc' ? requestNftSeller : undefined,
+        nftCollection: requestDealType === 'nft-otc' ? requestNftCollection : undefined,
+        deadlineDays: String(Math.max(1, Math.min(90, Number(requestDays) || 3))),
+        listingDays: String(visibleDays),
+        listingFee: getListingFee(visibleDays),
+        description: requestDescription.trim(),
+        deliverable: requestDeliverable.trim(),
+        client: marketWallet,
+        escrowJobId,
+        status: 'open',
+        createdAt: createdAt.toISOString(),
+        expiresAt: new Date(createdAt.getTime() + visibleDays * 86400_000).toISOString(),
+      }
+      setMarketRequests((prev) => {
+        const updated = [next, ...prev]
+        saveMarketRequests(updated)
+        return updated
+      })
+      setRequestTitle(''); setRequestBudget(''); setRequestDays('3')
+      setRequestListingDays('3'); setRequestDescription(''); setRequestDeliverable(''); setRequestCategory('AI Work')
+      setRequestDealType('work'); setRequestUpfront('10'); setRequestCompletion('10')
+      setRequestNftChain('Arc Testnet'); setRequestNftContract(''); setRequestNftTokenId(''); setRequestNftSeller(''); setRequestNftCollection('')
+      setMarketTab('browse')
+      addToast({ type: 'success', message: `Demo request posted with escrow #${escrowJobId}` })
+      return
     }
     const { encodeFunctionData } = await import('viem')
     setMarketLoading(true)
@@ -1128,8 +1196,23 @@ export default function App() {
   }
 
   async function acceptMarketRequest(id: string, dealType: DealType, escrowJobId: string | undefined) {
-    if (!isConnected || !activeWallet) return addToast({ type: 'error', message: 'Connect a wallet first' })
+    if (!marketCanAct || !marketWallet) return addToast({ type: 'error', message: 'Connect a wallet first or turn on Demo mode' })
     if (!escrowJobId) return addToast({ type: 'error', message: 'No on-chain job ID found for this request' })
+    if (demoMode) {
+      const target = marketRequests.find((request) => request.id === id)
+      if (!target) return addToast({ type: 'error', message: 'Request not found' })
+      if (target.client.toLowerCase() === marketWallet.toLowerCase()) return addToast({ type: 'error', message: 'Switch to Worker role to accept this request' })
+      if (target.status !== 'open') return addToast({ type: 'error', message: 'Request is already matched' })
+      setMarketRequests((prev) => {
+        const updated = prev.map((request) => request.id === id
+          ? { ...request, agent: marketWallet, status: 'matched' as const, acceptedAt: new Date().toISOString() }
+          : request)
+        saveMarketRequests(updated)
+        return updated
+      })
+      addToast({ type: 'success', message: 'Demo worker accepted the funded request' })
+      return
+    }
     const { encodeFunctionData } = await import('viem')
     setMarketLoading(true)
     try {
@@ -1159,8 +1242,22 @@ export default function App() {
   }
 
   async function cancelMarketRequest(id: string, dealType: DealType, escrowJobId: string | undefined) {
-    if (!isConnected || !activeWallet) return addToast({ type: 'error', message: 'Connect a wallet first' })
+    if (!marketCanAct || !marketWallet) return addToast({ type: 'error', message: 'Connect a wallet first or turn on Demo mode' })
     if (!escrowJobId) return addToast({ type: 'error', message: 'No on-chain job ID found' })
+    if (demoMode) {
+      const target = marketRequests.find((request) => request.id === id)
+      if (!target) return addToast({ type: 'error', message: 'Request not found' })
+      if (target.client.toLowerCase() !== marketWallet.toLowerCase()) return addToast({ type: 'error', message: 'Switch to Client role to cancel this request' })
+      setMarketRequests((prev) => {
+        const updated = prev.map((request) => request.id === id
+          ? { ...request, status: 'cancelled' as const, cancelledAt: new Date().toISOString() }
+          : request)
+        saveMarketRequests(updated)
+        return updated
+      })
+      addToast({ type: 'success', message: 'Demo request cancelled and refund simulated' })
+      return
+    }
     const { encodeFunctionData } = await import('viem')
     setMarketLoading(true)
     try {
@@ -1219,6 +1316,51 @@ export default function App() {
     }
   }
 
+  function submitDemoResult(requestId: string) {
+    if (!demoMode) return
+    const target = marketRequests.find((request) => request.id === requestId)
+    if (!target) return addToast({ type: 'error', message: 'Request not found' })
+    if (target.agent?.toLowerCase() !== marketWallet?.toLowerCase()) return addToast({ type: 'error', message: 'Switch to Worker role to submit this result.' })
+    if (target.status !== 'matched') return addToast({ type: 'error', message: 'Only matched demo requests can receive a result.' })
+    if (target.resultSubmittedAt) return addToast({ type: 'error', message: 'Result already submitted.' })
+    setMarketRequests((prev) => {
+      const updated = prev.map((request) => request.id === requestId
+        ? {
+            ...request,
+            resultSummary: request.dealType === 'nft-otc'
+              ? 'Seller approved the NFT for escrow settlement.'
+              : 'Worker submitted a concise deliverable for client review.',
+            resultSubmittedAt: new Date().toISOString(),
+          }
+        : request)
+      saveMarketRequests(updated)
+      return updated
+    })
+    addToast({ type: 'success', message: 'Demo result submitted. Switch to Client role to release payment.' })
+  }
+
+  function releaseDemoRequest(requestId: string) {
+    if (!demoMode) return
+    const target = marketRequests.find((request) => request.id === requestId)
+    if (!target) return addToast({ type: 'error', message: 'Request not found' })
+    if (target.client.toLowerCase() !== marketWallet?.toLowerCase()) return addToast({ type: 'error', message: 'Switch to Client role to release payment.' })
+    if (!target.resultSubmittedAt) return addToast({ type: 'error', message: 'Wait for the worker to submit a result first.' })
+    setMarketRequests((prev) => {
+      const updated = prev.map((request) => request.id === requestId
+        ? { ...request, status: 'completed' as const, completedAt: new Date().toISOString() }
+        : request)
+      saveMarketRequests(updated)
+      return updated
+    })
+    setHistory((prev) => addHistory(prev, {
+      type: 'escrow',
+      summary: `Demo release: ${requestId}`,
+      txHash: '',
+      timestamp: Date.now(),
+      status: 'success',
+    }))
+    addToast({ type: 'success', message: 'Demo payment released and request completed' })
+  }
 
   async function deleteExpiredMarketRequest(id: string) {
     const target = marketRequests.find((request) => request.id === id)
@@ -3026,12 +3168,12 @@ export default function App() {
               </div>
             </div>
 
-            {!isConnected && (
+            {!marketCanAct && (
               <div className="market-connect-banner">
                 <div className="market-connect-icon"><Wallet size={22} /></div>
                 <div className="market-connect-body">
                   <strong>Connect a wallet to post requests and claim work</strong>
-                  <p>You can browse open requests without a wallet. To post, accept, or submit work, connect a wallet on Arc Testnet.</p>
+                  <p>You can browse open requests without a wallet. To post, accept, or submit work, connect a wallet on Arc Testnet or turn on Demo mode.</p>
                 </div>
                 <button className="btn-primary" onClick={() => { setShowProfileMenu(true); setShowConnectors(true) }}>
                   Connect Wallet
@@ -3052,6 +3194,23 @@ export default function App() {
                 <strong>Use Gateway/x402 for tiny non-escrow charges: listing extensions, AI review, premium unlocks, paid APIs, and agent actions.</strong>
               </div>
             </div>
+
+            <section className={`market-demo-panel ${demoMode ? 'active' : ''}`}>
+              <div>
+                <span>Test drive</span>
+                <strong>{demoMode ? `Demo ${demoRole} wallet: ${marketWalletShort}` : 'Try the full marketplace flow without a funded wallet.'}</strong>
+                <small>Demo mode uses local browser data only. Real users still use wallet signatures, Arc Testnet USDC, and the shared request board.</small>
+              </div>
+              <div className="market-demo-controls">
+                <button className={demoMode ? 'active' : ''} onClick={() => setDemoMode(!demoMode)}>
+                  {demoMode ? 'Demo On' : 'Turn On Demo'}
+                </button>
+                <div className="demo-role-toggle" aria-label="Demo role">
+                  <button className={demoRole === 'client' ? 'active' : ''} onClick={() => setDemoRole('client')} disabled={!demoMode}>Client</button>
+                  <button className={demoRole === 'worker' ? 'active' : ''} onClick={() => setDemoRole('worker')} disabled={!demoMode}>Worker</button>
+                </div>
+              </div>
+            </section>
 
             {marketTab === 'create' ? (
               <section className="market-create-card">
@@ -3221,10 +3380,10 @@ export default function App() {
                   <span>What should the worker submit?</span>
                   <textarea className="market-textarea small" value={requestDeliverable} onChange={(e) => setRequestDeliverable(e.target.value)} placeholder="Define exactly what the agent should submit before payment is released." />
                 </label>
-                <button className="btn-primary market-submit" onClick={createMarketRequest} disabled={!isConnected || marketLoading}>
-                  <Plus size={14} /> {marketLoading ? 'Posting...' : 'Post to Shared Board'}
+                <button className="btn-primary market-submit" onClick={createMarketRequest} disabled={!marketCanAct || marketLoading}>
+                  <Plus size={14} /> {marketLoading ? 'Posting...' : demoMode ? 'Post Demo Request' : 'Post to Shared Board'}
                 </button>
-                {!isConnected && <div className="pay-inline-warning"><Wallet size={14} /> Connect a wallet to post as the request owner.</div>}
+                {!marketCanAct && <div className="pay-inline-warning"><Wallet size={14} /> Connect a wallet or turn on Demo mode to post as the request owner.</div>}
               </section>
             ) : (
               <>
@@ -3276,13 +3435,14 @@ export default function App() {
                   </div>
                 )}
                 {filteredMarketRequests.map((request) => {
-                  const isOwner = activeWallet?.toLowerCase() === request.client.toLowerCase()
-                  const isAgent = activeWallet && request.agent?.toLowerCase() === activeWallet.toLowerCase()
+                  const isOwner = marketWallet?.toLowerCase() === request.client.toLowerCase()
+                  const isAgent = marketWallet && request.agent?.toLowerCase() === marketWallet.toLowerCase()
                   const isEscrowFunded = Boolean(request.escrowJobId)
                   const cardRole = isOwner ? 'Client' : isAgent ? 'Worker' : 'Observer'
                   const roleClass = isOwner ? 'client' : isAgent ? 'worker' : 'observer'
                   const dealType = request.dealType ?? 'work'
                   const dealLabel = dealType === 'nft-otc' ? 'NFT OTC' : dealType === 'milestone' ? 'Milestone' : 'Work'
+                  const demoRequest = isDemoRequest(request)
                   const isExpiredRequest = Boolean(request.expiresAt && new Date(request.expiresAt).getTime() <= Date.now())
                   const isCancelled = request.status === 'cancelled'
                   const isCompleted = request.status === 'completed'
@@ -3291,14 +3451,14 @@ export default function App() {
                     : isCompleted
                       ? 'Deal complete'
                       : request.status === 'open'
-                        ? (isOwner ? 'Waiting for a worker' : 'Accept & claim on-chain')
+                        ? (isOwner ? 'Waiting for a worker' : demoMode ? 'Accept as demo worker' : 'Accept & claim on-chain')
                         : (isAgent
-                            ? (dealType === 'nft-otc' ? 'Approve NFT then settle' : 'Submit result')
-                            : isOwner ? (dealType === 'nft-otc' ? 'Wait for seller to approve NFT' : 'Wait for worker result') : 'Matched')
+                            ? (request.resultSubmittedAt ? 'Waiting for client release' : dealType === 'nft-otc' ? 'Approve NFT then settle' : 'Submit result')
+                            : isOwner ? (request.resultSubmittedAt ? 'Review and release payment' : dealType === 'nft-otc' ? 'Wait for seller to approve NFT' : 'Wait for worker result') : 'Matched')
                   const flowSteps = [
                     { label: 'Post + Fund', done: true },
                     { label: 'Match', done: Boolean(request.agent) },
-                    { label: 'Submit', done: isCompleted },
+                    { label: dealType === 'nft-otc' ? 'Approve' : 'Submit', done: Boolean(request.resultSubmittedAt) || isCompleted },
                     { label: 'Release', done: isCompleted },
                   ]
                   return (
@@ -3309,6 +3469,7 @@ export default function App() {
                       </div>
                       <div className="market-card-tags">
                         <span className={`deal-badge ${dealType}`}>{dealLabel}</span>
+                        {demoRequest && <span className="deal-badge demo">Demo local</span>}
                         <span className="market-category">{request.category}</span>
                       </div>
                       <h3>{request.title}</h3>
@@ -3342,6 +3503,12 @@ export default function App() {
                         <span>{dealType === 'nft-otc' ? 'Seller must provide' : 'Deliverable'}</span>
                         <strong>{request.deliverable}</strong>
                       </div>
+                      {request.resultSummary && (
+                        <div className="market-result-note">
+                          <span>Submitted result</span>
+                          <strong>{request.resultSummary}</strong>
+                        </div>
+                      )}
                       <div className="market-role-next">
                         <div>
                           <span>Your role</span>
@@ -3399,8 +3566,8 @@ export default function App() {
                             {!isCancelled && (
                               <button className="btn-outline"
                                 onClick={() => acceptMarketRequest(request.id, dealType, request.escrowJobId)}
-                                disabled={!isConnected || marketLoading || request.status !== 'open' || isOwner || !request.escrowJobId}>
-                                {request.status === 'open' ? 'Accept & Claim' : 'Matched'}
+                                disabled={!marketCanAct || marketLoading || request.status !== 'open' || isOwner || !request.escrowJobId}>
+                                {demoMode && request.status === 'open' ? 'Accept as Worker' : request.status === 'open' ? 'Accept & Claim' : 'Matched'}
                               </button>
                             )}
                             {/* Cancel — only owner, only while open or matched */}
@@ -3413,7 +3580,17 @@ export default function App() {
                               </button>
                             )}
                             {/* NFT OTC seller actions — shown in the card to the matched seller */}
-                            {dealType === 'nft-otc' && isAgent && request.status === 'matched' && request.escrowJobId && (
+                            {demoMode && isAgent && request.status === 'matched' && !request.resultSubmittedAt && (
+                              <button className="btn-primary" onClick={() => submitDemoResult(request.id)}>
+                                {dealType === 'nft-otc' ? 'Approve NFT (Demo)' : 'Submit Result (Demo)'}
+                              </button>
+                            )}
+                            {demoMode && isOwner && request.status === 'matched' && request.resultSubmittedAt && (
+                              <button className="btn-primary" onClick={() => releaseDemoRequest(request.id)}>
+                                Release Payment (Demo)
+                              </button>
+                            )}
+                            {!demoMode && dealType === 'nft-otc' && isAgent && request.status === 'matched' && request.escrowJobId && (
                               <>
                                 <button className="btn-outline"
                                   onClick={() => approveNftForEscrow(request.nftContract ?? '', request.nftTokenId ?? '')}>
@@ -3426,13 +3603,13 @@ export default function App() {
                               </>
                             )}
                             {/* Work/Milestone: agent submits result */}
-                            {dealType !== 'nft-otc' && isAgent && request.escrowJobId && request.status === 'matched' && (
+                            {!demoMode && dealType !== 'nft-otc' && isAgent && request.escrowJobId && request.status === 'matched' && (
                               <button className="btn-primary" onClick={() => openEscrowSubmission(request)}>
                                 Submit Result
                               </button>
                             )}
                             {/* Work/Milestone: client manages job (review + release) */}
-                            {dealType !== 'nft-otc' && isOwner && request.escrowJobId && request.status === 'matched' && (
+                            {!demoMode && dealType !== 'nft-otc' && isOwner && request.escrowJobId && request.status === 'matched' && (
                               <button className="btn-outline" onClick={() => viewRequestEscrow(request)}>
                                 <Lock size={12} /> Review &amp; Release
                               </button>

@@ -6,22 +6,22 @@ interface IERC20 {
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
 }
 
-// ─── ArcEscrow ───────────────────────────────────────────────────────────────
+// ArcEscrow
 //
-// 플로우 (marketplace):
-//   1. 의뢰인이 createJob(agent=0) → USDC 즉시 잠금, 누구나 claim 가능
-//   2. 작업자가 claimJob → agent로 확정, Matched 상태
-//   3. 작업자가 submitWork → 결과 URI 기록
-//   4. 의뢰인이 approveWork → 작업자에 USDC 지급
+// Marketplace flow:
+//   1. Client calls createJob(agent=0), locking USDC immediately.
+//   2. Any worker can call claimJob and become the matched agent.
+//   3. Worker calls submitWork with a result URI.
+//   4. Client calls approveWork to release USDC to the worker.
 //
-// 취소:
-//   - Open 상태(매칭 전): 전액 환불
-//   - Matched 상태(매칭 후): 5% 취소 수수료를 작업자에게, 나머지 환불
+// Cancellation:
+//   - Open: full refund to the client.
+//   - Matched: 5% cancellation fee to the worker, remainder to the client.
 //
-// 플로우 (direct):
-//   createJob(agent=specific) → 바로 Matched 상태로 생성
+// Direct flow:
+//   createJob(agent=specific) starts in Matched status.
 //
-// 배포 체인: Arc Testnet
+// Deployment target: Arc Testnet.
 
 contract ArcEscrow {
     IERC20 public immutable usdc;
@@ -54,8 +54,8 @@ contract ArcEscrow {
         usdc = IERC20(_usdc);
     }
 
-    // agent == address(0) → open job (anyone can claim)
-    // agent != address(0) → direct assignment, status starts as Matched
+    // agent == address(0): open job, anyone can claim.
+    // agent != address(0): direct assignment, status starts as Matched.
     function createJob(
         address agent,
         uint256 amount,

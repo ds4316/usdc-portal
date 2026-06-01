@@ -13,20 +13,20 @@ interface IERC721Like {
     function transferFrom(address from, address to, uint256 tokenId) external;
 }
 
-// ─── NFTOTCEscrow ─────────────────────────────────────────────────────────────
+// NFTOTCEscrow
 //
-// 플로우 (marketplace):
-//   1. 구매자가 fundDeal(seller=0) → USDC 즉시 잠금, NFT 판매자 미정
-//   2. NFT 소유자가 claimDeal → 판매자로 확정 (ownerOf 체크), Matched 상태
-//   3. 판매자가 NFT를 이 컨트랙트에 approve
-//   4. 구매자 또는 판매자가 settle → NFT는 구매자에게, USDC는 판매자에게
+// Marketplace flow:
+//   1. Buyer calls fundDeal(seller=0), locking USDC immediately.
+//   2. NFT owner calls claimDeal and becomes the seller after ownerOf check.
+//   3. Seller approves this contract for the NFT.
+//   4. Buyer or seller calls settle to atomically swap NFT for USDC.
 //
-// 취소:
-//   - Funded 상태(매칭 전): 전액 환불
-//   - Matched 상태(매칭 후): 5% 취소 수수료를 판매자에게, 나머지 환불
+// Cancellation:
+//   - Funded: full refund to the buyer.
+//   - Matched: 5% cancellation fee to the seller, remainder to the buyer.
 //
-// 플로우 (direct):
-//   fundDeal(seller=specific) → 바로 Matched 상태로 생성 (ownerOf 즉시 체크)
+// Direct flow:
+//   fundDeal(seller=specific) starts in Matched status after ownerOf check.
 
 contract NFTOTCEscrow {
     IUSDC public immutable usdc;
@@ -59,8 +59,8 @@ contract NFTOTCEscrow {
         usdc = IUSDC(usdcAddress);
     }
 
-    // seller == address(0) → open deal (anyone with the NFT can claim)
-    // seller != address(0) → direct deal (ownerOf check at creation)
+    // seller == address(0): open deal, anyone owning the NFT can claim.
+    // seller != address(0): direct deal, ownerOf checked at creation.
     function fundDeal(
         address seller,
         address nft,

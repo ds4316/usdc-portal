@@ -1,124 +1,137 @@
 # ArcEscrow Market
 
-**Arc × Circle Stablecoin Hackathon — Agentic Commerce Track**
+**Arc x Circle Stablecoin Hackathon - Agentic Commerce Track**
 
-A production-grade escrow marketplace on Arc Testnet using Circle USDC, CCTP V2, AI review, NFT OTC settlement, and ERC-8183 agentic commerce.
+A testnet escrow marketplace on Arc using Circle USDC, CCTP V2, AI-assisted review, NFT OTC settlement, and ERC-8183 agentic commerce.
 
 Live: **[https://usdc-portal.vercel.app](https://usdc-portal.vercel.app)**
-
----
 
 ## What It Does
 
 ArcEscrow Market is a full-stack decentralized escrow service where:
-- **Clients** post work requests with USDC locked **at posting time** (not after matching)
-- **Workers** claim jobs on-chain with `claimJob()`, submit proof, and get paid after AI-verified review
-- **AI (Claude Haiku)** evaluates submitted work and returns an approve/reject verdict before every payout
-- **NFT OTC** atomic swaps settle NFT ↔ USDC trades without trust
-- **ERC-8183** agentic commerce enables fully autonomous agent-to-agent job creation and payment
-- **Circle CCTP V2** bridges USDC from Sepolia to Arc with zero slippage
 
----
+- **Clients** post work requests with USDC locked at posting time.
+- **Workers** claim jobs on-chain with `claimJob()`, submit proof, and get paid after client approval.
+- **AI review** evaluates submitted work and returns an approve/reject recommendation before payout.
+- **NFT OTC** test contracts support atomic NFT-for-USDC swaps.
+- **ERC-8183** agentic commerce shows autonomous agent-to-agent job creation and payment.
+- **Circle CCTP V2** bridges USDC between Sepolia and Arc with native attestation.
 
 ## Circle + Arc Features
 
 | Feature | Implementation | Status |
-|---------|----------------|--------|
-| **Circle CCTP V2** | Bidirectional Sepolia ↔ Arc bridge, 0 slippage, native attestation | Live |
-| **Circle USDC** | Settlement asset for all escrow flows on Arc Testnet | Live |
-| **Circle App Kit** | Wallet connection, chain switching, multi-wallet UI | Live |
-| **Circle Programmable Wallets** | Custodial server-controlled agent wallets (UI showcase) | UI |
-| **Circle Gateway / x402** | Nanopayment layer architecture for micropayments | Arch |
-| **ArcEscrow** | Work + Milestone escrow: claimJob, submitWork, approveWork | Live |
-| **NFTOTCEscrow** | Atomic NFT ↔ USDC swap via ownerOf proof | Live |
-| **ERC-8183** | Arc's official agentic commerce standard | Live |
+| --- | --- | --- |
+| Circle CCTP V2 | Bidirectional Sepolia <-> Arc bridge, 0 slippage, native attestation | Live |
+| Circle USDC | Settlement asset for all escrow flows on Arc Testnet | Live |
+| Circle App Kit | Wallet connection, chain switching, multi-wallet UI | Live |
+| Circle Programmable Wallets | Custodial server-controlled agent wallets showcase | UI |
+| Circle Gateway / x402 | Nanopayment architecture for micropayments | Architecture |
+| ArcEscrow | Work + milestone escrow: claimJob, submitWork, approveWork | Live |
+| NFTOTCEscrow | Atomic NFT <-> USDC swap via ownerOf proof | Experimental |
+| ERC-8183 | Arc's agentic commerce standard | Live |
 
----
+## Deployed Contracts
 
-## Deployed Contracts (Arc Testnet · chainId 5042002)
+Arc Testnet chainId: `5042002`
 
 | Contract | Address |
-|----------|---------|
+| --- | --- |
 | ArcEscrow | `0x2D961a34d7558AA5A3BaB17f4d928fd0deC7a5Dc` |
 | NFTOTCEscrow | `0xdC47D9AE448BcE3E524C768446fE65f30d03f20e` |
 | ERC-8183 AgenticCommerce | `0x0747EEf0706327138c69792bF28Cd525089e4583` |
 | Arc Testnet USDC | `0x3600000000000000000000000000000000000000` |
 | ArcOnboarder (Sepolia) | `0x495825fF81B048B2A6e1FE10571625496f8fF1FD` |
 
----
+## Environment
 
-## Escrow Workflow
+Set these in Vercel project settings when using server-side features:
 
-```
-Client posts request → USDC locked via approve + createJob
-         ↓
-Worker calls claimJob on-chain → status: matched
-         ↓
-Worker uploads deliverable → Vercel Blob → URI stored via submitWork()
-         ↓
-Client runs Claude Haiku review → approve / reject verdict
-         ↓
-Client calls approveWork() → USDC released from ArcEscrow → worker wallet
-```
+- `BLOB_READ_WRITE_TOKEN`: stores marketplace requests and submitted result files.
+- `ANTHROPIC_API_KEY`: powers AI review for submitted work.
+- `CIRCLE_API_KEY`: optional for the server-side Circle faucet API route. The default UI uses Circle's public faucet flow.
 
----
+The app still runs locally without those variables. Demo mode and local request storage are available for judging and walkthroughs; shared board, file uploads, and AI review require the Vercel settings above.
 
-## Technical Stack
-
-- **Frontend**: React 19, TypeScript, Vite, wagmi v2, viem
-- **Wallet**: Circle App Kit + MetaMask / WalletConnect
-- **Chain**: Arc Testnet (EVM-compatible, chainId 5042002)
-- **Bridge**: Circle CCTP V2 — Sepolia ↔ Arc, bidirectional, 0 slippage
-- **Storage**: Vercel Blob (deliverables + shared request board JSON)
-- **AI**: Claude Haiku (`claude-haiku-4-5-20251001`) via Anthropic API
-- **APIs**: Vercel Serverless (`api/requests.js`, `api/evaluate.js`, `api/upload.js`)
-
----
-
-## Getting Started (Local)
+## Getting Started
 
 ```bash
 git clone https://github.com/ds4316/usdc-portal
 cd usdc-portal
 npm install
-```
-
-Create `.env.local`:
-```
-ANTHROPIC_API_KEY=your_key
-BLOB_READ_WRITE_TOKEN=your_vercel_blob_token
-```
-
-```bash
 npm run dev
 ```
 
----
+Open [http://localhost:5173](http://localhost:5173).
 
-## Demo Walkthrough for Judges
+> This is a testnet-only app. Never use a wallet with real funds.
 
-1. **Bridge USDC** — Go to *Move Funds* → CCTP Bridge → bridge Sepolia USDC to Arc Testnet
-2. **Post a request** — Go to *Requests* → Create Request → fill in task + USDC reward → Post (locks USDC on-chain immediately)
-3. **Accept as worker** — Switch to a second wallet → find the open request → *Accept & Claim* (calls `claimJob` on-chain)
-4. **Submit work** — As worker, go to *Escrow & Settlement* → find your job → submit text or file deliverable
-5. **AI review** — As client, click *Run Claude Review* → see approve/reject verdict with reasoning → *Release Payment*
-6. **NFT OTC** — Create an NFT OTC deal in Marketplace with USDC offer, match with NFT holder, approve NFT, settle atomically
-7. **ERC-8183** — Go to *Escrow & Settlement* → switch to *ERC-8183* tab → create + fund an agentic job directly
+## Demo Path
 
----
+Use this path for a fast hackathon walkthrough when wallet funding is unreliable:
 
-## Architecture Diagram
+1. Open the Marketplace and turn on Demo mode.
+2. Stay on Client, create a request, and post it as a demo escrow.
+3. Switch to Worker, accept the request, then submit the demo result.
+4. Switch back to Client, release payment, and show the completed Activity ledger entry.
 
+Demo mode stores requests in the browser only. It does not sign transactions or write to the shared Vercel request board.
+
+## Real Testnet Path
+
+Use this path when the connected wallet has Arc Testnet USDC:
+
+1. Connect a wallet and switch to Arc Testnet.
+2. Post a work or milestone request; the app approves USDC and funds `ArcEscrow`.
+3. A worker wallet accepts the request and submits a deliverable URI.
+4. The client can request AI review, inspect the result, and release USDC manually.
+
+NFT OTC is experimental on testnet. Verify the deployed `NFTOTCEscrow` address, NFT ownership, and token approval before using the real contract flow.
+
+## Escrow Workflow
+
+```text
+Client posts request -> USDC locked via approve + createJob
+Worker calls claimJob on-chain -> status: matched
+Worker uploads deliverable -> Vercel Blob -> URI stored via submitWork()
+Client runs AI review -> approve / reject recommendation
+Client calls approveWork() -> USDC released from ArcEscrow -> worker wallet
 ```
-Sepolia USDC ──[Circle CCTP V2]──▶ Arc Testnet USDC
-                                          │
-Client ──[approve + createJob]──▶ ArcEscrow (USDC locked)
-                                          │
-Worker ──────[claimJob]───────────────────┤
-                                          │
-Worker ──[Vercel Blob upload]──▶ [submitWork(uri)] (URI on-chain)
-                                          │
-[/api/evaluate → Claude Haiku] ──▶ approve / reject verdict
-                                          │
-Client ──────[approveWork]──────▶ USDC released to worker
-```
+
+## 3 Minute Judging Script
+
+1. Show the Overview and explain the product: client-funded USDC escrow for agentic work on Arc.
+2. Open Marketplace, enable Demo mode, and post a small work request as Client.
+3. Switch to Worker, accept it, and submit the result.
+4. Switch back to Client, release payment, then open Activity to show the settlement record.
+5. Open Docs & Contracts to show ArcEscrow, Arc USDC, CCTP resources, ERC-8183, and the experimental NFT OTC path.
+
+## AI Review Policy
+
+AI review is advisory only. A reject verdict does not block the client from releasing payment. The client can inspect the submitted result and choose to release USDC manually.
+
+## Known Limitations
+
+- Testnet-only; do not use real funds.
+- Vercel Blob and AI review require production environment variables.
+- Local Vite dev keeps API failures quiet and falls back to browser storage.
+- NFT OTC is included as a test path and should be treated as experimental until the deployed address and ownership checks are verified.
+
+## NFT OTC Test Contracts
+
+The repo includes two Remix-friendly Solidity contracts:
+
+- `contracts/MockArcNFT.sol`: minimal ERC-721 style NFT for test minting.
+- `contracts/NFTOTCEscrow.sol`: buyer funds USDC, seller approves the NFT, and either participant can settle atomically when the NFT approval is valid.
+
+Suggested test flow on Arc Testnet:
+
+1. Deploy `MockArcNFT`.
+2. Mint an NFT to the seller wallet.
+3. Deploy `NFTOTCEscrow` with Arc USDC: `0x3600000000000000000000000000000000000000`.
+4. Buyer approves `NFTOTCEscrow` to spend the USDC offer amount.
+5. Buyer calls `fundDeal(seller, nft, tokenId, usdcAmount, deadline)`.
+6. Seller calls `approve(nftOtcEscrowAddress, tokenId)` on `MockArcNFT`.
+7. Buyer or seller calls `settle(dealId)`.
+8. Verify that the NFT moved to buyer and USDC moved to seller.
+
+If the seller never approves the NFT before the deadline, the buyer can call `refundAfterDeadline(dealId)`.

@@ -3775,6 +3775,98 @@ html {
   color: var(--arc);
 }
 
+.deal-badge.demo {
+  border-color: color-mix(in srgb, var(--success) 34%, var(--border2));
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: var(--success);
+}
+
+.market-demo-panel {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+  border-radius: 14px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent), var(--surface));
+  box-shadow: var(--shadow-sm);
+}
+
+.market-demo-panel.active {
+  border-color: color-mix(in srgb, var(--success) 42%, var(--border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--success) 9%, transparent), var(--surface));
+}
+
+.market-demo-panel span,
+.market-result-note span {
+  display: block;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.market-demo-panel strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.market-demo-panel small {
+  display: block;
+  margin-top: 4px;
+  max-width: 760px;
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.market-demo-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.market-demo-controls button,
+.demo-role-toggle button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  background: var(--surface2);
+  color: var(--text-sub);
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.market-demo-controls button.active,
+.demo-role-toggle button.active {
+  border-color: color-mix(in srgb, var(--success) 42%, var(--border2));
+  background: color-mix(in srgb, var(--success) 12%, var(--surface));
+  color: var(--text);
+}
+
+.demo-role-toggle {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface3);
+}
+
+.demo-role-toggle button {
+  border-radius: 999px;
+  border-color: transparent;
+}
+
 .marketplace-hero h3 {
   margin: 8px 0 12px;
   color: var(--text);
@@ -5472,6 +5564,25 @@ html {
   background: rgba(139,92,246,0.12);
   color: #a78bfa;
   border: 1px solid rgba(139,92,246,0.24);
+}
+
+.market-result-note {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--success) 30%, var(--border2));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--success) 8%, var(--surface2));
+}
+
+.market-result-note span {
+  color: var(--success);
+}
+
+.market-result-note strong {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 /* Progress steps — done highlight */
