@@ -10,6 +10,7 @@ import {
   ArrowUpRight, Repeat2, Layers, BookUser,
   Fuel, Trash2, Download, Zap, ShieldCheck, CircleDollarSign, Bot,
   Lock, Upload, BookOpen, LayoutDashboard, ArrowRightLeft, Network, UserCircle, BriefcaseBusiness,
+  Maximize2, Minimize2,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { arcTestnet } from './wagmi.config'
@@ -344,6 +345,8 @@ type FaucetPollState = 'idle' | 'polling' | 'received'
 type NetworkMode = 'mainnet' | 'testnet'
 type MainTab     = 'assets' | 'history' | 'faucet'
 type Theme       = 'dark' | 'light'
+type LayoutMode  = 'contained' | 'wide' | 'fullscreen'
+type DensityMode = 'comfort' | 'compact'
 type Page        = 'overview' | 'marketplace' | 'portfolio' | 'pay' | 'funds' | 'escrow' | 'activity' | 'docs'
 type InAppFaucetChain = 'ARC-TESTNET' | 'ETH-SEPOLIA' | 'BASE-SEPOLIA'
 type MarketRequestStatus = 'open' | 'matched' | 'cancelled' | 'completed'
@@ -656,6 +659,9 @@ export default function App() {
   const { sendTransactionAsync } = useSendTransaction()
 
   const [theme, setTheme]           = useState<Theme>(() => (localStorage.getItem('theme') as Theme) ?? 'dark')
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => (localStorage.getItem('layoutMode') as LayoutMode) ?? 'contained')
+  const [densityMode, setDensityMode] = useState<DensityMode>(() => (localStorage.getItem('densityMode') as DensityMode) ?? 'comfort')
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const [networkMode, setNetworkMode] = useState<NetworkMode>(() => (localStorage.getItem('networkMode') as NetworkMode) ?? 'mainnet')
   const [mainTab, setMainTab]       = useState<MainTab>('assets')
   const [transferSeg, setTransferSeg] = useState<TransferSeg>('send')
@@ -859,6 +865,26 @@ export default function App() {
   }
 
   useEffect(() => { localStorage.setItem('theme', theme) }, [theme])
+  useEffect(() => { localStorage.setItem('layoutMode', layoutMode) }, [layoutMode])
+  useEffect(() => { localStorage.setItem('densityMode', densityMode) }, [densityMode])
+  useEffect(() => {
+    const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', syncFullscreen)
+    syncFullscreen()
+    return () => document.removeEventListener('fullscreenchange', syncFullscreen)
+  }, [])
+
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+      } else {
+        await document.documentElement.requestFullscreen()
+      }
+    } catch {
+      addToast({ type: 'error', message: 'Fullscreen is blocked by this browser window.' })
+    }
+  }, [])
   useEffect(() => { localStorage.setItem('networkMode', networkMode) }, [networkMode])
   useEffect(() => { saveMarketRequests(marketRequests) }, [marketRequests])
   useEffect(() => { loadMarketRequestsFromApi() }, [])
@@ -2474,7 +2500,7 @@ export default function App() {
   ]
 
   return (
-    <div className="root" data-theme={theme}>
+    <div className="root" data-theme={theme} data-layout={layoutMode} data-density={densityMode}>
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       {confirmState && <ConfirmModal state={confirmState} onCancel={() => setConfirmState(null)} />}
 
@@ -2601,6 +2627,35 @@ export default function App() {
           </div>
         </div>
         <div className="nav-right">
+          <div className="view-controls" aria-label="View options">
+            {(['contained', 'wide'] as const).map((mode) => (
+              <button
+                key={mode}
+                className={layoutMode === mode ? 'active' : ''}
+                onClick={() => setLayoutMode(mode)}
+                title={mode === 'contained' ? 'Contained page width' : 'Wide page width'}>
+                {mode === 'contained' ? 'Fit' : 'Wide'}
+              </button>
+            ))}
+            <button
+              className={densityMode === 'compact' ? 'active' : ''}
+              onClick={() => setDensityMode((mode) => mode === 'comfort' ? 'compact' : 'comfort')}
+              title="Toggle compact spacing">
+              Compact
+            </button>
+            <button
+              className={layoutMode === 'fullscreen' ? 'active icon-only' : 'icon-only'}
+              onClick={() => setLayoutMode((mode) => mode === 'fullscreen' ? 'contained' : 'fullscreen')}
+              title={layoutMode === 'fullscreen' ? 'Return to contained layout' : 'Use full browser width'}>
+              {layoutMode === 'fullscreen' ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+            </button>
+            <button
+              className={isFullscreen ? 'active icon-only' : 'icon-only'}
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'Exit browser fullscreen' : 'Enter browser fullscreen'}>
+              {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+            </button>
+          </div>
           <div className="network-toggle">
             <button className={`net-btn ${networkMode === 'mainnet' ? 'active' : ''}`} onClick={() => setNetworkMode('mainnet')}>Mainnet</button>
             <button className={`net-btn ${networkMode === 'testnet' ? 'active' : ''}`} onClick={() => setNetworkMode('testnet')}>Testnet</button>
@@ -3172,8 +3227,8 @@ export default function App() {
               <div className="market-connect-banner">
                 <div className="market-connect-icon"><Wallet size={22} /></div>
                 <div className="market-connect-body">
-                  <strong>Connect a wallet to post requests and claim work</strong>
-                  <p>You can browse open requests without a wallet. To post, accept, or submit work, connect a wallet on Arc Testnet or turn on Demo mode.</p>
+                  <strong>Wallet needed for real escrow actions</strong>
+                  <p>Browse without a wallet, or turn on Demo mode to walk through post, accept, submit, and release. Real mode uses Arc Testnet wallet signatures.</p>
                 </div>
                 <button className="btn-primary" onClick={() => { setShowProfileMenu(true); setShowConnectors(true) }}>
                   Connect Wallet
@@ -3742,9 +3797,9 @@ export default function App() {
                             <Lock size={13} /> {e8183Loading ? (e8183Step === 'creating' ? 'Creating...' : 'Funding...') : 'Create & Fund Job'}
                           </button>
                           <div className="escrow-hint">
-                            ERC-8183 is Arc's official agentic commerce standard for autonomous job-based payments.
-                            An AI agent (LLM + wallet) can call <code>createJob → setBudget → fund → submit → complete</code> without any human in the loop.
-                            The evaluator address receives the approval call — wire it to a trusted AI endpoint for fully autonomous escrow.
+                            ArcEscrow is the main demo flow for human clients and workers.
+                            ERC-8183 is the experimental agent-standard lane: an agent wallet can call <code>createJob -&gt; setBudget -&gt; fund -&gt; submit -&gt; complete</code>.
+                            Use ArcEscrow for judging the marketplace demo; use ERC-8183 when explaining autonomous agent-to-agent commerce.
                           </div>
                           {e8183JobId && (
                             <div className="e8183-job-id-pill">Job ID: <strong>#{e8183JobId}</strong></div>
@@ -4952,13 +5007,13 @@ export default function App() {
               </div>
 
               <div className="docs-section">
-                <div className="docs-section-title">ERC-8183 Standard</div>
+                <div className="docs-section-title">ERC-8183 vs ArcEscrow</div>
                 <div className="docs-note-list">
-                  <p>Arc adopts ERC-8183 as the agentic commerce standard. This app implements it alongside custom ArcEscrow contracts:</p>
-                  <span>1. <strong>createJob</strong> — client defines task, evaluator, expiry, and optional hook</span>
-                  <span>2. <strong>setBudget + fund</strong> — USDC locked in escrow via ERC-20 approval</span>
-                  <span>3. <strong>submit</strong> — worker posts deliverable as bytes32 hash on-chain</span>
-                  <span>4. <strong>complete</strong> — evaluator (or AI) approves and releases USDC to worker</span>
+                  <p>For the demo, ArcEscrow is the product workflow. ERC-8183 is a separate standards track for agent wallets and autonomous job contracts.</p>
+                  <span>1. <strong>ArcEscrow</strong> - request marketplace flow: post, claim, submit work, AI review, release USDC.</span>
+                  <span>2. <strong>ERC-8183</strong> - agentic commerce flow: createJob, setBudget, fund, submit, complete.</span>
+                  <span>3. <strong>Why both?</strong> ArcEscrow is easier for judges and users. ERC-8183 maps the same idea to an agent-to-agent standard.</span>
+                  <span>4. <strong>Status</strong> - keep ArcEscrow as the primary demo path; present ERC-8183 as an experimental/testnet lane.</span>
                   <a className="docs-link" href="https://eips.ethereum.org/EIPS/eip-8183" target="_blank" rel="noreferrer">
                     <ExternalLink size={13} /> ERC-8183 Specification
                   </a>
