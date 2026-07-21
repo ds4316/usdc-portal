@@ -39,13 +39,14 @@ const SEPOLIA_USDC        = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x$
 const ARC_MSG_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x${string}`
 
 // ─── ArcOnboarder ─────────────────────────────────────────────────────────
-// TODO: Remix로 Sepolia 배포 후 이 주소를 실제 컨트랙트 주소로 교체
 const ARC_ONBOARDER = '0x495825fF81B048B2A6e1FE10571625496f8fF1FD' as `0x${string}`
 
-// ─── ArcEscrow ────────────────────────────────────────────────────────────
-const ARC_ESCROW = '0xc73821142DeD9Ab7f0F299389Fd3a186475676d5' as `0x${string}`
+// ─── ArcEscrow V2 ─────────────────────────────────────────────────────────
+const ARC_ESCROW = '0x7420C7A3459B532Dee36Fc1e22badBe262BaD571' as `0x${string}`
 const ARC_TESTNET_USDC = '0x3600000000000000000000000000000000000000' as `0x${string}`
 
+// job.jobType: 0 = AIJudged, 1 = OnchainCondition
+// job.comparator (OnchainCondition only): 0 = GTE, 1 = LTE, 2 = EQ
 const ARC_ESCROW_ABI = [
   { name: 'createJob', type: 'function', stateMutability: 'nonpayable',
     inputs: [
@@ -54,12 +55,25 @@ const ARC_ESCROW_ABI = [
       { name: 'deadline',    type: 'uint256' },
       { name: 'description', type: 'string'  },
     ], outputs: [{ name: 'jobId', type: 'uint256' }] },
+  { name: 'createOnchainConditionJob', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'agent',              type: 'address' },
+      { name: 'amount',             type: 'uint256' },
+      { name: 'deadline',           type: 'uint256' },
+      { name: 'description',        type: 'string'  },
+      { name: 'conditionTarget',    type: 'address' },
+      { name: 'conditionCalldata',  type: 'bytes'   },
+      { name: 'conditionThreshold', type: 'uint256' },
+      { name: 'comparator',         type: 'uint8'   },
+    ], outputs: [{ name: 'jobId', type: 'uint256' }] },
   { name: 'submitWork', type: 'function', stateMutability: 'nonpayable',
     inputs: [
       { name: 'jobId',     type: 'uint256' },
       { name: 'resultUri', type: 'string'  },
     ], outputs: [] },
   { name: 'approveWork', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'jobId', type: 'uint256' }], outputs: [] },
+  { name: 'checkAndSettle', type: 'function', stateMutability: 'nonpayable',
     inputs: [{ name: 'jobId', type: 'uint256' }], outputs: [] },
   { name: 'claimRefund', type: 'function', stateMutability: 'nonpayable',
     inputs: [{ name: 'jobId', type: 'uint256' }], outputs: [] },
@@ -73,6 +87,15 @@ const ARC_ESCROW_ABI = [
       { name: 'description', type: 'string'  },
       { name: 'resultUri',   type: 'string'  },
       { name: 'status',      type: 'uint8'   },
+      { name: 'jobType',     type: 'uint8'   },
+    ] },
+  { name: 'getCondition', type: 'function', stateMutability: 'view',
+    inputs: [{ name: 'jobId', type: 'uint256' }],
+    outputs: [
+      { name: 'conditionTarget',    type: 'address' },
+      { name: 'conditionCalldata',  type: 'bytes'   },
+      { name: 'conditionThreshold', type: 'uint256' },
+      { name: 'comparator',         type: 'uint8'   },
     ] },
 ] as const
 
@@ -85,6 +108,7 @@ const APPROVE_ABI = [
     inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }],
     outputs: [{ name: '', type: 'bool' }] },
 ] as const
+
 
 
 const ARC_ONBOARDER_ABI = [
@@ -421,8 +445,16 @@ export default function App() {
   const [escrowJobId,  setEscrowJobId]  = useState('')
   const [escrowJob,    setEscrowJob]    = useState<{
     client: string; agent: string; amount: bigint; deadline: bigint;
-    description: string; resultUri: string; status: number
+    description: string; resultUri: string; status: number; jobType: number
   } | null>(null)
+  const [escrowCondition, setEscrowCondition] = useState<{
+    conditionTarget: string; conditionThreshold: bigint; comparator: number
+  } | null>(null)
+  const [escrowNewJobType, setEscrowNewJobType] = useState<'ai' | 'onchain'>('ai')
+  const [escrowCondToken,      setEscrowCondToken]      = useState('')
+  const [escrowCondRecipient,  setEscrowCondRecipient]  = useState('')
+  const [escrowCondThreshold,  setEscrowCondThreshold]  = useState('')
+  const [escrowCondComparator, setEscrowCondComparator] = useState<'gte' | 'lte' | 'eq'>('gte')
   const [escrowWorkText,     setEscrowWorkText]     = useState('')
   const [escrowWorkFile,     setEscrowWorkFile]     = useState<File | null>(null)
   const [escrowWorkUploading,setEscrowWorkUploading]= useState(false)
@@ -920,12 +952,32 @@ export default function App() {
 
   // ─── ArcEscrow 함수들 ────────────────────────────────────────────────────
 
+  const COMPARATOR_CODE = { gte: 0, lte: 1, eq: 2 } as const
+
   async function escrowCreateJob() {
     const { encodeFunctionData } = await import('viem')
     const amt = parseFloat(escrowAmount)
     if (!isAddress(escrowAgent)) return addToast({ type: 'error', message: 'Invalid agent address' })
     if (!amt || amt <= 0)        return addToast({ type: 'error', message: 'Enter USDC amount' })
     if (!escrowDesc.trim())      return addToast({ type: 'error', message: 'Enter job description' })
+
+    let conditionArgs: [`0x${string}`, `0x${string}`, bigint, number] | null = null
+    if (escrowNewJobType === 'onchain') {
+      if (!isAddress(escrowCondToken))     return addToast({ type: 'error', message: 'Invalid condition token address' })
+      if (!isAddress(escrowCondRecipient)) return addToast({ type: 'error', message: 'Invalid recipient address' })
+      const threshold = parseFloat(escrowCondThreshold)
+      if (!threshold || threshold <= 0)    return addToast({ type: 'error', message: 'Enter condition threshold' })
+
+      const conditionCalldata = encodeFunctionData({
+        abi: ERC20_ABI, functionName: 'balanceOf', args: [escrowCondRecipient as `0x${string}`],
+      })
+      conditionArgs = [
+        escrowCondToken as `0x${string}`,
+        conditionCalldata,
+        BigInt(Math.round(threshold * 1e6)),
+        COMPARATOR_CODE[escrowCondComparator],
+      ]
+    }
 
     const usdcAmt  = BigInt(Math.round(amt * 1e6))
     const deadline = BigInt(Math.floor(Date.now() / 1000) + parseInt(escrowDays) * 86400)
@@ -941,16 +993,22 @@ export default function App() {
           args: [ARC_ESCROW, usdcAmt] }),
       })
 
-      // createJob
-      await sendTransactionAsync({
-        to: ARC_ESCROW,
-        data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'createJob',
-          args: [escrowAgent as `0x${string}`, usdcAmt, deadline, escrowDesc] }),
-      })
+      // createJob (AIJudged) or createOnchainConditionJob
+      const createHash = conditionArgs
+        ? await sendTransactionAsync({
+            to: ARC_ESCROW,
+            data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'createOnchainConditionJob',
+              args: [escrowAgent as `0x${string}`, usdcAmt, deadline, escrowDesc, ...conditionArgs] }),
+          })
+        : await sendTransactionAsync({
+            to: ARC_ESCROW,
+            data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'createJob',
+              args: [escrowAgent as `0x${string}`, usdcAmt, deadline, escrowDesc] }),
+          })
+      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash: createHash })
 
       // read nextJobId to get the new job's ID
-      const arcClient = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
-      const nextId = await arcClient.readContract({ address: ARC_ESCROW, abi: NEXT_JOB_ID_ABI, functionName: 'nextJobId' })
+      const nextId = await publicClients[arcTestnet.id].readContract({ address: ARC_ESCROW, abi: NEXT_JOB_ID_ABI, functionName: 'nextJobId' })
       const newJobId = Number(nextId) - 1
       setRecentJobIds(prev => {
         const updated = [newJobId, ...prev.filter(id => id !== newJobId)]
@@ -961,8 +1019,29 @@ export default function App() {
       setEscrowMyTab('jobs')
       addToast({ type: 'success', message: `Job #${newJobId} created! ${amt} USDC locked in escrow.` })
       setEscrowAgent(''); setEscrowAmount(''); setEscrowDesc('')
+      setEscrowCondToken(''); setEscrowCondRecipient(''); setEscrowCondThreshold('')
     } catch (e: unknown) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Transaction failed' })
+    } finally {
+      setEscrowLoading(false)
+    }
+  }
+
+  async function escrowCheckAndSettle() {
+    const { encodeFunctionData } = await import('viem')
+    setEscrowLoading(true)
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+      const hash = await sendTransactionAsync({
+        to: ARC_ESCROW,
+        data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'checkAndSettle',
+          args: [BigInt(parseInt(escrowJobId))] }),
+      })
+      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash })
+      addToast({ type: 'success', message: 'Condition met — USDC sent to agent!' })
+      await escrowLookupJob()
+    } catch (e: unknown) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Condition not met yet, or transaction failed' })
     } finally {
       setEscrowLoading(false)
     }
@@ -976,7 +1055,7 @@ export default function App() {
       const res = await fetch('/api/evaluate', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jobDescription: escrowJob.description, resultUri: escrowJob.resultUri }),
+        body: JSON.stringify({ jobId: escrowJobId }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
@@ -1001,20 +1080,19 @@ export default function App() {
     }
 
     setAiVerdict(null)
+    setEscrowCondition(null)
     setEscrowLoading(true)
     try {
-      const { encodeFunctionData, decodeFunctionResult } = await import('viem')
-      const arcClient = createPublicClient({
-        chain: arcTestnet,
-        transport: http('https://rpc.testnet.arc.network'),
-      })
-      const data = encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'getJob', args: [BigInt(id)] })
-      const raw  = await arcClient.call({ to: ARC_ESCROW, data })
-      if (!raw.data) throw new Error('No data returned')
-      const [client, agent, amount, deadline, description, resultUri, status] =
-        decodeFunctionResult({ abi: ARC_ESCROW_ABI, functionName: 'getJob', data: raw.data }) as
-        [string, string, bigint, bigint, string, string, number]
-      setEscrowJob({ client, agent, amount, deadline, description, resultUri, status })
+      const arcClient = publicClients[arcTestnet.id]
+      const [client, agent, amount, deadline, description, resultUri, status, jobType] =
+        await arcClient.readContract({ address: ARC_ESCROW, abi: ARC_ESCROW_ABI, functionName: 'getJob', args: [BigInt(id)] })
+      setEscrowJob({ client, agent, amount, deadline, description, resultUri, status, jobType })
+
+      if (jobType === 1) {
+        const [conditionTarget, , conditionThreshold, comparator] =
+          await arcClient.readContract({ address: ARC_ESCROW, abi: ARC_ESCROW_ABI, functionName: 'getCondition', args: [BigInt(id)] })
+        setEscrowCondition({ conditionTarget, conditionThreshold, comparator })
+      }
     } catch (e: unknown) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Lookup failed' })
       setEscrowJob(null)
@@ -1069,11 +1147,12 @@ export default function App() {
       setEscrowWorkUploading(false)
       setEscrowLoading(true)
       await switchChain({ chainId: arcTestnet.id })
-      await sendTransactionAsync({
+      const submitHash = await sendTransactionAsync({
         to: ARC_ESCROW,
         data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'submitWork',
           args: [BigInt(parseInt(escrowJobId)), resultUrl] }),
       })
+      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash: submitHash })
       addToast({ type: 'success', message: 'Work submitted! Claude will read the actual content.' })
       setEscrowWorkText('')
       setEscrowWorkFile(null)
@@ -1091,11 +1170,12 @@ export default function App() {
     setEscrowLoading(true)
     try {
       await switchChain({ chainId: arcTestnet.id })
-      await sendTransactionAsync({
+      const approveHash = await sendTransactionAsync({
         to: ARC_ESCROW,
         data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'approveWork',
           args: [BigInt(parseInt(escrowJobId))] }),
       })
+      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash: approveHash })
       addToast({ type: 'success', message: 'Work approved — USDC sent to agent!' })
       await escrowLookupJob()
     } catch (e: unknown) {
@@ -1110,11 +1190,12 @@ export default function App() {
     setEscrowLoading(true)
     try {
       await switchChain({ chainId: arcTestnet.id })
-      await sendTransactionAsync({
+      const refundHash = await sendTransactionAsync({
         to: ARC_ESCROW,
         data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'claimRefund',
           args: [BigInt(parseInt(escrowJobId))] }),
       })
+      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash: refundHash })
       addToast({ type: 'success', message: 'Refund claimed!' })
       await escrowLookupJob()
     } catch (e: unknown) {
@@ -1827,6 +1908,22 @@ export default function App() {
                     {escrowMyTab === 'new' ? (
                       <div className="escrow-form">
                         <div className="escrow-form-group">
+                          <label>Verification Method</label>
+                          <div className="escrow-board-tabs">
+                            <button className={escrowNewJobType === 'ai' ? 'active' : ''} onClick={() => setEscrowNewJobType('ai')}>
+                              ✦ AI-Judged
+                            </button>
+                            <button className={escrowNewJobType === 'onchain' ? 'active' : ''} onClick={() => setEscrowNewJobType('onchain')}>
+                              ⛓ Onchain Condition
+                            </button>
+                          </div>
+                          <div className="escrow-hint">
+                            {escrowNewJobType === 'ai'
+                              ? 'Agent submits a result; Claude reads it and you approve/reject.'
+                              : 'Agent must satisfy an onchain condition (e.g. a token balance threshold). No AI, no approval — the contract settles automatically once the condition is true.'}
+                          </div>
+                        </div>
+                        <div className="escrow-form-group">
                           <label>Agent Wallet Address</label>
                           <input className="action-input" placeholder="0x..." value={escrowAgent}
                             onChange={(e) => setEscrowAgent(e.target.value)} />
@@ -1854,10 +1951,46 @@ export default function App() {
                           <input className="action-input" placeholder="Describe the task clearly..." value={escrowDesc}
                             onChange={(e) => setEscrowDesc(e.target.value)} />
                         </div>
+                        {escrowNewJobType === 'onchain' && (
+                          <>
+                            <div className="escrow-form-group">
+                              <label>Condition Token Address</label>
+                              <input className="action-input" placeholder="0x... (e.g. Arc USDC precompile)" value={escrowCondToken}
+                                onChange={(e) => setEscrowCondToken(e.target.value)} />
+                            </div>
+                            <div className="escrow-form-group">
+                              <label>Recipient Address (whose balance is checked)</label>
+                              <input className="action-input" placeholder="0x..." value={escrowCondRecipient}
+                                onChange={(e) => setEscrowCondRecipient(e.target.value)} />
+                            </div>
+                            <div className="escrow-form-row">
+                              <div className="escrow-form-group">
+                                <label>Comparator</label>
+                                <select className="action-input" value={escrowCondComparator}
+                                  onChange={(e) => setEscrowCondComparator(e.target.value as 'gte' | 'lte' | 'eq')}>
+                                  <option value="gte">≥ (at least)</option>
+                                  <option value="lte">≤ (at most)</option>
+                                  <option value="eq">= (exactly)</option>
+                                </select>
+                              </div>
+                              <div className="escrow-form-group">
+                                <label>Threshold</label>
+                                <div className="escrow-input-suffix">
+                                  <input className="action-input" inputMode="decimal" placeholder="0.00" value={escrowCondThreshold}
+                                    onChange={(e) => setEscrowCondThreshold(e.target.value)} />
+                                  <span>tokens</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="escrow-hint">
+                              Example: token = USDC precompile, recipient = client address, comparator = ≥, threshold = 105 → settles once the recipient holds at least 105 tokens.
+                            </div>
+                          </>
+                        )}
                         <button className="btn-primary escrow-submit-btn" onClick={escrowCreateJob} disabled={escrowLoading}>
                           {escrowLoading ? 'Processing...' : '🔒 Lock USDC & Post Job'}
                         </button>
-                        <div className="escrow-hint">USDC is held in the ArcEscrow contract until you approve the result.</div>
+                        <div className="escrow-hint">USDC is held in the ArcEscrow contract until the job is settled.</div>
                       </div>
                     ) : (
                       <div className="escrow-jobs-panel">
@@ -1954,16 +2087,44 @@ export default function App() {
                               </div>
 
                               {/* 결과물 링크 */}
-                              {escrowJob.resultUri && (
+                              {escrowJob.jobType === 0 && escrowJob.resultUri && (
                                 <a className="escrow-result-link" href={escrowJob.resultUri} target="_blank" rel="noreferrer">
                                   📎 View Result ↗
                                 </a>
                               )}
 
+                              {/* 온체인 조건 요약 */}
+                              {escrowJob.jobType === 1 && escrowCondition && (
+                                <div className="escrow-condition-summary">
+                                  <div className="escrow-meta-item">
+                                    <span className="escrow-meta-label">Condition Target</span>
+                                    <code>{escrowCondition.conditionTarget.slice(0, 8)}…{escrowCondition.conditionTarget.slice(-6)}</code>
+                                  </div>
+                                  <div className="escrow-meta-item">
+                                    <span className="escrow-meta-label">Rule</span>
+                                    <span className="escrow-meta-value">
+                                      balanceOf(recipient) {['≥', '≤', '='][escrowCondition.comparator] ?? '?'} {(Number(escrowCondition.conditionThreshold) / 1e6).toFixed(2)}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+
                               {/* 액션 영역 */}
                               <div className="escrow-actions">
-                                {/* 에이전트: 결과 제출 */}
-                                {isAgent && escrowJob.status === 0 && !expired && (
+                                {/* 온체인 조건: 누구나 조건 확인 후 자동 정산 */}
+                                {escrowJob.jobType === 1 && escrowJob.status === 0 && !expired && (isAgent || isClient) && (
+                                  <div className="escrow-action-group">
+                                    <div className="escrow-submit-hint">
+                                      No AI, no approval — anyone can trigger settlement once the condition above is objectively true onchain.
+                                    </div>
+                                    <button className="btn-primary" onClick={escrowCheckAndSettle} disabled={escrowLoading}>
+                                      {escrowLoading ? 'Checking...' : '⛓ Check & Settle'}
+                                    </button>
+                                  </div>
+                                )}
+
+                                {/* 에이전트: 결과 제출 (AI-Judged only) */}
+                                {escrowJob.jobType === 0 && isAgent && escrowJob.status === 0 && !expired && (
                                   <div className="escrow-action-group">
                                     <div className="escrow-submit-label">결과물 제출</div>
                                     <textarea
@@ -1998,8 +2159,8 @@ export default function App() {
                                   </div>
                                 )}
 
-                                {/* 클라이언트: AI 평가 + 승인 */}
-                                {isClient && escrowJob.status === 1 && (
+                                {/* 클라이언트: AI 평가 + 승인 (AI-Judged only) */}
+                                {escrowJob.jobType === 0 && isClient && escrowJob.status === 1 && (
                                   <div className="escrow-action-group">
                                     <button className="escrow-ai-btn" onClick={evaluateWithAI} disabled={aiLoading || escrowLoading}>
                                       {aiLoading ? '✦ Evaluating...' : '✦ Ask Claude to Evaluate'}
