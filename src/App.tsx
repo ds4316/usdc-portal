@@ -864,7 +864,13 @@ export default function App() {
     }
   }
 
-  useEffect(() => { localStorage.setItem('theme', theme) }, [theme])
+  useEffect(() => {
+    localStorage.setItem('theme', theme)
+    // body's own background is outside the .root theme scope (CSS vars don't
+    // cascade upward), so it stays hardcoded dark unless set here — otherwise
+    // light mode flashes/shows the dark body color through any gap in .root.
+    document.body.style.background = theme === 'light' ? '#f7fbff' : '#05070b'
+  }, [theme])
   useEffect(() => { localStorage.setItem('layoutMode', layoutMode) }, [layoutMode])
   useEffect(() => { localStorage.setItem('densityMode', densityMode) }, [densityMode])
   useEffect(() => {
@@ -3108,7 +3114,7 @@ export default function App() {
               <div className="ov-label">Circle + Arc Stack</div>
               <div className="ov-arch-rail">
                 {([
-                  { name: 'USDC',         tech: 'Settlement asset',  color: '#2775ca' },
+                  { name: 'USDC',         tech: 'Settlement asset',  color: '#56a7ff' },
                   { name: 'Arc Testnet',  tech: 'Stablecoin L1',     color: '#00c2ff' },
                   { name: 'CCTP V2',      tech: 'Circle cross-chain', color: '#16a34a' },
                   { name: 'ArcEscrow',    tech: 'Work / Milestone', color: '#8b5cf6' },
