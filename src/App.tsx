@@ -1260,15 +1260,28 @@ export default function App() {
           data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'claimJob', args: [BigInt(escrowJobId)] }) })
       }
       await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash: claimHash as `0x${string}` })
-      const res = await fetch('/api/requests', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action: 'accept', agent: activeWallet }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || 'Could not accept request')
-      if (Array.isArray(json.requests)) setMarketRequests(json.requests)
-      addToast({ type: 'success', message: 'Accepted — you are now the matched worker', txHash: claimHash, explorerBase: 'https://testnet.arcscan.app' })
+      // Claim succeeded on-chain — mark it matched locally right away so the
+      // Accept button disables immediately, even if the board sync below is
+      // slow or fails. Otherwise a stale "Accept" button lets the user retry
+      // claimJob on an already-matched job, which reverts on-chain.
+      setMarketRequests((prev) => prev.map((request) => request.id === id
+        ? { ...request, status: 'matched' as const, agent: activeWallet }
+        : request))
+      try {
+        const res = await fetch('/api/requests', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, action: 'accept', agent: activeWallet }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Could not sync request board')
+        if (Array.isArray(json.requests)) setMarketRequests(json.requests)
+        addToast({ type: 'success', message: 'Accepted — you are now the matched worker', txHash: claimHash, explorerBase: 'https://testnet.arcscan.app' })
+      } catch (syncError) {
+        // On-chain claim already succeeded — don't show this as a failure,
+        // but flag that the shared board may be showing stale data.
+        addToast({ type: 'error', message: `Claimed on-chain, but the request board didn't sync (${syncError instanceof Error ? syncError.message : 'unknown error'}). Refresh to see the latest state.` })
+      }
     } catch (e) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Could not accept request' })
     } finally {
@@ -1306,14 +1319,24 @@ export default function App() {
           data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'cancelJob', args: [BigInt(escrowJobId)] }) })
       }
       await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash: cancelHash as `0x${string}` })
-      const res = await fetch('/api/requests', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action: 'cancel', client: activeWallet }),
-      })
-      const json = await res.json()
-      if (res.ok && Array.isArray(json.requests)) setMarketRequests(json.requests)
-      addToast({ type: 'success', message: 'Cancelled — USDC refunded (5% fee to worker if already matched)', txHash: cancelHash, explorerBase: 'https://testnet.arcscan.app' })
+      // Refund already happened on-chain — reflect that locally before the
+      // board sync, so a failed/slow sync doesn't leave a stale Cancel button.
+      setMarketRequests((prev) => prev.map((request) => request.id === id
+        ? { ...request, status: 'cancelled' as const }
+        : request))
+      try {
+        const res = await fetch('/api/requests', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, action: 'cancel', client: activeWallet }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Could not sync request board')
+        if (Array.isArray(json.requests)) setMarketRequests(json.requests)
+        addToast({ type: 'success', message: 'Cancelled — USDC refunded (5% fee to worker if already matched)', txHash: cancelHash, explorerBase: 'https://testnet.arcscan.app' })
+      } catch (syncError) {
+        addToast({ type: 'error', message: `Refunded on-chain, but the request board didn't sync (${syncError instanceof Error ? syncError.message : 'unknown error'}). Refresh to see the latest state.` })
+      }
     } catch (e) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Cancel failed' })
     } finally {
@@ -1342,12 +1365,21 @@ export default function App() {
       const settleHash = await sendTransactionAsync({ to: NFT_OTC_ESCROW,
         data: encodeFunctionData({ abi: NFT_OTC_ESCROW_ABI, functionName: 'settle', args: [BigInt(escrowJobId)] }) })
       await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash: settleHash })
-      // Mark request as completed in the shared board
-      await fetch('/api/requests', { method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: requestId, action: 'complete' }) })
-      await loadMarketRequestsFromApi()
-      addToast({ type: 'success', message: 'Deal settled — NFT sent to buyer, USDC released to seller', txHash: settleHash, explorerBase: 'https://testnet.arcscan.app' })
+      // NFT/USDC already moved on-chain — reflect that locally before the
+      // board sync, so a failed/slow sync doesn't leave a stale Settle button.
+      setMarketRequests((prev) => prev.map((request) => request.id === requestId
+        ? { ...request, status: 'completed' as const }
+        : request))
+      try {
+        const res = await fetch('/api/requests', { method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: requestId, action: 'complete' }) })
+        if (!res.ok) { const json = await res.json(); throw new Error(json.error || 'Could not sync request board') }
+        await loadMarketRequestsFromApi()
+        addToast({ type: 'success', message: 'Deal settled — NFT sent to buyer, USDC released to seller', txHash: settleHash, explorerBase: 'https://testnet.arcscan.app' })
+      } catch (syncError) {
+        addToast({ type: 'error', message: `Settled on-chain, but the request board didn't sync (${syncError instanceof Error ? syncError.message : 'unknown error'}). Refresh to see the latest state.` })
+      }
     } catch (e) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Settle failed' })
     }
