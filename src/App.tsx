@@ -1177,6 +1177,7 @@ export default function App() {
         txHash = await sendTransactionAsync({ to: NFT_OTC_ESCROW,
           data: encodeFunctionData({ abi: NFT_OTC_ESCROW_ABI, functionName: 'fundDeal',
             args: [sellerAddr, requestNftContract as `0x${string}`, BigInt(requestNftTokenId), usdcAmt, deadline] }) })
+        await arcClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` })
         const nextId = await arcClient.readContract({ address: NFT_OTC_ESCROW, abi: NFT_OTC_ESCROW_ABI, functionName: 'nextDealId' })
         escrowJobId = Number(nextId) - 1
       } else {
@@ -1185,6 +1186,7 @@ export default function App() {
         txHash = await sendTransactionAsync({ to: ARC_ESCROW,
           data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'createJob',
             args: ['0x0000000000000000000000000000000000000000' as `0x${string}`, usdcAmt, deadline, `${requestTitle}: ${requestDeliverable}`] }) })
+        await arcClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` })
         const nextId = await arcClient.readContract({ address: ARC_ESCROW, abi: NEXT_JOB_ID_ABI, functionName: 'nextJobId' })
         escrowJobId = Number(nextId) - 1
       }
@@ -1251,6 +1253,7 @@ export default function App() {
         claimHash = await sendTransactionAsync({ to: ARC_ESCROW,
           data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'claimJob', args: [BigInt(escrowJobId)] }) })
       }
+      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash: claimHash as `0x${string}` })
       const res = await fetch('/api/requests', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -1296,6 +1299,7 @@ export default function App() {
         cancelHash = await sendTransactionAsync({ to: ARC_ESCROW,
           data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'cancelJob', args: [BigInt(escrowJobId)] }) })
       }
+      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash: cancelHash as `0x${string}` })
       const res = await fetch('/api/requests', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -1331,6 +1335,7 @@ export default function App() {
       await switchChain({ chainId: arcTestnet.id })
       const settleHash = await sendTransactionAsync({ to: NFT_OTC_ESCROW,
         data: encodeFunctionData({ abi: NFT_OTC_ESCROW_ABI, functionName: 'settle', args: [BigInt(escrowJobId)] }) })
+      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash: settleHash })
       // Mark request as completed in the shared board
       await fetch('/api/requests', { method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -2067,6 +2072,7 @@ export default function App() {
         data: encodeFunctionData({ abi: ERC8183_ABI, functionName: 'fund',
           args: [jobId, '0x' as `0x${string}`] }),
       })
+      await arcClient.waitForTransactionReceipt({ hash: fundHash })
 
       setE8183Step('done')
       addToast({ type: 'success', message: `Job #${jobId} funded with ${amt} USDC!`, txHash: fundHash, explorerBase: 'https://testnet.arcscan.app' })
@@ -2096,6 +2102,7 @@ export default function App() {
         data: encodeFunctionData({ abi: ERC8183_ABI, functionName: 'submit',
           args: [BigInt(e8183JobId), delivHash, '0x' as `0x${string}`] }),
       })
+      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash: submitHash })
       addToast({ type: 'success', message: 'Deliverable submitted!', txHash: submitHash, explorerBase: 'https://testnet.arcscan.app' })
       await e8183LookupJob(e8183JobId)
     } catch (e: unknown) {
@@ -2121,6 +2128,7 @@ export default function App() {
         data: encodeFunctionData({ abi: ERC8183_ABI, functionName: 'complete',
           args: [BigInt(e8183JobId), reason, '0x' as `0x${string}`] }),
       })
+      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash: completeHash })
       addToast({ type: 'success', message: approved ? 'Job approved - provider paid!' : 'Job rejected - funds returned!', txHash: completeHash, explorerBase: 'https://testnet.arcscan.app' })
       await e8183LookupJob(e8183JobId)
     } catch (e: unknown) {
@@ -2183,6 +2191,7 @@ export default function App() {
 
       // read nextJobId to get the new job's ID
       const arcClient = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
+      await arcClient.waitForTransactionReceipt({ hash: createHash })
       const nextId = await arcClient.readContract({ address: ARC_ESCROW, abi: NEXT_JOB_ID_ABI, functionName: 'nextJobId' })
       const newJobId = Number(nextId) - 1
       setRecentJobIds(prev => {
@@ -2342,6 +2351,7 @@ export default function App() {
         data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'submitWork',
           args: [BigInt(parseInt(escrowJobId)), resultUrl] }),
       })
+      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash: submitHash })
       addToast({ type: 'success', message: 'Work submitted — URI stored on-chain. Client can now run AI review.', txHash: submitHash, explorerBase: 'https://testnet.arcscan.app' })
       setHistory((prev) => addHistory(prev, { type: 'escrow', summary: `Result submitted: Job #${escrowJobId}`, txHash: submitHash, timestamp: Date.now(), status: 'success' }))
       setEscrowWorkText('')
@@ -2365,6 +2375,7 @@ export default function App() {
         data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'approveWork',
           args: [BigInt(parseInt(escrowJobId))] }),
       })
+      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash })
       addToast({ type: 'success', message: 'Work approved — USDC released to worker!', txHash: hash, explorerBase: 'https://testnet.arcscan.app' })
       setHistory((prev) => addHistory(prev, { type: 'escrow', summary: `Payment released: Job #${escrowJobId}`, txHash: hash, timestamp: Date.now(), status: 'success' }))
       // Also mark the linked marketplace request as completed
@@ -2396,6 +2407,7 @@ export default function App() {
         data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'claimRefund',
           args: [BigInt(parseInt(escrowJobId))] }),
       })
+      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash })
       addToast({ type: 'success', message: 'Refund claimed!', txHash: hash, explorerBase: 'https://testnet.arcscan.app' })
       setHistory((prev) => addHistory(prev, { type: 'escrow', summary: `Refund claimed: Job #${escrowJobId}`, txHash: hash, timestamp: Date.now(), status: 'success' }))
       await escrowLookupJob()
