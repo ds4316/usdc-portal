@@ -2,7 +2,7 @@ import { createConfig, http, fallback } from 'wagmi'
 import { mainnet, base, polygon, arbitrum, optimism, avalanche, sepolia, baseSepolia } from 'wagmi/chains'
 import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors'
 
-// Arc Testnet 커스텀 체인
+// Arc Testnet custom chain.
 export const arcTestnet = {
   id: 5042002,
   name: 'Arc Testnet',

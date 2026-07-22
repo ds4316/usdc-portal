@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-// ⚠️  TESTNET ONLY — 메인넷 배포 전 아래 항목 반드시 수정할 것:
-//   1. Reentrancy: bridgeUSDCToArc / bridgeETHToArc에 ReentrancyGuard 추가
-//   2. arcRecipient zero-address 체크 추가
-//   3. Swap deadline 파라미터 추가 (front-running 방지)
-//   4. 주소 하드코딩 → 생성자 파라미터로 변경 (멀티체인 지원)
-//   5. rescue() 함수에 timelock 또는 multisig 적용 고려
+// TESTNET ONLY. Before any mainnet deployment:
+//   1. Add ReentrancyGuard to bridgeUSDCToArc and bridgeETHToArc.
+//   2. Validate arcRecipient is not zero.
+//   3. Add a swap deadline parameter for front-running protection.
+//   4. Keep all deployment addresses constructor-driven for each chain.
+//   5. Consider timelock or multisig controls for rescue().
 
-// ─── Interfaces ──────────────────────────────────────────────────────────────
+// Interfaces
 
 interface ISwapRouter {
     struct ExactInputSingleParams {
@@ -41,14 +41,14 @@ interface ITokenMessenger {
     ) external returns (uint64 nonce);
 }
 
-// ─── ArcOnboarder ────────────────────────────────────────────────────────────
+// ArcOnboarder
 //
-// 역할: 다른 EVM 체인의 자산을 Arc Testnet USDC로 1트랜잭션에 온보딩
+// Role: onboard assets from another EVM chain into Arc Testnet USDC.
 //
-// 배포 체인: Ethereum Sepolia (테스트) / Ethereum Mainnet (메인넷)
-// 목적지:    Arc Testnet (CCTP Domain 26)
+// Source chain: Ethereum Sepolia for the demo path.
+// Destination: Arc Testnet (CCTP domain 26).
 //
-// 생성자 파라미터 (Sepolia):
+// Sepolia constructor parameters:
 //   _router    = 0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E  (Uniswap V3 SwapRouter02)
 //   _messenger = 0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA  (CCTP V2 TokenMessenger)
 //   _usdc      = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238  (Sepolia USDC)
@@ -60,9 +60,9 @@ contract ArcOnboarder {
     address        public immutable usdc;
     address        public immutable weth;
 
-    // Arc Testnet CCTP 도메인
+    // Arc Testnet CCTP domain.
     uint32  public constant ARC_DOMAIN = 26;
-    // Uniswap USDC/ETH 0.05% 풀
+    // Uniswap USDC/ETH 0.05% pool.
     uint24  public constant POOL_FEE   = 500;
 
     address public owner;
@@ -86,17 +86,16 @@ contract ArcOnboarder {
         owner          = msg.sender;
     }
 
-    // ── 1. ETH → USDC (Uniswap V3) → Arc USDC (CCTP) ────────────────────
-    //    메인 함수: 1트랜잭션으로 ETH를 Arc USDC로 변환
-    //    arcRecipient: Arc 수신 주소를 bytes32로 (address를 오른쪽 정렬 패딩)
-    //    minUsdcOut:   슬리피지 보호 (예: 예상 금액의 95%)
+    // 1. ETH -> USDC (Uniswap V3) -> Arc USDC (CCTP).
+    //    arcRecipient is the Arc recipient address encoded as bytes32.
+    //    minUsdcOut provides slippage protection.
     function bridgeETHToArc(
         bytes32 arcRecipient,
         uint256 minUsdcOut
     ) external payable {
         require(msg.value > 0, "No ETH sent");
 
-        // Step 1: ETH → USDC via Uniswap V3
+        // Step 1: ETH -> USDC via Uniswap V3.
         uint256 usdcOut = swapRouter.exactInputSingle{value: msg.value}(
             ISwapRouter.ExactInputSingleParams({
                 tokenIn:           weth,
@@ -109,15 +108,14 @@ contract ArcOnboarder {
             })
         );
 
-        // Step 2: USDC → Arc via CCTP
+        // Step 2: USDC -> Arc via CCTP.
         IERC20(usdc).approve(address(tokenMessenger), usdcOut);
         tokenMessenger.depositForBurn(usdcOut, ARC_DOMAIN, arcRecipient, usdc);
 
         emit BridgeInitiated(msg.sender, arcRecipient, usdcOut);
     }
 
-    // ── 2. USDC → Arc USDC (CCTP 직접) ───────────────────────────────────
-    //    테스트용: USDC를 이미 갖고 있을 때 바로 브릿지
+    // 2. USDC -> Arc USDC via direct CCTP burn.
     function bridgeUSDCToArc(
         uint256 amount,
         bytes32 arcRecipient
@@ -131,7 +129,7 @@ contract ArcOnboarder {
         emit BridgeInitiated(msg.sender, arcRecipient, amount);
     }
 
-    // ── 비상용: 컨트랙트에 남은 토큰 회수 ────────────────────────────────
+    // Emergency token recovery for testnet deployments.
     function rescue(address token) external {
         require(msg.sender == owner, "Not owner");
         IERC20(token).transfer(owner, IERC20(token).balanceOf(address(this)));

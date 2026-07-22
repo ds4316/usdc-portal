@@ -9,6 +9,8 @@ import {
   Wallet, ExternalLink, AlertTriangle, QrCode, ChevronDown,
   ArrowUpRight, Repeat2, Layers, BookUser,
   Fuel, Trash2, Download, Zap, ShieldCheck, CircleDollarSign, Bot,
+  Lock, Upload, BookOpen, LayoutDashboard, ArrowRightLeft, Network, UserCircle, BriefcaseBusiness,
+  Maximize2, Minimize2,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { arcTestnet } from './wagmi.config'
@@ -21,32 +23,89 @@ const ERC20_ABI = [
     inputs: [{ name: 'account', type: 'address' }], outputs: [{ name: '', type: 'uint256' }] },
 ] as const
 
-// ─── USDCPaymentHub 컨트랙트 ──────────────────────────────────────────────
-const PAYMENT_HUB_ADDRESS = '0x5292C3d44e374a794d4b3477e2C81417BE5Db211' as `0x${string}`
-const PAYMENT_HUB_ABI = [
-  { name: 'pay',        type: 'function', stateMutability: 'payable',
-    inputs: [{ name: 'note', type: 'string' }], outputs: [] },
-  { name: 'withdraw',   type: 'function', stateMutability: 'nonpayable',
-    inputs: [], outputs: [] },
-  { name: 'getBalance', type: 'function', stateMutability: 'view',
-    inputs: [], outputs: [{ name: '', type: 'uint256' }] },
-  { name: 'owner',      type: 'function', stateMutability: 'view',
-    inputs: [], outputs: [{ name: '', type: 'address' }] },
-] as const
+// USDCPaymentHub removed (replaced by ArcEscrow + NFTOTCEscrow)
 
-// ─── CCTP V2 (Testnet) ────────────────────────────────────────────────────
+// ── CCTP V2 (Testnet) ─
 const SEPOLIA_USDC        = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`
 const ARC_MSG_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x${string}`
 
-// ─── ArcOnboarder ─────────────────────────────────────────────────────────
+// ── ArcOnboarder ─ helper contract for onboarding Arc Testnet wallets
 const ARC_ONBOARDER = '0x495825fF81B048B2A6e1FE10571625496f8fF1FD' as `0x${string}`
 
-// ─── ArcEscrow V2 ─────────────────────────────────────────────────────────
-const ARC_ESCROW = '0x7420C7A3459B532Dee36Fc1e22badBe262BaD571' as `0x${string}`
+// ── ArcEscrow ─
+const ARC_ESCROW = '0x2D961a34d7558AA5A3BaB17f4d928fd0deC7a5Dc' as `0x${string}`
 const ARC_TESTNET_USDC = '0x3600000000000000000000000000000000000000' as `0x${string}`
 
-// job.jobType: 0 = AIJudged, 1 = OnchainCondition
-// job.comparator (OnchainCondition only): 0 = GTE, 1 = LTE, 2 = EQ
+// NFTOTCEscrow — deployed Arc Testnet · atomic NFT ↔ USDC swap
+const NFT_OTC_ESCROW = '0xdC47D9AE448BcE3E524C768446fE65f30d03f20e' as `0x${string}`
+
+
+// CCTP V2 Arc TokenMessenger (Arc -> Sepolia burn) — CREATE2, same addr on both chains
+const ARC_TOKEN_MESSENGER = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA' as `0x${string}`
+
+const DEPOSIT_FOR_BURN_ABI = [
+  { name: 'depositForBurn', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'amount',                type: 'uint256' },
+      { name: 'destinationDomain',     type: 'uint32'  },
+      { name: 'mintRecipient',         type: 'bytes32' },
+      { name: 'burnToken',             type: 'address' },
+      { name: 'destinationCaller',     type: 'bytes32' }, // 0x0 = anyone can relay
+      { name: 'maxFee',                type: 'uint256' }, // 0 on testnet
+      { name: 'minFinalityThreshold',  type: 'uint32'  }, // 1000 = confirmed, 2000 = finalized
+    ], outputs: [{ name: '_nonce', type: 'uint64' }] },
+] as const
+
+// ERC-8183 AgenticCommerce (Arc Testnet official standard)
+const ERC8183_CONTRACT = '0x0747EEf0706327138c69792bF28Cd525089e4583' as `0x${string}`
+const ERC8183_ABI = [
+  { name: 'createJob', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'provider',    type: 'address' },
+      { name: 'evaluator',   type: 'address' },
+      { name: 'expiredAt',   type: 'uint256' },
+      { name: 'description', type: 'string'  },
+      { name: 'hook',        type: 'address' },
+    ], outputs: [{ name: 'jobId', type: 'uint256' }] },
+  { name: 'setBudget', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'jobId',     type: 'uint256' },
+      { name: 'amount',    type: 'uint256' },
+      { name: 'optParams', type: 'bytes'   },
+    ], outputs: [] },
+  { name: 'fund', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'jobId',     type: 'uint256' },
+      { name: 'optParams', type: 'bytes'   },
+    ], outputs: [] },
+  { name: 'submit', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'jobId',       type: 'uint256' },
+      { name: 'deliverable', type: 'bytes32' },
+      { name: 'optParams',   type: 'bytes'   },
+    ], outputs: [] },
+  { name: 'complete', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'jobId',     type: 'uint256' },
+      { name: 'reason',    type: 'bytes32' },
+      { name: 'optParams', type: 'bytes'   },
+    ], outputs: [] },
+  { name: 'getJob', type: 'function', stateMutability: 'view',
+    inputs: [{ name: 'jobId', type: 'uint256' }],
+    outputs: [
+      { name: 'id',          type: 'uint256'  },
+      { name: 'client',      type: 'address'  },
+      { name: 'provider',    type: 'address'  },
+      { name: 'evaluator',   type: 'address'  },
+      { name: 'description', type: 'string'   },
+      { name: 'budget',      type: 'uint256'  },
+      { name: 'expiredAt',   type: 'uint256'  },
+      { name: 'status',      type: 'uint8'    },
+      { name: 'hook',        type: 'address'  },
+    ] },
+  { name: 'nextJobId', type: 'function', stateMutability: 'view',
+    inputs: [], outputs: [{ name: '', type: 'uint256' }] },
+] as const
 const ARC_ESCROW_ABI = [
   { name: 'createJob', type: 'function', stateMutability: 'nonpayable',
     inputs: [
@@ -55,25 +114,16 @@ const ARC_ESCROW_ABI = [
       { name: 'deadline',    type: 'uint256' },
       { name: 'description', type: 'string'  },
     ], outputs: [{ name: 'jobId', type: 'uint256' }] },
-  { name: 'createOnchainConditionJob', type: 'function', stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'agent',              type: 'address' },
-      { name: 'amount',             type: 'uint256' },
-      { name: 'deadline',           type: 'uint256' },
-      { name: 'description',        type: 'string'  },
-      { name: 'conditionTarget',    type: 'address' },
-      { name: 'conditionCalldata',  type: 'bytes'   },
-      { name: 'conditionThreshold', type: 'uint256' },
-      { name: 'comparator',         type: 'uint8'   },
-    ], outputs: [{ name: 'jobId', type: 'uint256' }] },
+  { name: 'claimJob', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'jobId', type: 'uint256' }], outputs: [] },
+  { name: 'cancelJob', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'jobId', type: 'uint256' }], outputs: [] },
   { name: 'submitWork', type: 'function', stateMutability: 'nonpayable',
     inputs: [
       { name: 'jobId',     type: 'uint256' },
       { name: 'resultUri', type: 'string'  },
     ], outputs: [] },
   { name: 'approveWork', type: 'function', stateMutability: 'nonpayable',
-    inputs: [{ name: 'jobId', type: 'uint256' }], outputs: [] },
-  { name: 'checkAndSettle', type: 'function', stateMutability: 'nonpayable',
     inputs: [{ name: 'jobId', type: 'uint256' }], outputs: [] },
   { name: 'claimRefund', type: 'function', stateMutability: 'nonpayable',
     inputs: [{ name: 'jobId', type: 'uint256' }], outputs: [] },
@@ -87,16 +137,51 @@ const ARC_ESCROW_ABI = [
       { name: 'description', type: 'string'  },
       { name: 'resultUri',   type: 'string'  },
       { name: 'status',      type: 'uint8'   },
-      { name: 'jobType',     type: 'uint8'   },
     ] },
-  { name: 'getCondition', type: 'function', stateMutability: 'view',
-    inputs: [{ name: 'jobId', type: 'uint256' }],
+] as const
+
+// NFT OTC Escrow ABI
+const NFT_OTC_ESCROW_ABI = [
+  { name: 'fundDeal', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'seller',     type: 'address' },
+      { name: 'nft',        type: 'address' },
+      { name: 'tokenId',    type: 'uint256' },
+      { name: 'usdcAmount', type: 'uint256' },
+      { name: 'deadline',   type: 'uint256' },
+    ], outputs: [{ name: 'dealId', type: 'uint256' }] },
+  { name: 'claimDeal', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'dealId', type: 'uint256' }], outputs: [] },
+  { name: 'cancelDeal', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'dealId', type: 'uint256' }], outputs: [] },
+  { name: 'settle', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'dealId', type: 'uint256' }], outputs: [] },
+  { name: 'refundAfterDeadline', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'dealId', type: 'uint256' }], outputs: [] },
+  { name: 'isReadyToSettle', type: 'function', stateMutability: 'view',
+    inputs: [{ name: 'dealId', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }] },
+  { name: 'nextDealId', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint256' }] },
+  { name: 'getDeal', type: 'function', stateMutability: 'view',
+    inputs: [{ name: 'dealId', type: 'uint256' }],
     outputs: [
-      { name: 'conditionTarget',    type: 'address' },
-      { name: 'conditionCalldata',  type: 'bytes'   },
-      { name: 'conditionThreshold', type: 'uint256' },
-      { name: 'comparator',         type: 'uint8'   },
+      { name: 'buyer',      type: 'address' },
+      { name: 'seller',     type: 'address' },
+      { name: 'nft',        type: 'address' },
+      { name: 'tokenId',    type: 'uint256' },
+      { name: 'usdcAmount', type: 'uint256' },
+      { name: 'deadline',   type: 'uint256' },
+      { name: 'status',     type: 'uint8'   },
     ] },
+] as const
+
+// ERC-721 ABI for NFT approve and transferFrom
+const ERC721_ABI = [
+  { name: 'approve', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'to', type: 'address' }, { name: 'tokenId', type: 'uint256' }], outputs: [] },
+  { name: 'transferFrom', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'from', type: 'address' }, { name: 'to', type: 'address' }, { name: 'tokenId', type: 'uint256' }], outputs: [] },
+  { name: 'ownerOf', type: 'function', stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }], outputs: [{ name: '', type: 'address' }] },
 ] as const
 
 const NEXT_JOB_ID_ABI = [
@@ -108,7 +193,6 @@ const APPROVE_ABI = [
     inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }],
     outputs: [{ name: '', type: 'bool' }] },
 ] as const
-
 
 
 const ARC_ONBOARDER_ABI = [
@@ -131,7 +215,7 @@ const MESSAGE_SENT_EVENT = [
     inputs: [{ name: 'message', type: 'bytes', indexed: false }] },
 ] as const
 
-// ─── 체인 메타 ────────────────────────────────────────────────────────────
+// Wallet connection state
 export const CHAINS = [mainnet, base, polygon, arbitrum, optimism, avalanche, arcTestnet, sepolia, baseSepolia] as const
 
 export const CHAIN_META: Record<number, { label: string; color: string; isTestnet: boolean; explorer?: string }> = {
@@ -195,7 +279,7 @@ const TOKENS: Record<number, TokenInfo[]> = {
   [baseSepolia.id]: [{ symbol: 'USDC', address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', decimals: 6, coingeckoId: 'usd-coin' }],
 }
 
-// LI.FI EVM 체인 목록
+// LI.FI EVM chain support list
 const LIFI_CHAINS = [
   { id: mainnet.id,   label: 'Ethereum',  nativeSymbol: 'ETH' },
   { id: base.id,      label: 'Base',      nativeSymbol: 'ETH' },
@@ -219,7 +303,7 @@ function friendlyConnectError(error: Error | null, name: string): string | null 
   return 'Connection failed. Please try again.'
 }
 
-// ─── 가격 API ─────────────────────────────────────────────────────────────
+// Public client API setup
 interface PriceData { usd: number; change24h: number }
 
 async function fetchPrices(ids: string[]): Promise<Record<string, PriceData>> {
@@ -232,14 +316,14 @@ async function fetchPrices(ids: string[]): Promise<Record<string, PriceData>> {
   } catch { return {} }
 }
 
-// ─── 타입 ─────────────────────────────────────────────────────────────────
+// ── LI.FI chain config ─
 interface AssetRow {
   wallet: string; chain: number; symbol: string
   balance: string; usdcValue: string; coingeckoId: string; change24h: number
 }
 
 interface TxRecord {
-  type: 'swap' | 'bridge' | 'send' | 'cross'
+  type: 'swap' | 'bridge' | 'send' | 'cross' | 'escrow'
   summary: string; txHash: string; timestamp: number; status: 'success' | 'fail'
 }
 
@@ -261,14 +345,85 @@ type FaucetPollState = 'idle' | 'polling' | 'received'
 type NetworkMode = 'mainnet' | 'testnet'
 type MainTab     = 'assets' | 'history' | 'faucet'
 type Theme       = 'dark' | 'light'
+type LayoutMode  = 'contained' | 'wide' | 'fullscreen'
+type DensityMode = 'comfort' | 'compact'
+type Page        = 'overview' | 'marketplace' | 'portfolio' | 'pay' | 'funds' | 'escrow' | 'activity' | 'docs'
+type InAppFaucetChain = 'ARC-TESTNET' | 'ETH-SEPOLIA' | 'BASE-SEPOLIA'
+type MarketRequestStatus = 'open' | 'matched' | 'cancelled' | 'completed'
+type DealType = 'work' | 'milestone' | 'nft-otc'
+type DemoRole = 'client' | 'worker'
 
-// 주소록
+const PAGE_IDS: Page[] = ['overview', 'marketplace', 'portfolio', 'pay', 'funds', 'escrow', 'activity', 'docs']
+
+function getPageFromLocation(): Page {
+  if (typeof window === 'undefined') return 'overview'
+  const hashPage = window.location.hash.replace('#', '') as Page
+  return PAGE_IDS.includes(hashPage) ? hashPage : 'overview'
+}
+
 interface Contact { id: string; name: string; address: string }
+interface MarketRequest {
+  id: string
+  dealType?: DealType
+  title: string
+  category: string
+  budget: string
+  deadlineDays: string
+  listingDays?: string
+  listingFee?: string
+  expiresAt?: string
+  description: string
+  deliverable: string
+  upfrontAmount?: string
+  completionAmount?: string
+  nftChain?: string
+  nftContract?: string
+  nftTokenId?: string
+  nftSeller?: string
+  nftCollection?: string
+  client: string
+  agent?: string
+  escrowJobId?: string
+  resultSummary?: string
+  resultSubmittedAt?: string
+  status: MarketRequestStatus
+  createdAt: string
+  acceptedAt?: string
+  cancelledAt?: string
+  completedAt?: string
+}
+
 const CONTACTS_KEY = 'usdc_portal_contacts'
+const REQUESTS_KEY = 'usdc_portal_requests'
+const DEMO_MODE_KEY = 'usdc_portal_demo_mode'
+const DEMO_CLIENT = '0x1111111111111111111111111111111111111111'
+const DEMO_WORKER = '0x2222222222222222222222222222222222222222'
+const isDemoRequest = (request: MarketRequest) => request.id.startsWith('demo-') || request.escrowJobId?.startsWith('demo-')
 function loadContacts(): Contact[] {
   try { return JSON.parse(localStorage.getItem(CONTACTS_KEY) ?? '[]') } catch { return [] }
 }
 function saveContacts(c: Contact[]) { localStorage.setItem(CONTACTS_KEY, JSON.stringify(c)) }
+function loadMarketRequests(): MarketRequest[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(REQUESTS_KEY) ?? '[]')
+    return Array.isArray(stored) ? stored : []
+  } catch { return [] }
+}
+function saveMarketRequests(requests: MarketRequest[]) {
+  localStorage.setItem(REQUESTS_KEY, JSON.stringify(requests))
+}
+function getListingFee(days: string | number) {
+  const d = Math.max(1, Math.min(7, Number(days) || 3))
+  return d <= 3 ? '0.00' : ((d - 3) * 0.05).toFixed(2)
+}
+function formatTimeLeft(expiresAt?: string) {
+  if (!expiresAt) return 'No expiry'
+  const ms = new Date(expiresAt).getTime() - Date.now()
+  if (ms <= 0) return 'Expired'
+  const days = Math.floor(ms / 86400_000)
+  const hours = Math.ceil((ms % 86400_000) / 3600_000)
+  return days > 0 ? `${days}d ${hours}h left` : `${hours}h left`
+}
 
 // LI.FI
 interface LiFiQuote {
@@ -298,11 +453,11 @@ interface FaucetInfo {
 }
 
 const FAUCETS: FaucetInfo[] = [
-  { chain: 'Arc Testnet', chainId: arcTestnet.id, name: 'Circle Faucet', url: 'https://faucet.circle.com',
-    tokens: ['USDC'], desc: 'Official Circle faucet — Arc Testnet USDC', cooldownHours: 24,
+  { chain: 'Arc Testnet', chainId: arcTestnet.id, name: 'Circle Faucet', url: 'https://faucet.circle.com/?allow=true',
+    tokens: ['USDC'], desc: 'Official Circle faucet - 20 USDC every 2 hours', cooldownHours: 2,
     pollToken: { address: '0x3600000000000000000000000000000000000000', decimals: 6 } },
   { chain: 'Ethereum Sepolia', chainId: sepolia.id, name: 'Alchemy Faucet', url: 'https://sepoliafaucet.com',
-    tokens: ['ETH'], desc: 'Sepolia test ETH — 0.5 ETH/day', cooldownHours: 24, pollToken: 'native' },
+    tokens: ['ETH'], desc: 'Sepolia test ETH, up to 0.5 ETH/day', cooldownHours: 24, pollToken: 'native' },
   { chain: 'Ethereum Sepolia', chainId: sepolia.id, name: 'Chainlink Faucet', url: 'https://faucets.chain.link/sepolia',
     tokens: ['ETH', 'LINK'], desc: 'ETH + LINK in one request', cooldownHours: 24, pollToken: 'native' },
   { chain: 'Base Sepolia', chainId: baseSepolia.id, name: 'Base Faucet', url: 'https://faucet.quicknode.com/base/sepolia',
@@ -311,7 +466,13 @@ const FAUCETS: FaucetInfo[] = [
     tokens: ['ETH'], desc: 'Coinbase official Base faucet', cooldownHours: 24, pollToken: 'native' },
 ]
 
-// ─── Public clients ───────────────────────────────────────────────────────
+const IN_APP_FAUCETS: Record<InAppFaucetChain, { label: string; chainId: number; token: string; url: string; desc: string }> = {
+  'ARC-TESTNET':  { label: 'Arc Testnet',      chainId: arcTestnet.id,   token: 'USDC', url: 'https://faucet.circle.com/?allow=true', desc: 'Official Circle public faucet. Open it, paste the active wallet, and this portal will watch for the incoming USDC.' },
+  'ETH-SEPOLIA':  { label: 'Ethereum Sepolia', chainId: sepolia.id,      token: 'USDC', url: 'https://faucet.circle.com/?allow=true', desc: 'Use Circle public faucet for Sepolia USDC before CCTP bridge testing into Arc.' },
+  'BASE-SEPOLIA': { label: 'Base Sepolia',     chainId: baseSepolia.id,  token: 'USDC', url: 'https://faucet.circle.com/?allow=true', desc: 'Use Circle public faucet for Base Sepolia USDC before route testing.' },
+}
+
+// ── Public clients ─
 const publicClients = Object.fromEntries(
   CHAINS.map((chain) => {
     const rpcs: Record<number, string[]> = {
@@ -322,13 +483,14 @@ const publicClients = Object.fromEntries(
       [optimism.id]:   ['https://mainnet.optimism.io', 'https://1rpc.io/op'],
       [avalanche.id]:  ['https://api.avax.network/ext/bc/C/rpc', 'https://1rpc.io/avax/c'],
       [arcTestnet.id]: ['https://rpc.testnet.arc.network'],
+      [sepolia.id]:    ['https://ethereum-sepolia-rpc.publicnode.com', 'https://1rpc.io/sepolia'],
     }
     const urls = rpcs[chain.id]
     return [chain.id, createPublicClient({ chain, transport: urls ? fallback(urls.map((u) => http(u))) : http() })]
   })
 )
 
-// ─── TX 히스토리 ───────────────────────────────────────────────────────────
+// ── TX helpers ─
 const TX_KEY = 'usdc_portal_history'
 function loadHistory(): TxRecord[] {
   try { return JSON.parse(localStorage.getItem(TX_KEY) ?? '[]') } catch { return [] }
@@ -338,7 +500,18 @@ function addHistory(records: TxRecord[], entry: TxRecord): TxRecord[] {
   const next = [entry, ...records].slice(0, 50); saveHistory(next); return next
 }
 
-// ─── 유틸 컴포넌트 ────────────────────────────────────────────────────────
+function isNonceAlreadyUsedError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const msg = error.message.toLowerCase()
+  return msg.includes('nonce already used') || msg.includes('nonce has already been used')
+}
+
+function isReceiptTimeout(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  return error.message.toLowerCase().includes('timed out while waiting for transaction')
+}
+
+// Market request + bridge state
 function TokenIconWithChain({ symbol, chainId }: { symbol: string; chainId: number }) {
   const color = TOKEN_COLORS[symbol] ?? '#555'
   const chainColor = CHAIN_META[chainId]?.color ?? '#555'
@@ -423,7 +596,61 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
   )
 }
 
-// ─── 메인 앱 ──────────────────────────────────────────────────────────────
+type PendingBridge = {
+  burnHash: string; messageBytes: string; messageHash: string
+  direction: 'to-arc' | 'to-sepolia'; amount: string; savedAt: number; attestation?: string
+}
+
+// ── Wallet balance refresh ─
+function SettlementFlowDiagram() {
+  const steps = [
+    {
+      icon: '↓',
+      title: 'Lock Funds',
+      caption: 'Client deposits Arc USDC into escrow.',
+      color: '#2775ca',
+    },
+    {
+      icon: '↑',
+      title: 'Submit Work',
+      caption: 'Agent submits a deliverable, file, or public URI.',
+      color: '#627eea',
+    },
+    {
+      icon: '◈',
+      title: 'Claude Review',
+      caption: 'Claude evaluates the submitted result against the job description.',
+      color: '#d4a574',
+    },
+    {
+      icon: '→',
+      title: 'Release Payout',
+      caption: 'Approved work unlocks Arc USDC settlement to the agent.',
+      color: '#00c2ff',
+    },
+  ]
+  return (
+    <div className="sfd-wrap">
+      <div className="sfd-label">Settlement lifecycle</div>
+      <div className="sfd-steps">
+        {steps.map((s, i) => (
+          <div key={i} className="sfd-step" style={{ '--sfd-color': s.color, '--sfd-i': i } as React.CSSProperties}>
+            <div className="sfd-icon-col">
+              <div className="sfd-icon">{s.icon}</div>
+              {i < steps.length - 1 && <div className="sfd-connector" />}
+            </div>
+            <div className="sfd-content">
+              <div className="sfd-title">{s.title}</div>
+              <div className="sfd-caption">{s.caption}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Portfolio ─
 export default function App() {
   const connections = useConnections()
   const { connectors, connect, isPending: isConnecting, error: connectError, variables: connectVariables } = useConnect()
@@ -432,48 +659,75 @@ export default function App() {
   const { sendTransactionAsync } = useSendTransaction()
 
   const [theme, setTheme]           = useState<Theme>(() => (localStorage.getItem('theme') as Theme) ?? 'dark')
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => (localStorage.getItem('layoutMode') as LayoutMode) ?? 'contained')
+  const [densityMode, setDensityMode] = useState<DensityMode>(() => (localStorage.getItem('densityMode') as DensityMode) ?? 'comfort')
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const [networkMode, setNetworkMode] = useState<NetworkMode>(() => (localStorage.getItem('networkMode') as NetworkMode) ?? 'mainnet')
   const [mainTab, setMainTab]       = useState<MainTab>('assets')
   const [transferSeg, setTransferSeg] = useState<TransferSeg>('send')
   const [defiSeg, setDefiSeg]       = useState<DefiSeg>('cross')
+  const [moveFundsTab, setMoveFundsTab] = useState<'bridge' | 'cross' | 'send'>('bridge')
+  const [activePage, setActivePage] = useState<Page>(() => getPageFromLocation())
+  const pagePopRef = useRef(false)
+  const profileMenuRef = useRef<HTMLDivElement | null>(null)
 
-  // ── ArcEscrow 상태 ────────────────────────────────────────────────────────
+// ── ArcEscrow ?ê³¹ê¹­ ─
   const [escrowAgent,  setEscrowAgent]  = useState('')
   const [escrowAmount, setEscrowAmount] = useState('')
   const [escrowDays,   setEscrowDays]   = useState('3')
   const [escrowDesc,   setEscrowDesc]   = useState('')
+  const [escrowPayoutMode, setEscrowPayoutMode] = useState<'connected' | 'custom'>('connected')
   const [escrowJobId,  setEscrowJobId]  = useState('')
   const [escrowJob,    setEscrowJob]    = useState<{
     client: string; agent: string; amount: bigint; deadline: bigint;
-    description: string; resultUri: string; status: number; jobType: number
+    description: string; resultUri: string; status: number
   } | null>(null)
-  const [escrowCondition, setEscrowCondition] = useState<{
-    conditionTarget: string; conditionThreshold: bigint; comparator: number
-  } | null>(null)
-  const [escrowNewJobType, setEscrowNewJobType] = useState<'ai' | 'onchain'>('ai')
-  const [escrowCondToken,      setEscrowCondToken]      = useState('')
-  const [escrowCondRecipient,  setEscrowCondRecipient]  = useState('')
-  const [escrowCondThreshold,  setEscrowCondThreshold]  = useState('')
-  const [escrowCondComparator, setEscrowCondComparator] = useState<'gte' | 'lte' | 'eq'>('gte')
   const [escrowWorkText,     setEscrowWorkText]     = useState('')
   const [escrowWorkFile,     setEscrowWorkFile]     = useState<File | null>(null)
   const [escrowWorkUploading,setEscrowWorkUploading]= useState(false)
   const [escrowLoading,      setEscrowLoading]      = useState(false)
+  const [resultPreview,      setResultPreview]      = useState<{ url: string; text: string; contentType: string; loading: boolean; error: string } | null>(null)
   const [aiVerdict,          setAiVerdict]          = useState<{ verdict: 'approve' | 'reject'; reasoning: string } | null>(null)
   const [aiLoading,          setAiLoading]          = useState(false)
-  const [escrowMyTab,    setEscrowMyTab]    = useState<'new' | 'jobs'>('new')
+  const [escrowMyTab,    setEscrowMyTab]    = useState<'new' | 'jobs'>('jobs')
+  const [escrowProtocol, setEscrowProtocol] = useState<'arc-escrow' | 'erc8183'>('arc-escrow')
   const [recentJobIds,   setRecentJobIds]   = useState<number[]>(() => {
     try { return JSON.parse(localStorage.getItem('arc_escrow_jobs') ?? '[]') } catch { return [] }
   })
+  const [marketRequests, setMarketRequests] = useState<MarketRequest[]>(loadMarketRequests)
+  const [marketLoading, setMarketLoading] = useState(false)
+  const [marketTab, setMarketTab] = useState<'browse' | 'create'>('browse')
+  const [marketDealFilter, setMarketDealFilter] = useState<'all' | DealType>('all')
+  const [marketScopeFilter, setMarketScopeFilter] = useState<'open' | 'mine' | 'all'>('all')
+  const [demoMode, setDemoModeState] = useState(() => localStorage.getItem(DEMO_MODE_KEY) === '1')
+  const [demoRole, setDemoRole] = useState<DemoRole>('client')
+  const [activeEscrowRequestId, setActiveEscrowRequestId] = useState<string | null>(null)
+  const [requestDealType, setRequestDealType] = useState<DealType>('work')
+  const [requestTitle, setRequestTitle] = useState('')
+  const [requestCategory, setRequestCategory] = useState('AI Work')
+  const [requestBudget, setRequestBudget] = useState('')
+  const [requestUpfront, setRequestUpfront] = useState('10')
+  const [requestCompletion, setRequestCompletion] = useState('10')
+  const [requestNftChain, setRequestNftChain] = useState('Arc Testnet')
+  const [requestNftContract, setRequestNftContract] = useState('')
+  const [requestNftTokenId, setRequestNftTokenId] = useState('')
+  const [requestNftSeller, setRequestNftSeller] = useState('')
+  const [requestNftCollection, setRequestNftCollection] = useState('')
+  const [requestDays, setRequestDays] = useState('3')
+  const [requestListingDays, setRequestListingDays] = useState('3')
+  const [requestDescription, setRequestDescription] = useState('')
+  const [requestDeliverable, setRequestDeliverable] = useState('')
   const [sortBy, setSortBy]         = useState<'value' | 'symbol' | 'chain'>('value')
 
   const [assets, setAssets]         = useState<AssetRow[]>([])
   const [prices, setPrices]         = useState<Record<string, PriceData>>({})
   const [totalUsdc, setTotalUsdc]   = useState('0.00')
   const [loadingAssets, setLoadingAssets] = useState(false)
+  const [cctpBalances, setCctpBalances] = useState<{ sepolia: string; arc: string; loading: boolean }>({ sepolia: '—', arc: '—', loading: false })
   const [history, setHistory]       = useState<TxRecord[]>(loadHistory)
 
   const [showConnectors, setShowConnectors] = useState(false)
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [connectingId, setConnectingId]     = useState<string | null>(null)
   const [confirmState, setConfirmState]     = useState<ConfirmState | null>(null)
   const [copiedAddr, setCopiedAddr]         = useState(false)
@@ -482,32 +736,58 @@ export default function App() {
   // Toast
   const [toasts, setToasts] = useState<Toast[]>([])
 
-  // 주소록
   const [contacts, setContacts]           = useState<Contact[]>(loadContacts)
   const [showContacts, setShowContacts]   = useState(false)
   const [newContactName, setNewContactName] = useState('')
   const [newContactAddr, setNewContactAddr] = useState('')
 
-  // 가스비
+// Wallet + chain helpers
   const [gasPrices, setGasPrices] = useState<Record<number, string>>({})
 
-  // 파우셋 폴링
+  // loading states
   const [faucetPoll, setFaucetPoll] = useState<Record<number, FaucetPollState>>({})
+  const [inAppFaucetChain, setInAppFaucetChain] = useState<InAppFaucetChain>('ARC-TESTNET')
+  const [inAppFaucetLoading, setInAppFaucetLoading] = useState(false)
+  const [inAppFaucetMessage, setInAppFaucetMessage] = useState('')
   const pollTimers = useRef<Record<number, ReturnType<typeof setInterval>>>({})
 
-  // 폼 상태
+  // escrow state
   const [recipient, setRecipient] = useState('')
   const [amount, setAmount]       = useState('')
   // fromChain kept for Circle AppKit compatibility (kit.unifiedBalance)
   const _fromChain = 'Base_Sepolia' as const; void _fromChain
   const [txLoading, setTxLoading] = useState(false)
 
-  // CCTP Bridge 상태
+  // CCTP Bridge ?곹깭
   type CCTPStep = 'idle' | 'approving' | 'burning' | 'attesting' | 'minting' | 'done' | 'error'
   const [cctpAmount,    setCctpAmount]    = useState('')
   const [cctpRecipient, setCctpRecipient] = useState('')
   const [cctpStep,      setCctpStep]      = useState<CCTPStep>('idle')
   const [cctpBurnHash,  setCctpBurnHash]  = useState('')
+  const [cctpDirection, setCctpDirection] = useState<'to-arc' | 'to-sepolia'>('to-arc')
+
+  const [pendingBridge, setPendingBridge] = useState<PendingBridge | null>(() => {
+    try { return JSON.parse(localStorage.getItem('cctp_pending_bridge') ?? 'null') } catch { return null }
+  })
+  const [claimLoading, setClaimLoading] = useState(false)
+  const [recoverHash,  setRecoverHash]  = useState('')
+
+  // ERC-8183 state
+  type E8183Step = 'idle' | 'creating' | 'funding' | 'submitting' | 'completing' | 'done' | 'error'
+  const [e8183Tab,       setE8183Tab]       = useState<'create' | 'lookup'>('create')
+  const [e8183Provider,  setE8183Provider]  = useState('')
+  const [e8183PayoutMode, setE8183PayoutMode] = useState<'connected' | 'custom'>('connected')
+  const [e8183Amount,    setE8183Amount]    = useState('')
+  const [e8183Days,      setE8183Days]      = useState('3')
+  const [e8183Desc,      setE8183Desc]      = useState('')
+  const [e8183JobId,     setE8183JobId]     = useState('')
+  const [e8183Job,       setE8183Job]       = useState<{
+    id: bigint; client: string; provider: string; evaluator: string;
+    description: string; budget: bigint; expiredAt: bigint; status: number
+  } | null>(null)
+  const [e8183DelivUri,  setE8183DelivUri]  = useState('')
+  const [e8183Step,      setE8183Step]      = useState<E8183Step>('idle')
+  const [e8183Loading,   setE8183Loading]   = useState(false)
 
   // LI.FI
   const [lifiFromChainId, setLifiFromChainId] = useState<number>(mainnet.id)
@@ -520,43 +800,146 @@ export default function App() {
   const [lifiError, setLifiError]             = useState('')
   const [lifiExecuting, setLifiExecuting]     = useState(false)
 
-  // Payment Hub
-  const [payNote, setPayNote]                 = useState('')
-  const [payAmount, setPayAmount]             = useState('')
-  const [contractBalance, setContractBalance] = useState<string>('')
-  const [contractOwner, setContractOwner]     = useState<string>('')
-  const [withdrawLoading, setWithdrawLoading] = useState(false)
 
   const allAddresses = [...new Set(connections.flatMap((c) => c.accounts))]
   const isConnected  = connections.length > 0
   const activeChainId = connections[0]?.chainId
+  const activeWallet = allAddresses[0]
+  const activeWalletShort = activeWallet ? `${activeWallet.slice(0, 6)}...${activeWallet.slice(-4)}` : 'Not connected'
+  const demoWallet = demoRole === 'client' ? DEMO_CLIENT : DEMO_WORKER
+  const demoWalletShort = `${demoWallet.slice(0, 6)}...${demoWallet.slice(-4)}`
+  const marketWallet = demoMode ? demoWallet : activeWallet
+  const marketWalletShort = demoMode ? demoWalletShort : activeWalletShort
+  const marketCanAct = demoMode || Boolean(isConnected && activeWallet)
+  const activeChainMeta = activeChainId ? CHAIN_META[activeChainId] : undefined
+  const escrowWorkerAddress = escrowPayoutMode === 'connected' ? (activeWallet ?? '') : escrowAgent
+  const e8183WorkerAddress = e8183PayoutMode === 'connected' ? (activeWallet ?? '') : e8183Provider
+  const settlementHistory = history.filter((h) => h.type === 'escrow')
+  const completedSettlementCount = settlementHistory.filter((h) => h.status === 'success' && /released|approved|refund/i.test(h.summary)).length
+  const activeMarketRequests = demoMode ? marketRequests : marketRequests.filter((request) => !isDemoRequest(request))
+  const requestStats = {
+    open: activeMarketRequests.filter((r) => r.status === 'open').length,
+    matched: activeMarketRequests.filter((r) => r.status === 'matched').length,
+    funded: activeMarketRequests.filter((r) => r.escrowJobId && r.status !== 'cancelled').length,
+    mine: activeMarketRequests.filter((r) => marketWallet && (r.client.toLowerCase() === marketWallet.toLowerCase() || r.agent?.toLowerCase() === marketWallet.toLowerCase())).length,
+  }
+  const escrowRelatedRequests = marketRequests.filter((request) =>
+    activeWallet
+    && (request.client.toLowerCase() === activeWallet.toLowerCase() || request.agent?.toLowerCase() === activeWallet.toLowerCase())
+    && Boolean(request.agent || request.escrowJobId)
+  )
+  const filteredMarketRequests = activeMarketRequests.filter((request) => {
+    const matchesDeal = marketDealFilter === 'all' || (request.dealType ?? 'work') === marketDealFilter
+    const matchesScope = marketScopeFilter === 'all'
+      || (marketScopeFilter === 'open' && request.status === 'open')
+      || (marketScopeFilter === 'mine' && Boolean(marketWallet && (request.client.toLowerCase() === marketWallet.toLowerCase() || request.agent?.toLowerCase() === marketWallet.toLowerCase())))
+    return matchesDeal && matchesScope
+  })
 
-  // ─── Toast 헬퍼 ──────────────────────────────────────────────────────────
+  function setDemoMode(next: boolean) {
+    setDemoModeState(next)
+    localStorage.setItem(DEMO_MODE_KEY, next ? '1' : '0')
+    if (next) setMarketScopeFilter('all')
+  }
+
+// ── Toast manager ─
   function addToast(t: Omit<Toast, 'id'>): string {
     const id = Date.now().toString() + Math.random().toString(36).slice(2)
     setToasts((prev) => [...prev, { ...t, id }])
-    if (t.type !== 'loading') setTimeout(() => removeToast(id), 5000)
+    if (t.type === 'success') setTimeout(() => removeToast(id), 6000)
+    if (t.type === 'error') setTimeout(() => removeToast(id), 10000)
     return id
   }
   function removeToast(id: string) { setToasts((prev) => prev.filter((x) => x.id !== id)) }
   // updateToast available for future use
   // function updateToast(id: string, t: Partial<Toast>) { ... }
 
-  useEffect(() => { localStorage.setItem('theme', theme) }, [theme])
-  useEffect(() => { localStorage.setItem('networkMode', networkMode) }, [networkMode])
-  useEffect(() => { if (allAddresses.length) loadAssets() }, [connections.length, allAddresses.join(',')])
+  function navigatePage(page: Page) {
+    setActivePage(page)
+    setShowProfileMenu(false)
+    setShowConnectors(false)
+    const targetHash = page
+    if (window.location.hash.replace('#', '') !== targetHash) {
+      window.location.hash = targetHash
+    }
+  }
 
-  // 60초 자동 새로고침
+  useEffect(() => { localStorage.setItem('theme', theme) }, [theme])
+  useEffect(() => { localStorage.setItem('layoutMode', layoutMode) }, [layoutMode])
+  useEffect(() => { localStorage.setItem('densityMode', densityMode) }, [densityMode])
+  useEffect(() => {
+    const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', syncFullscreen)
+    syncFullscreen()
+    return () => document.removeEventListener('fullscreenchange', syncFullscreen)
+  }, [])
+
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+      } else {
+        await document.documentElement.requestFullscreen()
+      }
+    } catch {
+      addToast({ type: 'error', message: 'Fullscreen is blocked by this browser window.' })
+    }
+  }, [])
+  useEffect(() => { localStorage.setItem('networkMode', networkMode) }, [networkMode])
+  useEffect(() => { saveMarketRequests(marketRequests) }, [marketRequests])
+  useEffect(() => { loadMarketRequestsFromApi() }, [])
+  useEffect(() => { if (allAddresses.length) loadAssets() }, [connections.length, allAddresses.join(',')])
+  useEffect(() => {
+    const applyPageFromUrl = () => {
+      pagePopRef.current = true
+      setActivePage(getPageFromLocation())
+      setShowProfileMenu(false)
+      setShowConnectors(false)
+    }
+    window.addEventListener('hashchange', applyPageFromUrl)
+    return () => {
+      window.removeEventListener('hashchange', applyPageFromUrl)
+    }
+  }, [])
+  useEffect(() => {
+    if (pagePopRef.current) {
+      pagePopRef.current = false
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [activePage])
+  useEffect(() => {
+    if (!showProfileMenu && !showConnectors) return
+    const closeOnOutside = (event: MouseEvent) => {
+      if (!profileMenuRef.current?.contains(event.target as Node)) {
+        setShowProfileMenu(false)
+        setShowConnectors(false)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowProfileMenu(false)
+        setShowConnectors(false)
+      }
+    }
+    document.addEventListener('mousedown', closeOnOutside)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutside)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [showProfileMenu, showConnectors])
+
+  // auto-refresh every 60 seconds
   useEffect(() => {
     if (!isConnected) return
     const t = setInterval(() => loadAssets(), 60000)
     return () => clearInterval(t)
   }, [isConnected])
 
-  // 폴링 클린업
+  // cleanup poll timers on unmount
   useEffect(() => () => { Object.values(pollTimers.current).forEach(clearInterval) }, [])
 
-  // ─── 가스비 조회 ─────────────────────────────────────────────────────────
+// Asset loading + polling
   useEffect(() => {
     async function fetchGas() {
       const results: Record<number, string> = {}
@@ -577,43 +960,58 @@ export default function App() {
     return () => clearInterval(t)
   }, [networkMode])
 
-  // ─── 자산 조회 ───────────────────────────────────────────────────────────
+// ── Confirm modal ─
   const loadAssets = useCallback(async () => {
     if (!allAddresses.length) return
     setLoadingAssets(true)
     try {
-      const rows: AssetRow[] = []
+      // All RPC calls fire in parallel — no sequential chain/token loop
+      const balanceTasks: Promise<AssetRow | null>[] = []
       for (const address of allAddresses) {
         const shortAddr = `${address.slice(0, 6)}...${address.slice(-4)}`
         for (const chain of CHAINS) {
           const client = publicClients[chain.id]
-          try {
-            const bal = await client.getBalance({ address })
-            if (bal > 0n) {
-              const isArc  = chain.id === arcTestnet.id
-              const isPoly = chain.id === polygon.id
-              const isAvax = chain.id === avalanche.id
-              rows.push({
-                wallet: shortAddr, chain: chain.id,
+          const isArc  = chain.id === arcTestnet.id
+          const isPoly = chain.id === polygon.id
+          const isAvax = chain.id === avalanche.id
+          balanceTasks.push(
+            client.getBalance({ address }).then(bal => {
+              if (bal === 0n) return null
+              return {
+                wallet: shortAddr, chain: chain.id, change24h: 0,
                 symbol: isArc ? 'USDC (gas)' : isPoly ? 'POL' : isAvax ? 'AVAX' : 'ETH',
-                balance: parseFloat(formatUnits(bal, 18)).toFixed(6), usdcValue: '0', change24h: 0,
-                coingeckoId: isArc ? 'usd-coin' : isPoly ? 'matic-network' : isAvax ? 'avalanche-2' : 'ethereum',
-              })
-            }
-          } catch { /* ignore */ }
+                balance: parseFloat(formatUnits(bal, 18)).toFixed(6),
+                usdcValue: '0',
+                coingeckoId: isArc ? 'usd-coin' : isPoly ? 'polygon-ecosystem-token' : isAvax ? 'avalanche-2' : 'ethereum',
+              } as AssetRow
+            }).catch(() => null)
+          )
           for (const token of TOKENS[chain.id] ?? []) {
-            try {
-              const bal = await client.readContract({ address: token.address, abi: ERC20_ABI, functionName: 'balanceOf', args: [address] })
-              if ((bal as bigint) > 0n)
-                rows.push({ wallet: shortAddr, chain: chain.id, symbol: token.symbol, change24h: 0,
-                  balance: parseFloat(formatUnits(bal as bigint, token.decimals)).toFixed(6),
-                  usdcValue: '0', coingeckoId: token.coingeckoId })
-            } catch { /* ignore */ }
+            balanceTasks.push(
+              client.readContract({ address: token.address, abi: ERC20_ABI, functionName: 'balanceOf', args: [address] })
+                .then(bal => {
+                  if ((bal as bigint) === 0n) return null
+                  return {
+                    wallet: shortAddr, chain: chain.id, symbol: token.symbol, change24h: 0,
+                    balance: parseFloat(formatUnits(bal as bigint, token.decimals)).toFixed(6),
+                    usdcValue: '0', coingeckoId: token.coingeckoId,
+                  } as AssetRow
+                }).catch(() => null)
+            )
           }
         }
       }
-      const ids = [...new Set(rows.map((r) => r.coingeckoId))]
-      const priceMap = await fetchPrices(ids)
+      // Price fetch runs in parallel with all balance queries
+      const allCgIds = ['ethereum', 'usd-coin', 'tether', 'weth', 'dai',
+        'polygon-ecosystem-token', 'arbitrum', 'optimism', 'avalanche-2']
+      const [settled, priceMap] = await Promise.all([
+        Promise.allSettled(balanceTasks),
+        fetchPrices(allCgIds),
+      ])
+      const rows = settled
+        .filter((r): r is PromiseFulfilledResult<AssetRow | null> => r.status === 'fulfilled')
+        .map(r => r.value)
+        .filter((r): r is AssetRow => r !== null)
       setPrices(priceMap)
       let total = 0
       const enriched = rows.map((r) => {
@@ -627,7 +1025,48 @@ export default function App() {
     } finally { setLoadingAssets(false) }
   }, [allAddresses.join(',')])
 
-  // ─── 주소록 ──────────────────────────────────────────────────────────────
+  const loadCctpBalances = useCallback(async () => {
+    const addr = allAddresses[0] as `0x${string}` | undefined
+    if (!addr) return
+    setCctpBalances(b => ({ ...b, loading: true }))
+    try {
+      const [sepoliaBal, arcBal] = await Promise.all([
+        publicClients[11155111].readContract({
+          address: SEPOLIA_USDC as `0x${string}`,
+          abi: ERC20_ABI, functionName: `balanceOf`, args: [addr],
+        }).catch(() => 0n),
+        publicClients[5042002].readContract({
+          address: ARC_TESTNET_USDC,
+          abi: ERC20_ABI, functionName: `balanceOf`, args: [addr],
+        }).catch(() => 0n),
+      ])
+      setCctpBalances({
+        sepolia: parseFloat(formatUnits(sepoliaBal as bigint, 6)).toFixed(2),
+        arc:     parseFloat(formatUnits(arcBal as bigint, 6)).toFixed(2),
+        loading: false,
+      })
+    } catch {
+      setCctpBalances(b => ({ ...b, loading: false }))
+    }
+  }, [allAddresses.join(',')])
+
+  useEffect(() => { if (isConnected && allAddresses[0]) loadCctpBalances() }, [isConnected, allAddresses.join(',')])
+
+  useEffect(() => {
+    if (activePage !== 'overview') return
+    let obs: IntersectionObserver
+    const timer = setTimeout(() => {
+      const els = document.querySelectorAll<HTMLElement>('.reveal-section')
+      obs = new IntersectionObserver(
+        (entries) => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('in-view') }),
+        { threshold: 0.08 }
+      )
+      els.forEach(el => obs.observe(el))
+    }, 80)
+    return () => { clearTimeout(timer); obs?.disconnect() }
+  }, [activePage])
+
+// ── Bidirectional CCTP bridge ─
   function addContact() {
     if (!newContactName.trim() || !isAddress(newContactAddr)) return
     const next = [...contacts, { id: Date.now().toString(), name: newContactName.trim(), address: newContactAddr }]
@@ -639,7 +1078,365 @@ export default function App() {
     setContacts(next); saveContacts(next)
   }
 
-  // ─── 파우셋 폴링 ─────────────────────────────────────────────────────────
+  async function loadMarketRequestsFromApi() {
+    setMarketLoading(true)
+    try {
+      const res = await fetch('/api/requests')
+      const contentType = res.headers.get('content-type') ?? ''
+      if (!contentType.includes('application/json')) return
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not load requests')
+      if (Array.isArray(json.requests)) {
+        setMarketRequests((prev) => {
+          const localDemo = prev.filter(isDemoRequest)
+          const remoteIds = new Set(json.requests.map((request: MarketRequest) => request.id))
+          return [...localDemo.filter((request) => !remoteIds.has(request.id)), ...json.requests]
+        })
+      }
+    } catch {
+      // Local Vite dev does not serve Vercel API routes; keep the local fallback quiet.
+    } finally {
+      setMarketLoading(false)
+    }
+  }
+
+  async function createMarketRequest() {
+    if (!marketCanAct || !marketWallet) return addToast({ type: 'error', message: 'Connect a wallet first or turn on Demo mode' })
+    if (!requestTitle.trim()) return addToast({ type: 'error', message: 'Enter a request title' })
+    if (!requestDescription.trim()) return addToast({ type: 'error', message: 'Describe the work request' })
+    if (!requestDeliverable.trim()) return addToast({ type: 'error', message: 'Define the expected deliverable' })
+    const upfront = parseFloat(requestUpfront)
+    const completion = parseFloat(requestCompletion)
+    const budget = requestDealType === 'milestone' ? upfront + completion : parseFloat(requestBudget)
+    if (!Number.isFinite(budget) || budget <= 0) return addToast({ type: 'error', message: 'Enter a USDC budget' })
+    if (requestDealType === 'milestone' && (!Number.isFinite(upfront) || upfront < 0 || !Number.isFinite(completion) || completion <= 0)) {
+      return addToast({ type: 'error', message: 'Enter valid upfront and completion amounts' })
+    }
+    if (requestDealType === 'nft-otc') {
+      if (!isAddress(requestNftContract)) return addToast({ type: 'error', message: 'Enter a valid NFT contract address' })
+      if (!requestNftTokenId.trim()) return addToast({ type: 'error', message: 'Enter the NFT token ID' })
+      if (requestNftSeller && !isAddress(requestNftSeller)) return addToast({ type: 'error', message: 'Seller wallet must be a valid address' })
+      if (NFT_OTC_ESCROW === '0x0000000000000000000000000000000000000000') {
+        return addToast({ type: 'error', message: 'NFT OTC escrow is experimental. Use Demo mode or verify NFT_OTC_ESCROW before posting.' })
+      }
+    }
+    if (demoMode) {
+      const visibleDays = Math.max(1, Math.min(7, Number(requestListingDays) || 3))
+      const createdAt = new Date()
+      const escrowJobId = `demo-${Date.now().toString().slice(-5)}`
+      const next: MarketRequest = {
+        id: `demo-req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        dealType: requestDealType,
+        title: requestTitle.trim(),
+        category: requestCategory.trim() || 'AI Work',
+        budget: budget.toFixed(2),
+        upfrontAmount: requestDealType === 'milestone' ? upfront.toFixed(2) : undefined,
+        completionAmount: requestDealType === 'milestone' ? completion.toFixed(2) : undefined,
+        nftChain: requestDealType === 'nft-otc' ? requestNftChain : undefined,
+        nftContract: requestDealType === 'nft-otc' ? requestNftContract : undefined,
+        nftTokenId: requestDealType === 'nft-otc' ? requestNftTokenId : undefined,
+        nftSeller: requestDealType === 'nft-otc' ? requestNftSeller : undefined,
+        nftCollection: requestDealType === 'nft-otc' ? requestNftCollection : undefined,
+        deadlineDays: String(Math.max(1, Math.min(90, Number(requestDays) || 3))),
+        listingDays: String(visibleDays),
+        listingFee: getListingFee(visibleDays),
+        description: requestDescription.trim(),
+        deliverable: requestDeliverable.trim(),
+        client: marketWallet,
+        escrowJobId,
+        status: 'open',
+        createdAt: createdAt.toISOString(),
+        expiresAt: new Date(createdAt.getTime() + visibleDays * 86400_000).toISOString(),
+      }
+      setMarketRequests((prev) => {
+        const updated = [next, ...prev]
+        saveMarketRequests(updated)
+        return updated
+      })
+      setRequestTitle(''); setRequestBudget(''); setRequestDays('3')
+      setRequestListingDays('3'); setRequestDescription(''); setRequestDeliverable(''); setRequestCategory('AI Work')
+      setRequestDealType('work'); setRequestUpfront('10'); setRequestCompletion('10')
+      setRequestNftChain('Arc Testnet'); setRequestNftContract(''); setRequestNftTokenId(''); setRequestNftSeller(''); setRequestNftCollection('')
+      setMarketTab('browse')
+      addToast({ type: 'success', message: `Demo request posted with escrow #${escrowJobId}` })
+      return
+    }
+    const { encodeFunctionData } = await import('viem')
+    setMarketLoading(true)
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+      const usdcAmt  = BigInt(Math.round(budget * 1e6))
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + parseInt(requestDays) * 86400)
+      const arcClient = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
+      let escrowJobId: number
+      let txHash: string | undefined
+      if (requestDealType === 'nft-otc') {
+        await sendTransactionAsync({ to: ARC_TESTNET_USDC,
+          data: encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve', args: [NFT_OTC_ESCROW, usdcAmt] }) })
+        const sellerAddr = (requestNftSeller && isAddress(requestNftSeller) ? requestNftSeller : '0x0000000000000000000000000000000000000000') as `0x${string}`
+        txHash = await sendTransactionAsync({ to: NFT_OTC_ESCROW,
+          data: encodeFunctionData({ abi: NFT_OTC_ESCROW_ABI, functionName: 'fundDeal',
+            args: [sellerAddr, requestNftContract as `0x${string}`, BigInt(requestNftTokenId), usdcAmt, deadline] }) })
+        const nextId = await arcClient.readContract({ address: NFT_OTC_ESCROW, abi: NFT_OTC_ESCROW_ABI, functionName: 'nextDealId' })
+        escrowJobId = Number(nextId) - 1
+      } else {
+        await sendTransactionAsync({ to: ARC_TESTNET_USDC,
+          data: encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve', args: [ARC_ESCROW, usdcAmt] }) })
+        txHash = await sendTransactionAsync({ to: ARC_ESCROW,
+          data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'createJob',
+            args: ['0x0000000000000000000000000000000000000000' as `0x${string}`, usdcAmt, deadline, `${requestTitle}: ${requestDeliverable}`] }) })
+        const nextId = await arcClient.readContract({ address: ARC_ESCROW, abi: NEXT_JOB_ID_ABI, functionName: 'nextJobId' })
+        escrowJobId = Number(nextId) - 1
+      }
+      const res = await fetch('/api/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dealType: requestDealType, title: requestTitle, category: requestCategory, budget,
+          upfrontAmount: requestDealType === 'milestone' ? upfront : undefined,
+          completionAmount: requestDealType === 'milestone' ? completion : undefined,
+          nftChain: requestDealType === 'nft-otc' ? requestNftChain : undefined,
+          nftContract: requestDealType === 'nft-otc' ? requestNftContract : undefined,
+          nftTokenId: requestDealType === 'nft-otc' ? requestNftTokenId : undefined,
+          nftSeller: requestDealType === 'nft-otc' ? requestNftSeller : undefined,
+          nftCollection: requestDealType === 'nft-otc' ? requestNftCollection : undefined,
+          deadlineDays: requestDays, listingDays: requestListingDays,
+          description: requestDescription, deliverable: requestDeliverable,
+          client: activeWallet, escrowJobId,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not post request')
+      if (Array.isArray(json.requests)) setMarketRequests(json.requests)
+      setRequestTitle(''); setRequestBudget(''); setRequestDays('3')
+      setRequestListingDays('3'); setRequestDescription(''); setRequestDeliverable(''); setRequestCategory('AI Work')
+      setRequestDealType('work'); setRequestUpfront('10'); setRequestCompletion('10')
+      setRequestNftChain('Arc Testnet'); setRequestNftContract(''); setRequestNftTokenId(''); setRequestNftSeller(''); setRequestNftCollection('')
+      setMarketTab('browse')
+      addToast({ type: 'success', message: `Posted — ${budget} USDC locked in escrow (job #${escrowJobId})`, txHash, explorerBase: 'https://testnet.arcscan.app' })
+    } catch (e) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Could not post request' })
+    } finally {
+      setMarketLoading(false)
+    }
+  }
+
+  async function acceptMarketRequest(id: string, dealType: DealType, escrowJobId: string | undefined) {
+    if (!marketCanAct || !marketWallet) return addToast({ type: 'error', message: 'Connect a wallet first or turn on Demo mode' })
+    if (!escrowJobId) return addToast({ type: 'error', message: 'No on-chain job ID found for this request' })
+    if (demoMode) {
+      const target = marketRequests.find((request) => request.id === id)
+      if (!target) return addToast({ type: 'error', message: 'Request not found' })
+      if (target.client.toLowerCase() === marketWallet.toLowerCase()) return addToast({ type: 'error', message: 'Switch to Worker role to accept this request' })
+      if (target.status !== 'open') return addToast({ type: 'error', message: 'Request is already matched' })
+      setMarketRequests((prev) => {
+        const updated = prev.map((request) => request.id === id
+          ? { ...request, agent: marketWallet, status: 'matched' as const, acceptedAt: new Date().toISOString() }
+          : request)
+        saveMarketRequests(updated)
+        return updated
+      })
+      addToast({ type: 'success', message: 'Demo worker accepted the funded request' })
+      return
+    }
+    const { encodeFunctionData } = await import('viem')
+    setMarketLoading(true)
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+      let claimHash: string
+      if (dealType === 'nft-otc') {
+        claimHash = await sendTransactionAsync({ to: NFT_OTC_ESCROW,
+          data: encodeFunctionData({ abi: NFT_OTC_ESCROW_ABI, functionName: 'claimDeal', args: [BigInt(escrowJobId)] }) })
+      } else {
+        claimHash = await sendTransactionAsync({ to: ARC_ESCROW,
+          data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'claimJob', args: [BigInt(escrowJobId)] }) })
+      }
+      const res = await fetch('/api/requests', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'accept', agent: activeWallet }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not accept request')
+      if (Array.isArray(json.requests)) setMarketRequests(json.requests)
+      addToast({ type: 'success', message: 'Accepted — you are now the matched worker', txHash: claimHash, explorerBase: 'https://testnet.arcscan.app' })
+    } catch (e) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Could not accept request' })
+    } finally {
+      setMarketLoading(false)
+    }
+  }
+
+  async function cancelMarketRequest(id: string, dealType: DealType, escrowJobId: string | undefined) {
+    if (!marketCanAct || !marketWallet) return addToast({ type: 'error', message: 'Connect a wallet first or turn on Demo mode' })
+    if (!escrowJobId) return addToast({ type: 'error', message: 'No on-chain job ID found' })
+    if (demoMode) {
+      const target = marketRequests.find((request) => request.id === id)
+      if (!target) return addToast({ type: 'error', message: 'Request not found' })
+      if (target.client.toLowerCase() !== marketWallet.toLowerCase()) return addToast({ type: 'error', message: 'Switch to Client role to cancel this request' })
+      setMarketRequests((prev) => {
+        const updated = prev.map((request) => request.id === id
+          ? { ...request, status: 'cancelled' as const, cancelledAt: new Date().toISOString() }
+          : request)
+        saveMarketRequests(updated)
+        return updated
+      })
+      addToast({ type: 'success', message: 'Demo request cancelled and refund simulated' })
+      return
+    }
+    const { encodeFunctionData } = await import('viem')
+    setMarketLoading(true)
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+      let cancelHash: string
+      if (dealType === 'nft-otc') {
+        cancelHash = await sendTransactionAsync({ to: NFT_OTC_ESCROW,
+          data: encodeFunctionData({ abi: NFT_OTC_ESCROW_ABI, functionName: 'cancelDeal', args: [BigInt(escrowJobId)] }) })
+      } else {
+        cancelHash = await sendTransactionAsync({ to: ARC_ESCROW,
+          data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'cancelJob', args: [BigInt(escrowJobId)] }) })
+      }
+      const res = await fetch('/api/requests', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'cancel', client: activeWallet }),
+      })
+      const json = await res.json()
+      if (res.ok && Array.isArray(json.requests)) setMarketRequests(json.requests)
+      addToast({ type: 'success', message: 'Cancelled — USDC refunded (5% fee to worker if already matched)', txHash: cancelHash, explorerBase: 'https://testnet.arcscan.app' })
+    } catch (e) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Cancel failed' })
+    } finally {
+      setMarketLoading(false)
+    }
+  }
+
+  async function approveNftForEscrow(nftContract: string, tokenId: string) {
+    if (!isConnected) return addToast({ type: 'error', message: 'Connect a wallet first' })
+    const { encodeFunctionData } = await import('viem')
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+      const approveHash = await sendTransactionAsync({ to: nftContract as `0x${string}`,
+        data: encodeFunctionData({ abi: ERC721_ABI, functionName: 'approve', args: [NFT_OTC_ESCROW, BigInt(tokenId)] }) })
+      addToast({ type: 'success', message: 'NFT approved for escrow — either side can now settle', txHash: approveHash, explorerBase: 'https://testnet.arcscan.app' })
+    } catch (e) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Approve failed' })
+    }
+  }
+
+  async function settleNftOtcDeal(requestId: string, escrowJobId: string) {
+    if (!isConnected) return addToast({ type: 'error', message: 'Connect a wallet first' })
+    const { encodeFunctionData } = await import('viem')
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+      const settleHash = await sendTransactionAsync({ to: NFT_OTC_ESCROW,
+        data: encodeFunctionData({ abi: NFT_OTC_ESCROW_ABI, functionName: 'settle', args: [BigInt(escrowJobId)] }) })
+      // Mark request as completed in the shared board
+      await fetch('/api/requests', { method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: requestId, action: 'complete' }) })
+      await loadMarketRequestsFromApi()
+      addToast({ type: 'success', message: 'Deal settled — NFT sent to buyer, USDC released to seller', txHash: settleHash, explorerBase: 'https://testnet.arcscan.app' })
+    } catch (e) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Settle failed' })
+    }
+  }
+
+  function submitDemoResult(requestId: string) {
+    if (!demoMode) return
+    const target = marketRequests.find((request) => request.id === requestId)
+    if (!target) return addToast({ type: 'error', message: 'Request not found' })
+    if (target.agent?.toLowerCase() !== marketWallet?.toLowerCase()) return addToast({ type: 'error', message: 'Switch to Worker role to submit this result.' })
+    if (target.status !== 'matched') return addToast({ type: 'error', message: 'Only matched demo requests can receive a result.' })
+    if (target.resultSubmittedAt) return addToast({ type: 'error', message: 'Result already submitted.' })
+    setMarketRequests((prev) => {
+      const updated = prev.map((request) => request.id === requestId
+        ? {
+            ...request,
+            resultSummary: request.dealType === 'nft-otc'
+              ? 'Seller approved the NFT for escrow settlement.'
+              : 'Worker submitted a concise deliverable for client review.',
+            resultSubmittedAt: new Date().toISOString(),
+          }
+        : request)
+      saveMarketRequests(updated)
+      return updated
+    })
+    addToast({ type: 'success', message: 'Demo result submitted. Switch to Client role to release payment.' })
+  }
+
+  function releaseDemoRequest(requestId: string) {
+    if (!demoMode) return
+    const target = marketRequests.find((request) => request.id === requestId)
+    if (!target) return addToast({ type: 'error', message: 'Request not found' })
+    if (target.client.toLowerCase() !== marketWallet?.toLowerCase()) return addToast({ type: 'error', message: 'Switch to Client role to release payment.' })
+    if (!target.resultSubmittedAt) return addToast({ type: 'error', message: 'Wait for the worker to submit a result first.' })
+    setMarketRequests((prev) => {
+      const updated = prev.map((request) => request.id === requestId
+        ? { ...request, status: 'completed' as const, completedAt: new Date().toISOString() }
+        : request)
+      saveMarketRequests(updated)
+      return updated
+    })
+    setHistory((prev) => addHistory(prev, {
+      type: 'escrow',
+      summary: `Demo release: ${requestId}`,
+      txHash: '',
+      timestamp: Date.now(),
+      status: 'success',
+    }))
+    addToast({ type: 'success', message: 'Demo payment released and request completed' })
+  }
+
+  async function deleteExpiredMarketRequest(id: string) {
+    const target = marketRequests.find((request) => request.id === id)
+    if (!target?.expiresAt || new Date(target.expiresAt).getTime() > Date.now()) {
+      return addToast({ type: 'error', message: 'Only expired requests can be removed' })
+    }
+    setMarketLoading(true)
+    try {
+      const res = await fetch('/api/requests', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'deleteExpired' }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not remove request')
+      if (Array.isArray(json.requests)) setMarketRequests(json.requests)
+      addToast({ type: 'success', message: 'Expired request removed' })
+    } catch {
+      setMarketRequests((prev) => prev.filter((request) => request.id !== id))
+      addToast({ type: 'success', message: 'Expired request removed locally' })
+    } finally {
+      setMarketLoading(false)
+    }
+  }
+
+  function viewRequestEscrow(request: MarketRequest) {
+    if (!request.escrowJobId) {
+      addToast({ type: 'error', message: 'No escrow job linked to this request' })
+      return
+    }
+    setEscrowProtocol('arc-escrow')
+    setEscrowJobId(request.escrowJobId)
+    setEscrowMyTab('jobs')
+    navigatePage('escrow')
+    void escrowLookupJob(Number(request.escrowJobId))
+  }
+
+  function openEscrowSubmission(request: MarketRequest) {
+    if (!request.escrowJobId) {
+      addToast({ type: 'error', message: 'No on-chain escrow job found for this request' })
+      return
+    }
+    setEscrowProtocol('arc-escrow')
+    setEscrowMyTab('jobs')
+    setEscrowJobId(request.escrowJobId)
+    navigatePage('escrow')
+    void escrowLookupJob(Number(request.escrowJobId))
+  }
+
+// Confirm modal + contact helpers
   async function getTokenBalance(address: `0x${string}`, faucet: FaucetInfo): Promise<bigint> {
     const client = publicClients[faucet.chainId]
     if (!client) return 0n
@@ -676,7 +1473,33 @@ export default function App() {
     }, 180000)
   }
 
-  // ─── CSV 내보내기 ─────────────────────────────────────────────────────────
+  function requestInAppFaucet() {
+    const addr = allAddresses[0]
+    if (!addr) return addToast({ type: 'error', message: 'Connect a wallet first' })
+
+    setInAppFaucetLoading(true)
+    setInAppFaucetMessage('')
+    const selected = IN_APP_FAUCETS[inAppFaucetChain]
+    const loadId = addToast({ type: 'loading', message: 'Opening Circle public faucet and watching your wallet...' })
+    try {
+      navigator.clipboard?.writeText(addr).catch(() => undefined)
+      window.open(selected.url, '_blank', 'noopener,noreferrer')
+      removeToast(loadId)
+      setInAppFaucetMessage(`Active wallet copied: ${addr.slice(0, 6)}...${addr.slice(-4)}. Complete the Circle faucet tab, then this portal will detect the incoming ${selected.token}.`)
+      addToast({ type: 'success', message: 'Circle faucet opened. Wallet address copied.' })
+      const faucetIdx = FAUCETS.findIndex((f) => f.chainId === selected.chainId && f.tokens.includes('USDC'))
+      if (faucetIdx >= 0) startFaucetPoll(faucetIdx)
+    } catch (e) {
+      removeToast(loadId)
+      const msg = e instanceof Error ? e.message : 'Faucet request failed'
+      setInAppFaucetMessage(msg)
+      addToast({ type: 'error', message: msg })
+    } finally {
+      setInAppFaucetLoading(false)
+    }
+  }
+
+// CSV export
   function exportCSV() {
     const rows = ['Token,Chain,Wallet,Balance,Value (USD),24h Change']
     displayed.forEach((a) => {
@@ -689,59 +1512,8 @@ export default function App() {
     URL.revokeObjectURL(url)
   }
 
-  // ─── Payment Hub ──────────────────────────────────────────────────────────
-  async function loadContractInfo() {
-    try {
-      const client = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
-      const [bal, owner] = await Promise.all([
-        client.readContract({ address: PAYMENT_HUB_ADDRESS, abi: PAYMENT_HUB_ABI, functionName: 'getBalance' }),
-        client.readContract({ address: PAYMENT_HUB_ADDRESS, abi: PAYMENT_HUB_ABI, functionName: 'owner' }),
-      ])
-      setContractBalance(formatUnits(bal as bigint, 6))
-      setContractOwner((owner as string).toLowerCase())
-    } catch { /* ignore */ }
-  }
 
-  async function payToContract() {
-    if (!payAmount || parseFloat(payAmount) <= 0) return addToast({ type: 'error', message: 'Enter an amount' })
-    const addrs = connections.flatMap((c) => [...c.accounts] as string[])
-    if (!addrs.length) return addToast({ type: 'error', message: 'Connect a wallet first' })
-    const loadId = addToast({ type: 'loading', message: 'Processing payment...' })
-    setTxLoading(true)
-    try {
-      await switchChain({ chainId: arcTestnet.id })
-      const amountWei = BigInt(Math.round(parseFloat(payAmount) * 1e6))
-      const { encodeFunctionData } = await import('viem')
-      const data = encodeFunctionData({ abi: PAYMENT_HUB_ABI, functionName: 'pay', args: [payNote || ''] })
-      const hash = await sendTransactionAsync({ to: PAYMENT_HUB_ADDRESS, data, value: amountWei })
-      removeToast(loadId)
-      addToast({ type: 'success', message: `Paid ${payAmount} USDC to contract`, txHash: hash, explorerBase: 'https://testnet.arcscan.app' })
-      setPayAmount(''); setPayNote('')
-      setTimeout(loadContractInfo, 3000)
-    } catch (e: unknown) {
-      removeToast(loadId)
-      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Payment failed' })
-    } finally { setTxLoading(false) }
-  }
-
-  async function withdrawFromContract() {
-    setWithdrawLoading(true)
-    const loadId = addToast({ type: 'loading', message: 'Withdrawing...' })
-    try {
-      await switchChain({ chainId: arcTestnet.id })
-      const { encodeFunctionData } = await import('viem')
-      const data = encodeFunctionData({ abi: PAYMENT_HUB_ABI, functionName: 'withdraw', args: [] })
-      const hash = await sendTransactionAsync({ to: PAYMENT_HUB_ADDRESS, data })
-      removeToast(loadId)
-      addToast({ type: 'success', message: 'Withdrawal successful', txHash: hash, explorerBase: 'https://testnet.arcscan.app' })
-      setTimeout(loadContractInfo, 3000)
-    } catch (e: unknown) {
-      removeToast(loadId)
-      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Withdrawal failed' })
-    } finally { setWithdrawLoading(false) }
-  }
-
-  // ─── LI.FI ───────────────────────────────────────────────────────────────
+// ── LI.FI ─
   function getLifiTokenAddress(chainId: number, symbol: string): string {
     if (symbol === 'ETH' || symbol === 'POL' || symbol === 'AVAX') return '0x0000000000000000000000000000000000000000'
     return TOKENS[chainId]?.find((t) => t.symbol === symbol)?.address ?? '0x0000000000000000000000000000000000000000'
@@ -795,20 +1567,20 @@ export default function App() {
       const toSym   = lifiQuote.action.toToken.symbol
       const toAmt   = parseFloat(formatUnits(BigInt(lifiQuote.estimate.toAmount), lifiQuote.action.toToken.decimals)).toFixed(4)
       removeToast(loadId)
-      addToast({ type: 'success', message: `${lifiAmount} ${fromSym} → ${toAmt} ${toSym}`, txHash: hash,
+      addToast({ type: 'success', message: `${lifiAmount} ${fromSym} ??${toAmt} ${toSym}`, txHash: hash,
         explorerBase: CHAIN_META[lifiQuote.action.fromChainId]?.explorer })
-      setHistory((prev) => addHistory(prev, { type: 'cross', summary: `${lifiAmount} ${fromSym} → ${toAmt} ${toSym}`,
+      setHistory((prev) => addHistory(prev, { type: 'cross', summary: `${lifiAmount} ${fromSym} ??${toAmt} ${toSym}`,
         txHash: hash, timestamp: Date.now(), status: 'success' }))
       setLifiQuote(null); setLifiAmount(''); loadAssets()
     } catch (e) {
       removeToast(loadId)
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Swap failed' })
-      setHistory((prev) => addHistory(prev, { type: 'cross', summary: `${lifiAmount} ${lifiFromToken} → ${lifiToToken}`,
+      setHistory((prev) => addHistory(prev, { type: 'cross', summary: `${lifiAmount} ${lifiFromToken} ??${lifiToToken}`,
         txHash: '', timestamp: Date.now(), status: 'fail' }))
     } finally { setLifiExecuting(false) }
   }
 
-  // ─── 요약 수치 ────────────────────────────────────────────────────────────
+// ── LI.FI routing ─
   const ethValue      = assets.filter((a) => a.symbol === 'ETH').reduce((s, a) => s + parseFloat(a.usdcValue), 0)
   const usdcTotalVal  = assets.filter((a) => a.symbol.includes('USDC')).reduce((s, a) => s + parseFloat(a.usdcValue), 0)
   const otherValue    = parseFloat(totalUsdc) - ethValue - usdcTotalVal
@@ -817,7 +1589,7 @@ export default function App() {
     .map((c) => ({ id: c.id, val: assets.filter((a) => a.chain === c.id).reduce((s, a) => s + parseFloat(a.usdcValue), 0) }))
     .filter((c) => c.val > 0)
 
-  // ─── 보안 & 어댑터 ───────────────────────────────────────────────────────
+// Bridge & attestation helpers
   function validateSend(to: string, amt: string): string[] {
     const warnings: string[] = []
     if (allAddresses.some((a) => a.toLowerCase() === to.toLowerCase())) warnings.push('Sending to your own wallet address')
@@ -853,9 +1625,9 @@ export default function App() {
     if (!amount) return addToast({ type: 'error', message: 'Enter an amount' })
     setConfirmState({
       title: 'Confirm Swap',
-      lines: [`${amount} ETH → USDC`, 'Network: Arc Testnet', 'Fee: calculated by Arc App Kit'],
-      warnings: parseFloat(amount) > 1 ? ['Large swap amount — please double-check'] : [],
-      onConfirm: () => execTx('swap', `${amount} ETH → USDC`, async () => {
+      lines: [`${amount} ETH ??USDC`, 'Network: Arc Testnet', 'Fee: calculated by Arc App Kit'],
+      warnings: parseFloat(amount) > 1 ? ['Large swap amount ??please double-check'] : [],
+      onConfirm: () => execTx('swap', `${amount} ETH ??USDC`, async () => {
         const adapter = await getAdapter()
         const r = await (kit as unknown as { swap: { execute: (p: { fromToken: string; toToken: string; amount: string; adapter: unknown; networkType: string }) => Promise<{ txHash?: string }> } })
           .swap.execute({ fromToken: 'ETH', toToken: 'USDC', amount, adapter, networkType: 'testnet' })
@@ -864,7 +1636,7 @@ export default function App() {
     })
   }
 
-  // ─── CCTP Bridge: Sepolia USDC → Arc Testnet USDC ───────────────────────
+// ── CCTP Bridge: Sepolia USDC ??Arc Testnet USDC ─
   async function executeCCTPBridge() {
     const amt = parseFloat(cctpAmount)
     if (!amt || amt <= 0) return addToast({ type: 'error', message: 'Enter an amount' })
@@ -873,25 +1645,30 @@ export default function App() {
 
     const { encodeFunctionData, decodeEventLog, keccak256 } = await import('viem')
     const usdcAmount = BigInt(Math.round(amt * 1e6)) // USDC 6 decimals
-    // Arc recipient: EVM address → bytes32 (right-aligned, left-zero-padded)
+    // Arc recipient: EVM address ??bytes32 (right-aligned, left-zero-padded)
     const mintRecipient = `0x${'0'.repeat(24)}${recipientAddr.replace('0x', '')}` as `0x${string}`
+    let loadId = ''
+    const showBridgeStep = (message: string) => {
+      if (loadId) removeToast(loadId)
+      loadId = addToast({ type: 'loading', message })
+    }
 
     try {
-      // ── Step 1: Sepolia로 체인 전환 ─────────────────────────────────
+// ── Step 1: Sepolia USDC approve + depositForBurn ─
       await switchChain({ chainId: sepolia.id })
 
-      // ── Step 2: USDC approve → ArcOnboarder ─────────────────────────
+// ── Step 2: USDC approve ??ArcOnboarder ─
       setCctpStep('approving')
-      addToast({ type: 'loading', message: '1/4 Approving USDC on Sepolia...' })
+      showBridgeStep('1/4 Approving USDC on Sepolia...')
       await sendTransactionAsync({
         to: SEPOLIA_USDC,
         data: encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve',
           args: [ARC_ONBOARDER, usdcAmount] }),
       })
 
-      // ── Step 3: ArcOnboarder.bridgeUSDCToArc ─────────────────────────
+// ── Step 3: ArcOnboarder.bridgeUSDCToArc ─
       setCctpStep('burning')
-      addToast({ type: 'loading', message: '2/4 Bridging USDC → Arc via ArcOnboarder...' })
+      showBridgeStep('2/4 Bridging USDC to Arc via ArcOnboarder...')
       const burnHash = await sendTransactionAsync({
         to: ARC_ONBOARDER,
         data: encodeFunctionData({ abi: ARC_ONBOARDER_ABI, functionName: 'bridgeUSDCToArc',
@@ -899,7 +1676,7 @@ export default function App() {
       })
       setCctpBurnHash(burnHash)
 
-      // ── Step 4: MessageSent 이벤트에서 message 추출 ─────────────────
+// Step 4: extract MessageSent event + message bytes
       const sepoliaClient = createPublicClient({
         chain: sepolia,
         transport: http('https://rpc.sepolia.org'),
@@ -918,21 +1695,26 @@ export default function App() {
       const messageBytes = args.message as `0x${string}`
       const messageHash  = keccak256(messageBytes)
 
-      // ── Step 5: Circle Attestation API 폴링 ─────────────────────────
+      // Save to localStorage so user can close tab and claim later
+      const pendingToArc: PendingBridge = { burnHash, messageBytes, messageHash, direction: 'to-arc', amount: cctpAmount, savedAt: Date.now() }
+      localStorage.setItem('cctp_pending_bridge', JSON.stringify(pendingToArc))
+      setPendingBridge(pendingToArc)
+
+// Step 5: poll Circle Attestation API
       setCctpStep('attesting')
-      addToast({ type: 'loading', message: '3/4 Waiting Circle attestation...' })
+      showBridgeStep('3/4 Waiting Circle attestation...')
       let attestation = ''
       for (let i = 0; i < 60; i++) {
         await new Promise((r) => setTimeout(r, 5000))
-        const res  = await fetch(`https://iris-api-sandbox.circle.com/v1/attestations/${messageHash}`)
+        const res  = await fetch(`/api/attestation?messageHash=${messageHash}`)
         const json = await res.json()
         if (json.status === 'complete') { attestation = json.attestation; break }
       }
-      if (!attestation) throw new Error('Attestation timeout — retry later')
+      if (!attestation) throw new Error('Attestation timeout ??retry later')
 
-      // ── Step 6: Arc Testnet에서 receiveMessage ───────────────────────
+// ── Step 6: Arc Testnet receiveMessage ─
       setCctpStep('minting')
-      addToast({ type: 'loading', message: '4/4 Minting USDC on Arc Testnet...' })
+      showBridgeStep('4/4 Minting USDC on Arc Testnet...')
       await switchChain({ chainId: arcTestnet.id })
       await sendTransactionAsync({
         to: ARC_MSG_TRANSMITTER,
@@ -941,43 +1723,442 @@ export default function App() {
       })
 
       setCctpStep('done')
+      if (loadId) removeToast(loadId)
+      localStorage.removeItem('cctp_pending_bridge'); setPendingBridge(null)
       addToast({ type: 'success', message: `${cctpAmount} USDC arrived on Arc!`, txHash: burnHash })
       setCctpAmount('')
+      setTimeout(() => setCctpStep('idle'), 2500)
 
     } catch (e: unknown) {
+      if (loadId) removeToast(loadId)
       setCctpStep('error')
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Bridge failed' })
     }
   }
 
-  // ─── ArcEscrow 함수들 ────────────────────────────────────────────────────
+  // CCTP Bridge: Arc Testnet USDC -> Sepolia USDC (reverse direction)
+  async function executeCCTPBridgeArcToSepolia() {
+    const amt = parseFloat(cctpAmount)
+    if (!amt || amt <= 0) return addToast({ type: 'error', message: 'Enter an amount' })
+    const recipientAddr = (cctpRecipient || allAddresses[0]) as `0x${string}`
+    if (!recipientAddr) return addToast({ type: 'error', message: 'Connect wallet or enter Sepolia address' })
 
-  const COMPARATOR_CODE = { gte: 0, lte: 1, eq: 2 } as const
+    const { encodeFunctionData, decodeEventLog, keccak256 } = await import('viem')
+    const usdcAmount = BigInt(Math.round(amt * 1e6))
+    // Sepolia recipient: EVM address -> bytes32 (right-aligned, left-zero-padded)
+    const mintRecipient = `0x${'0'.repeat(24)}${recipientAddr.replace('0x', '')}` as `0x${string}`
+    let loadId = ''
+    const showBridgeStep = (message: string) => {
+      if (loadId) removeToast(loadId)
+      loadId = addToast({ type: 'loading', message })
+    }
+
+    try {
+      // Step 1: Switch to Arc Testnet
+      await switchChain({ chainId: arcTestnet.id })
+
+      // Step 2: Approve ARC_TESTNET_USDC to ARC_TOKEN_MESSENGER
+      setCctpStep('approving')
+      showBridgeStep('1/4 Approving USDC on Arc Testnet...')
+      await sendTransactionAsync({
+        to: ARC_TESTNET_USDC,
+        data: encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve',
+          args: [ARC_TOKEN_MESSENGER, usdcAmount] }),
+      })
+
+      // Step 3: depositForBurn -> Sepolia (domain 0)
+      setCctpStep('burning')
+      showBridgeStep('2/4 Burning USDC on Arc to Sepolia...')
+      const burnHash = await sendTransactionAsync({
+        to: ARC_TOKEN_MESSENGER,
+        data: encodeFunctionData({ abi: DEPOSIT_FOR_BURN_ABI, functionName: 'depositForBurn',
+          args: [usdcAmount, 0, mintRecipient, ARC_TESTNET_USDC, `0x${'0'.repeat(64)}` as `0x${string}`, 500n, 1000] }),
+      })
+      setCctpBurnHash(burnHash)
+
+      // Step 4: Find MessageSent log — filter by topic hash, not address (Arc MessageTransmitter may differ)
+      const arcClient = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
+      const receipt = await arcClient.waitForTransactionReceipt({ hash: burnHash })
+      if (receipt.status === 'reverted') throw new Error(`depositForBurn reverted on Arc. Check ARC_TOKEN_MESSENGER address or USDC approval.`)
+      // keccak256('MessageSent(bytes)') = 0x8c5261...
+      const MSG_SENT_TOPIC = '0x8c5261668696ce22758910d05bab8f186d6eb247ceac2af2e82c7dc17669b036'
+      const msgLog = receipt.logs.find(
+        (l) => l.topics[0]?.toLowerCase() === MSG_SENT_TOPIC
+      )
+      if (!msgLog) throw new Error(`MessageSent not found. Contract addrs in receipt: ${[...new Set(receipt.logs.map(l => l.address))].join(' | ')}`)
+
+      const { args } = decodeEventLog({
+        abi: MESSAGE_SENT_EVENT,
+        data: msgLog.data,
+        topics: msgLog.topics,
+      })
+      const messageBytes = args.message as `0x${string}`
+      const messageHash  = keccak256(messageBytes)
+
+      // Save to localStorage so user can close tab and claim later
+      const pendingToSep: PendingBridge = { burnHash, messageBytes, messageHash, direction: 'to-sepolia', amount: cctpAmount, savedAt: Date.now() }
+      localStorage.setItem('cctp_pending_bridge', JSON.stringify(pendingToSep))
+      setPendingBridge(pendingToSep)
+
+      // Step 5: Poll Circle attestation
+      setCctpStep('attesting')
+      showBridgeStep('3/4 Waiting Circle attestation...')
+      let attestation = ''
+      let apiMessage  = ''
+      for (let i = 0; i < 180; i++) {
+        await new Promise((r) => setTimeout(r, 10000))
+        const res  = await fetch(`/api/attestation?txHash=${burnHash}&sourceDomain=26`)
+        const json = await res.json()
+        if (json.status === 'complete' && json.message) {
+          attestation = json.attestation; apiMessage = json.message; break
+        }
+      }
+      if (!attestation || !apiMessage) {
+        if (loadId) removeToast(loadId)
+        addToast({ type: 'success', message: 'Burn complete! Close this tab and use Check & Claim when ready (15-20 min).' })
+        setCctpStep('idle')
+        return
+      }
+
+      // Step 6: Switch to Sepolia and receiveMessage — use API message (CCTP V2), not event-log message
+      setCctpStep('minting')
+      showBridgeStep('4/4 Minting USDC on Sepolia...')
+      await switchChain({ chainId: sepolia.id })
+      let mintHash: `0x${string}` | undefined
+      try {
+        mintHash = await sendTransactionAsync({
+          to: ARC_MSG_TRANSMITTER,
+          data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
+            args: [apiMessage as `0x${string}`, attestation as `0x${string}`] }),
+        })
+      } catch (sendError: unknown) {
+        if (isNonceAlreadyUsedError(sendError)) {
+          setCctpStep('done')
+          if (loadId) removeToast(loadId)
+          localStorage.removeItem('cctp_pending_bridge'); setPendingBridge(null)
+          addToast({ type: 'success', message: `${cctpAmount} USDC was already bridged to Sepolia. Refresh balances in a minute.` })
+          setCctpAmount('')
+          setTimeout(() => setCctpStep('idle'), 2500)
+          return
+        }
+        throw sendError
+      }
+      if (!mintHash) throw new Error('receiveMessage transaction was not submitted')
+      try {
+        const mintRcpt = await publicClients[11155111].waitForTransactionReceipt({ hash: mintHash, timeout: 90_000 })
+        if (mintRcpt.status === 'reverted') {
+          setCctpStep('done')
+          if (loadId) removeToast(loadId)
+          localStorage.removeItem('cctp_pending_bridge'); setPendingBridge(null)
+          addToast({ type: 'success', message: `${cctpAmount} USDC appears already claimed or relayed on Sepolia. Refresh balances to confirm.`, txHash: mintHash })
+          setCctpAmount('')
+          setTimeout(() => setCctpStep('idle'), 2500)
+          return
+        }
+      } catch (re: unknown) {
+        if (!isReceiptTimeout(re)) throw re
+        // receipt polling timed out — tx is submitted, just couldn't confirm in time
+      }
+
+      setCctpStep('done')
+      if (loadId) removeToast(loadId)
+      localStorage.removeItem('cctp_pending_bridge'); setPendingBridge(null)
+      addToast({ type: 'success', message: `${cctpAmount} USDC bridged to Sepolia! Refresh balances in a minute.`, txHash: mintHash })
+      setCctpAmount('')
+      setTimeout(() => setCctpStep('idle'), 2500)
+
+    } catch (e: unknown) {
+      if (loadId) removeToast(loadId)
+      setCctpStep('error')
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Bridge failed' })
+    }
+  }
+
+  // Claim a pending CCTP bridge after attestation is ready
+  async function claimPendingBridge() {
+    if (!pendingBridge) return
+    setClaimLoading(true)
+    let loadId = ''
+    try {
+      loadId = addToast({ type: 'loading', message: 'Checking attestation...' })
+      // Arc->Sepolia is CCTP V2 (query by txHash); Sepolia->Arc is V1 (query by messageHash)
+      const isV2 = pendingBridge.direction === 'to-sepolia'
+      const attUrl = isV2
+        ? `/api/attestation?txHash=${pendingBridge.burnHash}&sourceDomain=26`
+        : `/api/attestation?messageHash=${pendingBridge.messageHash}`
+      const res  = await fetch(attUrl)
+      const json = await res.json()
+      if (json.status !== 'complete') {
+        removeToast(loadId)
+        addToast({ type: 'error', message: `Circle status: "${json.status ?? 'unknown'}" — still processing. Try again in a few minutes.` })
+        return
+      }
+      const attestation = json.attestation as `0x${string}`
+      // CCTP V2 requires the message from the API; V1 uses the event-log message
+      const message = (isV2 ? json.message : pendingBridge.messageBytes) as `0x${string}`
+      if (!message) throw new Error('Message bytes missing from attestation response')
+      const { encodeFunctionData } = await import('viem')
+      await switchChain({ chainId: isV2 ? sepolia.id : arcTestnet.id })
+      removeToast(loadId)
+      loadId = addToast({ type: 'loading', message: 'Claiming — sign the receiveMessage tx...' })
+      let claimHash: `0x${string}` | undefined
+      try {
+        claimHash = await sendTransactionAsync({
+          to: ARC_MSG_TRANSMITTER,
+          data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
+            args: [message, attestation] }),
+        })
+      } catch (sendError: unknown) {
+        if (isNonceAlreadyUsedError(sendError)) {
+          removeToast(loadId); loadId = ''
+          localStorage.removeItem('cctp_pending_bridge')
+          setPendingBridge(null)
+          addToast({ type: 'success', message: `This bridge was already claimed or relayed to ${isV2 ? 'Sepolia' : 'Arc'}. Refresh balances to confirm.` })
+          return
+        }
+        throw sendError
+      }
+      if (!claimHash) throw new Error('receiveMessage transaction was not submitted')
+      removeToast(loadId)
+      loadId = addToast({ type: 'loading', message: 'Confirming on destination chain...' })
+      try {
+        const rcpt = await publicClients[isV2 ? 11155111 : 5042002].waitForTransactionReceipt({ hash: claimHash, timeout: 90_000 })
+        if (rcpt.status === 'reverted') {
+          removeToast(loadId); loadId = ''
+          localStorage.removeItem('cctp_pending_bridge')
+          setPendingBridge(null)
+          addToast({ type: 'success', message: `This bridge appears already claimed or relayed to ${isV2 ? 'Sepolia' : 'Arc'}. Refresh balances to confirm.`, txHash: claimHash })
+          return
+        }
+      } catch (re: unknown) {
+        if (!isReceiptTimeout(re)) throw re
+        // receipt polling timed out — tx is submitted
+      }
+      removeToast(loadId); loadId = ''
+      localStorage.removeItem('cctp_pending_bridge')
+      setPendingBridge(null)
+      addToast({ type: 'success', message: `✅ ${pendingBridge.amount} USDC bridged to ${isV2 ? 'Sepolia' : 'Arc'}! Refresh balances in a minute.`, txHash: claimHash })
+    } catch (e: unknown) {
+      if (loadId) removeToast(loadId)
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Claim failed' })
+    } finally {
+      setClaimLoading(false)
+    }
+  }
+
+  // Recover a stuck Arc->Sepolia bridge by its Arc burn tx hash
+  async function recoverStuckBridge() {
+    const h = recoverHash.trim()
+    if (!h.startsWith('0x') || h.length !== 66) {
+      return addToast({ type: 'error', message: 'Enter a valid Arc burn tx hash (0x… 66 chars)' })
+    }
+    setClaimLoading(true)
+    let loadId = ''
+    try {
+      loadId = addToast({ type: 'loading', message: 'Looking up burn tx on Circle...' })
+      const res  = await fetch(`/api/attestation?txHash=${h}&sourceDomain=26`)
+      const json = await res.json()
+      if (json.status !== 'complete' || !json.message || !json.attestation) {
+        removeToast(loadId)
+        addToast({ type: 'error', message: `Circle status: "${json.status ?? 'unknown'}" — not ready, try again later.` })
+        return
+      }
+      const { encodeFunctionData } = await import('viem')
+      await switchChain({ chainId: sepolia.id })
+      removeToast(loadId)
+      loadId = addToast({ type: 'loading', message: 'Claiming — sign receiveMessage on Sepolia...' })
+      let claimHash: `0x${string}` | undefined
+      try {
+        claimHash = await sendTransactionAsync({
+          to: ARC_MSG_TRANSMITTER,
+          data: encodeFunctionData({ abi: RECEIVE_MSG_ABI, functionName: 'receiveMessage',
+            args: [json.message as `0x${string}`, json.attestation as `0x${string}`] }),
+        })
+      } catch (sendError: unknown) {
+        if (isNonceAlreadyUsedError(sendError)) {
+          removeToast(loadId); loadId = ''
+          setRecoverHash('')
+          addToast({ type: 'success', message: 'This burn was already claimed or relayed to Sepolia. Refresh balances to confirm.' })
+          return
+        }
+        throw sendError
+      }
+      if (!claimHash) throw new Error('receiveMessage transaction was not submitted')
+      removeToast(loadId)
+      loadId = addToast({ type: 'loading', message: 'Confirming on Sepolia...' })
+      try {
+        const rcpt = await publicClients[11155111].waitForTransactionReceipt({ hash: claimHash, timeout: 90_000 })
+        if (rcpt.status === 'reverted') {
+          removeToast(loadId); loadId = ''
+          setRecoverHash('')
+          addToast({ type: 'success', message: 'This burn appears already claimed or relayed to Sepolia. Refresh balances to confirm.', txHash: claimHash })
+          return
+        }
+      } catch (re: unknown) {
+        if (!isReceiptTimeout(re)) throw re
+        // receipt polling timed out — tx is submitted
+      }
+      removeToast(loadId); loadId = ''
+      setRecoverHash('')
+      addToast({ type: 'success', message: '✅ USDC recovered on Sepolia! Refresh balances in a minute.', txHash: claimHash })
+    } catch (e: unknown) {
+      if (loadId) removeToast(loadId)
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Recovery failed' })
+    } finally {
+      setClaimLoading(false)
+    }
+  }
+
+  // ERC-8183 AgenticCommerce functions
+
+  async function e8183CreateAndFund() {
+    const amt = parseFloat(e8183Amount)
+    const workerAddress = e8183WorkerAddress
+    if (!workerAddress) return addToast({ type: 'error', message: 'Connect wallet or enter worker wallet address' })
+    if (!isAddress(workerAddress)) return addToast({ type: 'error', message: 'Invalid worker wallet address' })
+    if (!amt || amt <= 0)          return addToast({ type: 'error', message: 'Enter USDC amount' })
+    if (!e8183Desc.trim())         return addToast({ type: 'error', message: 'Enter job description' })
+    const { encodeFunctionData } = await import('viem')
+    const clientAddr = allAddresses[0] as `0x${string}`
+    if (!clientAddr) return addToast({ type: 'error', message: 'Connect wallet' })
+
+    const usdcAmt  = BigInt(Math.round(amt * 1e6))
+    const expiredAt = BigInt(Math.floor(Date.now() / 1000) + parseInt(e8183Days) * 86400)
+
+    setE8183Loading(true)
+    setE8183Step('creating')
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+
+      // createJob: provider=e8183Provider, evaluator=clientAddr (so client can approve)
+      addToast({ type: 'loading', message: '1/3 Creating ERC-8183 job...' })
+      const createHash = await sendTransactionAsync({
+        to: ERC8183_CONTRACT,
+        data: encodeFunctionData({ abi: ERC8183_ABI, functionName: 'createJob',
+          args: [workerAddress as `0x${string}`, clientAddr, expiredAt, e8183Desc, '0x0000000000000000000000000000000000000000' as `0x${string}`] }),
+      })
+
+      // Wait for receipt to get jobId from event (fallback: use nextJobId read)
+      const arcClient = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
+      await arcClient.waitForTransactionReceipt({ hash: createHash })
+      const nextId = await arcClient.readContract({
+        address: ERC8183_CONTRACT, abi: ERC8183_ABI, functionName: 'nextJobId',
+      }) as bigint
+      const jobId = nextId - 1n
+      setE8183JobId(jobId.toString())
+
+      // setBudget + approve + fund
+      setE8183Step('funding')
+      addToast({ type: 'loading', message: '2/3 Setting budget...' })
+      await sendTransactionAsync({
+        to: ERC8183_CONTRACT,
+        data: encodeFunctionData({ abi: ERC8183_ABI, functionName: 'setBudget',
+          args: [jobId, usdcAmt, '0x' as `0x${string}`] }),
+      })
+
+      addToast({ type: 'loading', message: '3/3 Approving & funding job...' })
+      await sendTransactionAsync({
+        to: ARC_TESTNET_USDC,
+        data: encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve',
+          args: [ERC8183_CONTRACT, usdcAmt] }),
+      })
+      const fundHash = await sendTransactionAsync({
+        to: ERC8183_CONTRACT,
+        data: encodeFunctionData({ abi: ERC8183_ABI, functionName: 'fund',
+          args: [jobId, '0x' as `0x${string}`] }),
+      })
+
+      setE8183Step('done')
+      addToast({ type: 'success', message: `Job #${jobId} funded with ${amt} USDC!`, txHash: fundHash, explorerBase: 'https://testnet.arcscan.app' })
+      await e8183LookupJob(jobId.toString())
+
+    } catch (e: unknown) {
+      setE8183Step('error')
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'ERC-8183 create failed' })
+    } finally {
+      setE8183Loading(false)
+    }
+  }
+
+  async function e8183Submit() {
+    if (!e8183JobId) return addToast({ type: 'error', message: 'Enter job ID' })
+    if (!e8183DelivUri.trim()) return addToast({ type: 'error', message: 'Enter deliverable URI' })
+    const { encodeFunctionData, keccak256, toBytes } = await import('viem')
+    const delivHash = keccak256(toBytes(e8183DelivUri)) as `0x${string}`
+
+    setE8183Loading(true)
+    setE8183Step('submitting')
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+      addToast({ type: 'loading', message: 'Submitting deliverable on-chain...' })
+      const submitHash = await sendTransactionAsync({
+        to: ERC8183_CONTRACT,
+        data: encodeFunctionData({ abi: ERC8183_ABI, functionName: 'submit',
+          args: [BigInt(e8183JobId), delivHash, '0x' as `0x${string}`] }),
+      })
+      addToast({ type: 'success', message: 'Deliverable submitted!', txHash: submitHash, explorerBase: 'https://testnet.arcscan.app' })
+      await e8183LookupJob(e8183JobId)
+    } catch (e: unknown) {
+      setE8183Step('error')
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Submit failed' })
+    } finally {
+      setE8183Loading(false)
+    }
+  }
+
+  async function e8183Complete(approved: boolean) {
+    if (!e8183JobId) return addToast({ type: 'error', message: 'Enter job ID' })
+    const { encodeFunctionData, keccak256, toBytes } = await import('viem')
+    const reason = keccak256(toBytes(approved ? 'approved' : 'rejected')) as `0x${string}`
+
+    setE8183Loading(true)
+    setE8183Step('completing')
+    try {
+      await switchChain({ chainId: arcTestnet.id })
+      addToast({ type: 'loading', message: approved ? 'Approving job...' : 'Rejecting job...' })
+      const completeHash = await sendTransactionAsync({
+        to: ERC8183_CONTRACT,
+        data: encodeFunctionData({ abi: ERC8183_ABI, functionName: 'complete',
+          args: [BigInt(e8183JobId), reason, '0x' as `0x${string}`] }),
+      })
+      addToast({ type: 'success', message: approved ? 'Job approved - provider paid!' : 'Job rejected - funds returned!', txHash: completeHash, explorerBase: 'https://testnet.arcscan.app' })
+      await e8183LookupJob(e8183JobId)
+    } catch (e: unknown) {
+      setE8183Step('error')
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Complete failed' })
+    } finally {
+      setE8183Loading(false)
+    }
+  }
+
+  async function e8183LookupJob(idOverride?: string) {
+    const id = idOverride ?? e8183JobId
+    if (!id) return addToast({ type: 'error', message: 'Enter job ID' })
+    setE8183Loading(true)
+    try {
+      const arcClient = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
+      const raw = await arcClient.readContract({
+        address: ERC8183_CONTRACT, abi: ERC8183_ABI, functionName: 'getJob', args: [BigInt(id)],
+      }) as unknown as readonly [bigint, string, string, string, string, bigint, bigint, number, string]
+      const job = { id: raw[0], client: raw[1], provider: raw[2], evaluator: raw[3], description: raw[4], budget: raw[5], expiredAt: raw[6], status: raw[7] }
+      setE8183Job(job)
+    } catch (e: unknown) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Lookup failed' })
+    } finally {
+      setE8183Loading(false)
+    }
+  }
+
+// ── ArcEscrow functions ─
 
   async function escrowCreateJob() {
     const { encodeFunctionData } = await import('viem')
     const amt = parseFloat(escrowAmount)
-    if (!isAddress(escrowAgent)) return addToast({ type: 'error', message: 'Invalid agent address' })
+    const workerAddress = escrowWorkerAddress
+    if (!workerAddress) return addToast({ type: 'error', message: 'Connect wallet or enter worker wallet address' })
+    if (!isAddress(workerAddress)) return addToast({ type: 'error', message: 'Invalid worker wallet address' })
     if (!amt || amt <= 0)        return addToast({ type: 'error', message: 'Enter USDC amount' })
     if (!escrowDesc.trim())      return addToast({ type: 'error', message: 'Enter job description' })
-
-    let conditionArgs: [`0x${string}`, `0x${string}`, bigint, number] | null = null
-    if (escrowNewJobType === 'onchain') {
-      if (!isAddress(escrowCondToken))     return addToast({ type: 'error', message: 'Invalid condition token address' })
-      if (!isAddress(escrowCondRecipient)) return addToast({ type: 'error', message: 'Invalid recipient address' })
-      const threshold = parseFloat(escrowCondThreshold)
-      if (!threshold || threshold <= 0)    return addToast({ type: 'error', message: 'Enter condition threshold' })
-
-      const conditionCalldata = encodeFunctionData({
-        abi: ERC20_ABI, functionName: 'balanceOf', args: [escrowCondRecipient as `0x${string}`],
-      })
-      conditionArgs = [
-        escrowCondToken as `0x${string}`,
-        conditionCalldata,
-        BigInt(Math.round(threshold * 1e6)),
-        COMPARATOR_CODE[escrowCondComparator],
-      ]
-    }
 
     const usdcAmt  = BigInt(Math.round(amt * 1e6))
     const deadline = BigInt(Math.floor(Date.now() / 1000) + parseInt(escrowDays) * 86400)
@@ -993,22 +2174,16 @@ export default function App() {
           args: [ARC_ESCROW, usdcAmt] }),
       })
 
-      // createJob (AIJudged) or createOnchainConditionJob
-      const createHash = conditionArgs
-        ? await sendTransactionAsync({
-            to: ARC_ESCROW,
-            data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'createOnchainConditionJob',
-              args: [escrowAgent as `0x${string}`, usdcAmt, deadline, escrowDesc, ...conditionArgs] }),
-          })
-        : await sendTransactionAsync({
-            to: ARC_ESCROW,
-            data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'createJob',
-              args: [escrowAgent as `0x${string}`, usdcAmt, deadline, escrowDesc] }),
-          })
-      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash: createHash })
+      // createJob
+      const createHash = await sendTransactionAsync({
+        to: ARC_ESCROW,
+        data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'createJob',
+          args: [workerAddress as `0x${string}`, usdcAmt, deadline, escrowDesc] }),
+      })
 
       // read nextJobId to get the new job's ID
-      const nextId = await publicClients[arcTestnet.id].readContract({ address: ARC_ESCROW, abi: NEXT_JOB_ID_ABI, functionName: 'nextJobId' })
+      const arcClient = createPublicClient({ chain: arcTestnet, transport: http('https://rpc.testnet.arc.network') })
+      const nextId = await arcClient.readContract({ address: ARC_ESCROW, abi: NEXT_JOB_ID_ABI, functionName: 'nextJobId' })
       const newJobId = Number(nextId) - 1
       setRecentJobIds(prev => {
         const updated = [newJobId, ...prev.filter(id => id !== newJobId)]
@@ -1017,31 +2192,25 @@ export default function App() {
       })
       setEscrowJobId(String(newJobId))
       setEscrowMyTab('jobs')
-      addToast({ type: 'success', message: `Job #${newJobId} created! ${amt} USDC locked in escrow.` })
+      if (activeEscrowRequestId && activeWallet) {
+        try {
+          const res = await fetch('/api/requests', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: activeEscrowRequestId, action: 'fund', client: activeWallet, escrowJobId: newJobId }),
+          })
+          const json = await res.json()
+          if (res.ok && Array.isArray(json.requests)) setMarketRequests(json.requests)
+          setActiveEscrowRequestId(null)
+        } catch {
+          addToast({ type: 'error', message: 'Escrow created, but request board was not updated' })
+        }
+      }
+      addToast({ type: 'success', message: `Job #${newJobId} created! ${amt} USDC locked in escrow.`, txHash: createHash, explorerBase: 'https://testnet.arcscan.app' })
+      setHistory((prev) => addHistory(prev, { type: 'escrow', summary: `Escrow funded: Job #${newJobId} · ${amt.toFixed(2)} USDC`, txHash: createHash, timestamp: Date.now(), status: 'success' }))
       setEscrowAgent(''); setEscrowAmount(''); setEscrowDesc('')
-      setEscrowCondToken(''); setEscrowCondRecipient(''); setEscrowCondThreshold('')
     } catch (e: unknown) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Transaction failed' })
-    } finally {
-      setEscrowLoading(false)
-    }
-  }
-
-  async function escrowCheckAndSettle() {
-    const { encodeFunctionData } = await import('viem')
-    setEscrowLoading(true)
-    try {
-      await switchChain({ chainId: arcTestnet.id })
-      const hash = await sendTransactionAsync({
-        to: ARC_ESCROW,
-        data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'checkAndSettle',
-          args: [BigInt(parseInt(escrowJobId))] }),
-      })
-      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash })
-      addToast({ type: 'success', message: 'Condition met — USDC sent to agent!' })
-      await escrowLookupJob()
-    } catch (e: unknown) {
-      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Condition not met yet, or transaction failed' })
     } finally {
       setEscrowLoading(false)
     }
@@ -1055,15 +2224,35 @@ export default function App() {
       const res = await fetch('/api/evaluate', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jobId: escrowJobId }),
+        body: JSON.stringify({ jobDescription: escrowJob.description, resultUri: escrowJob.resultUri }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setAiVerdict(data)
     } catch (e) {
-      addToast({ type: 'error', message: 'AI evaluation failed — check API key config' })
+      addToast({ type: 'error', message: 'AI evaluation failed — check ANTHROPIC_API_KEY config' })
     } finally {
       setAiLoading(false)
+    }
+  }
+
+  async function openResultPreview(url: string) {
+    setResultPreview({ url, text: '', contentType: '', loading: true, error: '' })
+    try {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const contentType = res.headers.get('content-type') ?? ''
+      const isText = contentType.startsWith('text/') || contentType.includes('json') || contentType.includes('xml')
+      const text = isText ? await res.text() : ''
+      setResultPreview({ url, text, contentType, loading: false, error: '' })
+    } catch (e) {
+      setResultPreview({
+        url,
+        text: '',
+        contentType: '',
+        loading: false,
+        error: e instanceof Error ? e.message : 'Could not load result preview',
+      })
     }
   }
 
@@ -1080,19 +2269,20 @@ export default function App() {
     }
 
     setAiVerdict(null)
-    setEscrowCondition(null)
     setEscrowLoading(true)
     try {
-      const arcClient = publicClients[arcTestnet.id]
-      const [client, agent, amount, deadline, description, resultUri, status, jobType] =
-        await arcClient.readContract({ address: ARC_ESCROW, abi: ARC_ESCROW_ABI, functionName: 'getJob', args: [BigInt(id)] })
-      setEscrowJob({ client, agent, amount, deadline, description, resultUri, status, jobType })
-
-      if (jobType === 1) {
-        const [conditionTarget, , conditionThreshold, comparator] =
-          await arcClient.readContract({ address: ARC_ESCROW, abi: ARC_ESCROW_ABI, functionName: 'getCondition', args: [BigInt(id)] })
-        setEscrowCondition({ conditionTarget, conditionThreshold, comparator })
-      }
+      const { encodeFunctionData, decodeFunctionResult } = await import('viem')
+      const arcClient = createPublicClient({
+        chain: arcTestnet,
+        transport: http('https://rpc.testnet.arc.network'),
+      })
+      const data = encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'getJob', args: [BigInt(id)] })
+      const raw  = await arcClient.call({ to: ARC_ESCROW, data })
+      if (!raw.data) throw new Error('No data returned')
+      const [client, agent, amount, deadline, description, resultUri, status] =
+        decodeFunctionResult({ abi: ARC_ESCROW_ABI, functionName: 'getJob', data: raw.data }) as
+        [string, string, bigint, bigint, string, string, number]
+      setEscrowJob({ client, agent, amount, deadline, description, resultUri, status })
     } catch (e: unknown) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Lookup failed' })
       setEscrowJob(null)
@@ -1126,7 +2316,7 @@ export default function App() {
     const res = await fetch('/api/upload', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ filename: 'result.txt', contentType: 'text/plain', data: base64 }),
+      body: JSON.stringify({ filename: 'result.txt', contentType: 'text/plain; charset=utf-8', data: base64 }),
     })
     if (!res.ok) throw new Error('Upload failed')
     const { url } = await res.json()
@@ -1135,7 +2325,7 @@ export default function App() {
 
   async function escrowSubmitWork() {
     const { encodeFunctionData } = await import('viem')
-    if (!escrowWorkText.trim() && !escrowWorkFile) return addToast({ type: 'error', message: '결과물을 입력하거나 파일을 첨부하세요' })
+    if (!escrowWorkText.trim() && !escrowWorkFile) return addToast({ type: 'error', message: 'Enter result text or attach a file' })
     setEscrowWorkUploading(true)
     try {
       let resultUrl = ''
@@ -1152,8 +2342,8 @@ export default function App() {
         data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'submitWork',
           args: [BigInt(parseInt(escrowJobId)), resultUrl] }),
       })
-      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash: submitHash })
-      addToast({ type: 'success', message: 'Work submitted! Claude will read the actual content.' })
+      addToast({ type: 'success', message: 'Work submitted — URI stored on-chain. Client can now run AI review.', txHash: submitHash, explorerBase: 'https://testnet.arcscan.app' })
+      setHistory((prev) => addHistory(prev, { type: 'escrow', summary: `Result submitted: Job #${escrowJobId}`, txHash: submitHash, timestamp: Date.now(), status: 'success' }))
       setEscrowWorkText('')
       setEscrowWorkFile(null)
       await escrowLookupJob()
@@ -1170,13 +2360,24 @@ export default function App() {
     setEscrowLoading(true)
     try {
       await switchChain({ chainId: arcTestnet.id })
-      const approveHash = await sendTransactionAsync({
+      const hash = await sendTransactionAsync({
         to: ARC_ESCROW,
         data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'approveWork',
           args: [BigInt(parseInt(escrowJobId))] }),
       })
-      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash: approveHash })
-      addToast({ type: 'success', message: 'Work approved — USDC sent to agent!' })
+      addToast({ type: 'success', message: 'Work approved — USDC released to worker!', txHash: hash, explorerBase: 'https://testnet.arcscan.app' })
+      setHistory((prev) => addHistory(prev, { type: 'escrow', summary: `Payment released: Job #${escrowJobId}`, txHash: hash, timestamp: Date.now(), status: 'success' }))
+      // Also mark the linked marketplace request as completed
+      const linked = marketRequests.find((r) => r.escrowJobId === escrowJobId)
+      if (linked) {
+        const res = await fetch('/api/requests', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: linked.id, action: 'complete' }),
+        })
+        const json = await res.json()
+        if (res.ok && Array.isArray(json.requests)) setMarketRequests(json.requests)
+      }
       await escrowLookupJob()
     } catch (e: unknown) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Transaction failed' })
@@ -1190,13 +2391,13 @@ export default function App() {
     setEscrowLoading(true)
     try {
       await switchChain({ chainId: arcTestnet.id })
-      const refundHash = await sendTransactionAsync({
+      const hash = await sendTransactionAsync({
         to: ARC_ESCROW,
         data: encodeFunctionData({ abi: ARC_ESCROW_ABI, functionName: 'claimRefund',
           args: [BigInt(parseInt(escrowJobId))] }),
       })
-      await publicClients[arcTestnet.id].waitForTransactionReceipt({ hash: refundHash })
-      addToast({ type: 'success', message: 'Refund claimed!' })
+      addToast({ type: 'success', message: 'Refund claimed!', txHash: hash, explorerBase: 'https://testnet.arcscan.app' })
+      setHistory((prev) => addHistory(prev, { type: 'escrow', summary: `Refund claimed: Job #${escrowJobId}`, txHash: hash, timestamp: Date.now(), status: 'success' }))
       await escrowLookupJob()
     } catch (e: unknown) {
       addToast({ type: 'error', message: e instanceof Error ? e.message : 'Transaction failed' })
@@ -1214,7 +2415,7 @@ export default function App() {
       title: 'Confirm Send',
       lines: [`${amount} USDC`, `To: ${recipient.slice(0, 10)}...${recipient.slice(-6)}`, 'Network: Arc Testnet'],
       warnings,
-      onConfirm: () => execTx('send', `${amount} USDC → ${recipient.slice(0, 8)}...`, async () => {
+      onConfirm: () => execTx('send', `${amount} USDC ??${recipient.slice(0, 8)}...`, async () => {
         const adapter = await getAdapter()
         const r = await kit.unifiedBalance.spend({ amount, token: 'USDC', from: [{ adapter }],
           to: { adapter, chain: 'Arc_Testnet', recipientAddress: recipient as `0x${string}` } })
@@ -1228,13 +2429,13 @@ export default function App() {
     navigator.clipboard.writeText(addr).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 2000) })
   }
 
-  // ─── 필터 & 정렬 ──────────────────────────────────────────────────────────
+// ── Market requests & filtering ─
   const displayed = assets
     .filter((a) => networkMode === 'mainnet' ? MAINNET_IDS.has(a.chain) : TESTNET_IDS.has(a.chain))
     .sort((a, b) => sortBy === 'value' ? parseFloat(b.usdcValue) - parseFloat(a.usdcValue)
       : sortBy === 'symbol' ? a.symbol.localeCompare(b.symbol) : a.chain - b.chain)
 
-  // ─── 커넥터 목록 ──────────────────────────────────────────────────────────
+// Settlement history helpers
   function ConnectorList() {
     return (
       <div className="connector-list">
@@ -1258,7 +2459,7 @@ export default function App() {
     )
   }
 
-  // ─── LI.FI 견적 카드 ──────────────────────────────────────────────────────
+// LI.FI swap routes
   function LiFiQuoteCard() {
     if (!lifiQuote) return null
     const toAmt    = parseFloat(formatUnits(BigInt(lifiQuote.estimate.toAmount), lifiQuote.action.toToken.decimals))
@@ -1278,7 +2479,7 @@ export default function App() {
         </div>
         <div className="lifi-quote-row">
           <span className="lifi-quote-label">Route</span>
-          <span className="lifi-quote-value">{fromLabel} → {toLabel}</span>
+          <span className="lifi-quote-value">{fromLabel} ??{toLabel}</span>
         </div>
         <div className="lifi-quote-row">
           <span className="lifi-quote-label">Est. time</span>
@@ -1288,13 +2489,22 @@ export default function App() {
     )
   }
 
-  // ─── 렌더 ─────────────────────────────────────────────────────────────────
+// ── Navbar items ─
+  const NAV_ITEMS = [
+    { id: 'overview'  as const, label: 'Product',      icon: <LayoutDashboard size={13} /> },
+    { id: 'marketplace' as const, label: 'Requests',    icon: <BookUser size={13} /> },
+    { id: 'escrow'    as const, label: 'Escrow',       icon: <Lock size={13} /> },
+    { id: 'funds'     as const, label: 'Move Funds',   icon: <ArrowRightLeft size={13} /> },
+    { id: 'activity'  as const, label: 'Settlements',  icon: <Network size={13} /> },
+    { id: 'docs'      as const, label: 'Docs',         icon: <BookOpen size={13} /> },
+  ]
+
   return (
-    <div className="root" data-theme={theme}>
+    <div className="root" data-theme={theme} data-layout={layoutMode} data-density={densityMode}>
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       {confirmState && <ConfirmModal state={confirmState} onCancel={() => setConfirmState(null)} />}
 
-      {/* QR 모달 */}
+      {/* QR Modal */}
       {showQR && isConnected && (
         <div className="modal-overlay" onClick={() => setShowQR(false)}>
           <div className="modal qr-modal" onClick={(e) => e.stopPropagation()}>
@@ -1316,7 +2526,51 @@ export default function App() {
         </div>
       )}
 
-      {/* 주소록 모달 */}
+      {resultPreview && (
+        <div className="modal-overlay" onClick={() => setResultPreview(null)}>
+          <div className="modal result-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3 className="modal-title">Submitted Result</h3>
+                <p className="result-modal-url">{resultPreview.url}</p>
+              </div>
+              <button className="modal-close" onClick={() => setResultPreview(null)}><X size={16} /></button>
+            </div>
+            {resultPreview.loading ? (
+              <div className="result-preview-state">Loading result...</div>
+            ) : resultPreview.error ? (
+              <div className="result-preview-state error">
+                <AlertTriangle size={16} />
+                <span>Preview failed: {resultPreview.error}</span>
+                <a href={resultPreview.url} target="_blank" rel="noreferrer">Open raw file</a>
+              </div>
+            ) : resultPreview.contentType.startsWith('image/') ? (
+              <div className="result-preview-media">
+                <img src={resultPreview.url} alt="Submitted result preview" />
+              </div>
+            ) : resultPreview.contentType.includes('application/pdf') ? (
+              <iframe className="result-preview-pdf" src={resultPreview.url} title="Submitted PDF result" />
+            ) : resultPreview.text ? (
+              <pre className="result-preview-text">{resultPreview.text}</pre>
+            ) : (
+              <div className="result-preview-state">
+                <span>This file type cannot be previewed inline yet.</span>
+                <a href={resultPreview.url} target="_blank" rel="noreferrer">Open raw file</a>
+              </div>
+            )}
+            <div className="result-modal-actions">
+              <button className="btn-outline" onClick={() => navigator.clipboard?.writeText(resultPreview.url)}>
+                <Copy size={13} /> Copy URL
+              </button>
+              <a className="btn-outline" href={resultPreview.url} target="_blank" rel="noreferrer">
+                <ExternalLink size={13} /> Open raw
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Address Book Modal */}
       {showContacts && (
         <div className="modal-overlay" onClick={() => setShowContacts(false)}>
           <div className="modal contacts-modal" onClick={(e) => e.stopPropagation()}>
@@ -1341,7 +2595,7 @@ export default function App() {
                     </div>
                     <div className="contact-actions">
                       <button className="btn-icon" title="Use address"
-                        onClick={() => { setRecipient(c.address); setTransferSeg('send'); setShowContacts(false) }}>
+                        onClick={() => { setRecipient(c.address); setMoveFundsTab('send'); navigatePage('funds'); setShowContacts(false) }}>
                         <ArrowUpRight size={13} />
                       </button>
                       <button className="btn-icon danger" title="Delete" onClick={() => removeContact(c.id)}>
@@ -1356,13 +2610,52 @@ export default function App() {
         </div>
       )}
 
-      {/* ─── 내비바 ────────────────────────────────────────────────────── */}
+      {/* NAVBAR */}
       <nav className="navbar">
-        <span className="nav-logo">
-          <CircleDollarSign size={16} style={{ verticalAlign: 'middle', marginRight: 6, color: 'var(--accent)' }} />
-          USDC Portal
-        </span>
+        <div className="nav-left">
+          <span className="nav-logo">
+            <CircleDollarSign size={16} style={{ verticalAlign: 'middle', marginRight: 6, color: 'var(--accent)' }} />
+            ArcEscrow Market
+          </span>
+          <div className="nav-links">
+            {NAV_ITEMS.map((item) => (
+              <button key={item.id} className={`nav-link ${activePage === item.id ? 'active' : ''}`}
+                onClick={() => navigatePage(item.id)}>
+                {item.icon} {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="nav-right">
+          <div className="view-controls" aria-label="View options">
+            {(['contained', 'wide'] as const).map((mode) => (
+              <button
+                key={mode}
+                className={layoutMode === mode ? 'active' : ''}
+                onClick={() => setLayoutMode(mode)}
+                title={mode === 'contained' ? 'Contained page width' : 'Wide page width'}>
+                {mode === 'contained' ? 'Fit' : 'Wide'}
+              </button>
+            ))}
+            <button
+              className={densityMode === 'compact' ? 'active' : ''}
+              onClick={() => setDensityMode((mode) => mode === 'comfort' ? 'compact' : 'comfort')}
+              title="Toggle compact spacing">
+              Compact
+            </button>
+            <button
+              className={layoutMode === 'fullscreen' ? 'active icon-only' : 'icon-only'}
+              onClick={() => setLayoutMode((mode) => mode === 'fullscreen' ? 'contained' : 'fullscreen')}
+              title={layoutMode === 'fullscreen' ? 'Return to contained layout' : 'Use full browser width'}>
+              {layoutMode === 'fullscreen' ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+            </button>
+            <button
+              className={isFullscreen ? 'active icon-only' : 'icon-only'}
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'Exit browser fullscreen' : 'Enter browser fullscreen'}>
+              {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+            </button>
+          </div>
           <div className="network-toggle">
             <button className={`net-btn ${networkMode === 'mainnet' ? 'active' : ''}`} onClick={() => setNetworkMode('mainnet')}>Mainnet</button>
             <button className={`net-btn ${networkMode === 'testnet' ? 'active' : ''}`} onClick={() => setNetworkMode('testnet')}>Testnet</button>
@@ -1379,554 +2672,1230 @@ export default function App() {
             </div>
           )}
 
-          <div className="nav-wallets">
-            {connections.map((conn) =>
-              conn.accounts.map((addr) => (
-                <div key={addr} className="nav-wallet-chip">
-                  <span className="wallet-dot" />
-                  <span>{addr.slice(0, 6)}...{addr.slice(-4)}</span>
-                  <button className="chip-disconnect" onClick={() => disconnect({ connector: conn.connector })}><X size={12} /></button>
-                </div>
-              ))
-            )}
-            <button className="btn-add-wallet" onClick={() => setShowConnectors((v) => !v)}>
-              {isConnected ? <><Plus size={13} /> Add wallet</> : <><Wallet size={13} /> Connect</>}
+          <div className="profile-menu-wrap" ref={profileMenuRef}>
+            <button className={`profile-trigger ${showProfileMenu ? 'active' : ''}`} onClick={() => { setShowProfileMenu((v) => !v); setShowConnectors(false) }}>
+              <UserCircle size={17} />
+              <span>{isConnected ? activeWalletShort : 'Profile'}</span>
+              <ChevronDown size={12} />
             </button>
-            {showConnectors && <div className="wallet-dropdown"><ConnectorList /></div>}
+            {showProfileMenu && (
+              <div className="profile-dropdown">
+                <div className="profile-head">
+                  <div className="profile-avatar"><UserCircle size={24} /></div>
+                  <div>
+                    <span>{isConnected ? 'Connected wallet' : 'Wallet not connected'}</span>
+                    <strong>{isConnected ? activeWalletShort : 'Connect to post or manage escrow'}</strong>
+                  </div>
+                </div>
+                {isConnected && (
+                  <div className="profile-wallet-list">
+                    {connections.map((conn) =>
+                      conn.accounts.map((addr) => (
+                        <div key={addr} className="profile-wallet-row">
+                          <span className="wallet-dot" />
+                          <code>{addr.slice(0, 8)}...{addr.slice(-6)}</code>
+                          <button className="chip-disconnect" onClick={() => disconnect({ connector: conn.connector })}><X size={12} /></button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+                <div className="profile-menu-section">
+                  <button onClick={() => { navigatePage('portfolio'); setMainTab('assets') }}>
+                    <Wallet size={14} /> Portfolio
+                  </button>
+                  <button onClick={() => { navigatePage('portfolio'); setMainTab('faucet') }}>
+                    <Fuel size={14} /> Faucet links
+                  </button>
+                  <button onClick={() => { setShowQR(true); setShowProfileMenu(false) }} disabled={!isConnected}>
+                    <QrCode size={14} /> Receive / QR
+                  </button>
+                  <button onClick={() => { setShowContacts(true); setShowProfileMenu(false) }}>
+                    <BookUser size={14} /> Address book
+                  </button>
+                  <button onClick={() => { exportCSV(); setShowProfileMenu(false) }} disabled={!assets.length}>
+                    <Download size={14} /> Export CSV
+                  </button>
+                </div>
+                <div className="profile-menu-section">
+                  <button onClick={() => setShowConnectors((v) => !v)}>
+                    {isConnected ? <><Plus size={14} /> Add wallet</> : <><Wallet size={14} /> Connect wallet</>}
+                  </button>
+                  <button onClick={() => setTheme((t) => t === 'dark' ? 'light' : 'dark')}>
+                    {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />} {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+                  </button>
+                </div>
+                {showConnectors && <div className="profile-connectors"><ConnectorList /></div>}
+              </div>
+            )}
           </div>
 
-          {isConnected && (
-            <button className="btn-theme" onClick={() => setShowQR(true)} title="Receive / QR">
-              <QrCode size={15} />
-            </button>
-          )}
           <button className="btn-theme" onClick={() => setTheme((t) => t === 'dark' ? 'light' : 'dark')}>
             {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
           </button>
         </div>
       </nav>
 
-      {/* ─── 포트폴리오 히어로 ────────────────────────────────────────── */}
-      <div className="portfolio-hero">
-        <div className="hero-main">
-          <span className="hero-label">Total Balance</span>
-          <div className="hero-value-row">
-            <span className="hero-value">
-              ${parseFloat(totalUsdc).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-            {loadingAssets && <span className="hero-loading-dot" />}
-          </div>
-          {parseFloat(totalUsdc) > 0 && (
-            <div className="hero-breakdown">
-              <span className="hero-breakdown-item">
-                <span style={{ color: '#627eea' }}>●</span> ETH ${ethValue.toFixed(2)}
-              </span>
-              <span className="hero-breakdown-item">
-                <span style={{ color: '#2775ca' }}>●</span> USDC ${usdcTotalVal.toFixed(2)}
-              </span>
-              {otherValue > 0.01 && (
-                <span className="hero-breakdown-item">
-                  <span style={{ color: 'var(--text-muted)' }}>●</span> Other ${otherValue.toFixed(2)}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="hero-actions">
-          <button className="btn-ghost" onClick={loadAssets} disabled={loadingAssets}>
-            <RefreshCw size={13} /> Refresh
+      {/* Mobile bottom nav */}
+      <nav className="mobile-nav">
+        {NAV_ITEMS.map((item) => (
+          <button key={item.id} className={`mobile-nav-item ${activePage === item.id ? 'active' : ''}`}
+            onClick={() => navigatePage(item.id)}>
+            {item.icon}
+            <span>{item.label}</span>
           </button>
-          {displayed.length > 0 && (
-            <button className="btn-ghost" onClick={exportCSV}>
-              <Download size={13} /> CSV
-            </button>
-          )}
-        </div>
-      </div>
+        ))}
+      </nav>
 
-      <main className="dashboard">
-        {/* ─── 포트폴리오 바 ─────────────────────────────────────────── */}
-        {chainBreakdown.length > 0 && parseFloat(totalUsdc) > 0 && (
-          <div className="portfolio-bar-wrap">
-            <div className="portfolio-bar">
-              {chainBreakdown.map((c) => (
-                <div key={c.id} className="bar-seg" title={`${CHAIN_META[c.id].label}: $${c.val.toFixed(2)}`}
-                  style={{ width: `${(c.val / parseFloat(totalUsdc)) * 100}%`, background: CHAIN_META[c.id].color }} />
+      <main className="page-container">
+
+        {/* ─── OVERVIEW ─── */}
+        {activePage === 'overview' && (
+          <div className="page overview-page">
+
+            {/* Hero */}
+            <section className="ov-hero">
+              <div className="ov-ambient ov-ambient-one" />
+              <div className="ov-ambient ov-ambient-two" />
+              <div className="ov-hero-text">
+                <div className="ov-eyebrow">Circle + Arc agentic escrow marketplace</div>
+                <h1 className="ov-h1">Trustless escrow &amp; settlement on Arc</h1>
+                <p className="ov-lead">
+                  Post a request, lock USDC instantly in ArcEscrow, and match with workers on-chain.
+                  AI review before every payout. NFT OTC atomic swaps. ERC-8183 agentic jobs.
+                  Bridge from any chain via Circle CCTP V2 with zero slippage.
+                </p>
+                <div className="ov-metrics">
+                  <div className="ov-metric">
+                    <span className="ov-metric-value">{marketRequests.length > 0 ? marketRequests.length : '—'}</span>
+                    <span className="ov-metric-label">Requests on shared board</span>
+                  </div>
+                  <div className="ov-metric">
+                    <span className="ov-metric-value">{requestStats.open > 0 ? requestStats.open : '—'}</span>
+                    <span className="ov-metric-label">Open · USDC locked at post</span>
+                  </div>
+                  <div className="ov-metric">
+                    <span className="ov-metric-value">4</span>
+                    <span className="ov-metric-label">Contracts live on Arc Testnet</span>
+                  </div>
+                </div>
+                <div className="ov-status-row">
+                  <span className="status-dot green" /><span>ArcEscrow live</span>
+                  <span className="ov-sep" />
+                  <span className="status-dot green" /><span>NFTOTCEscrow live</span>
+                  <span className="ov-sep" />
+                  <span className="status-dot green" /><span>CCTP V2 active</span>
+                  <span className="ov-sep" />
+                  <span className="status-dot green" /><span>ERC-8183 active</span>
+                  <span className="ov-sep" />
+                  <span className="status-dot green" /><span>AI Review ready</span>
+                  <span className="ov-sep" />
+                  <span className="status-dot green" /><span>Gateway nanopayments</span>
+                  {isConnected && (
+                    <><span className="ov-sep" /><span className="status-dot green" />
+                    <span className="ov-mono">{allAddresses[0]?.slice(0, 6)}...{allAddresses[0]?.slice(-4)} connected</span></>
+                  )}
+                </div>
+                <div className="ov-ctas">
+                  <button className="btn-primary ov-cta" onClick={() => navigatePage('marketplace')}>
+                    <BookUser size={14} /> Post a Request
+                  </button>
+                  <button className="btn-outline ov-cta" onClick={() => navigatePage('funds')}>
+                    <ArrowRightLeft size={14} /> Fund with USDC
+                  </button>
+                  {!isConnected && (
+                    <button className="btn-ghost ov-cta" onClick={() => { setShowProfileMenu(true); setShowConnectors(true) }}>
+                      <Wallet size={14} /> Connect Wallet
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="ov-hero-visual">
+                <div className="ov-showcase-wall" aria-hidden="true">
+                  <div className="showcase-column slow">
+                    {[
+                      ['Post', 'USDC locked now', 'Immediate escrow lock'],
+                      ['Claim', 'Worker on-chain', 'claimJob on Arc'],
+                      ['Submit', 'Deliverable', 'Vercel Blob + URI proof'],
+                    ].map((item, i) => (
+                      <div className="showcase-card" key={`a-${i}`}>
+                        <span>{item[0]}</span>
+                        <strong>{item[1]}</strong>
+                        <small>{item[2]}</small>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="showcase-column reverse">
+                    {[
+                      ['CCTP V2', 'Circle bridge', 'Sepolia → Arc, 0 slippage'],
+                      ['NFT OTC', 'Atomic swap', 'USDC ↔ NFT settlement'],
+                      ['ERC-8183', 'Agentic jobs', 'Agent-to-agent payments'],
+                    ].map((item, i) => (
+                      <div className="showcase-card accent" key={`b-${i}`}>
+                        <span>{item[0]}</span>
+                        <strong>{item[1]}</strong>
+                        <small>{item[2]}</small>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="showcase-column slow">
+                    {[
+                      ['AI Review', 'Claude Haiku', 'Approve / reject verdict'],
+                      ['Release', 'USDC payout', 'ArcEscrow → worker'],
+                      ['Bridge', 'Circle CCTP V2', 'Sepolia → Arc, 0 slippage'],
+                    ].map((item, i) => (
+                      <div className="showcase-card" key={`c-${i}`}>
+                        <span>{item[0]}</span>
+                        <strong>{item[1]}</strong>
+                        <small>{item[2]}</small>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="ov-status-panel framer-style-panel">
+                  <div className="ov-status-panel-head">
+                    <div>
+                      <span className="ov-panel-kicker">Active session</span>
+                      <strong>Agentic settlement workspace</strong>
+                    </div>
+                    <span className={`mode-pill ${networkMode}`}>{networkMode === 'mainnet' ? 'Mainnet' : 'Testnet'}</span>
+                  </div>
+                  <div className="ov-session-list">
+                    <div className="ov-session-row">
+                      <span>Connected wallet</span>
+                      <strong>{activeWalletShort}</strong>
+                    </div>
+                    <div className="ov-session-row">
+                      <span>Active network</span>
+                      <strong>{activeChainMeta?.label ?? 'Select network'}</strong>
+                    </div>
+                    <div className="ov-session-row">
+                      <span>{networkMode === 'testnet' ? 'Testnet value' : 'Portfolio value'}</span>
+                      <strong>${parseFloat(totalUsdc).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                    </div>
+                  </div>
+                  {networkMode === 'testnet' && (
+                    <div className="testnet-notice">
+                      <AlertTriangle size={14} />
+                      <span>Testnet balances are for development and are not real USD value.</span>
+                    </div>
+                  )}
+                  <div className="ov-product-path">
+                    {['Post', 'Claim', 'Submit', 'AI', 'Release'].map((item, i) => (
+                      <div key={item}>
+                        <span>{String(i + 1).padStart(2, '0')}</span>
+                        <strong>{item}</strong>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="ov-action-grid">
+                    <button className="ov-action-tile primary" onClick={() => navigatePage('marketplace')}>
+                      <BookUser size={16} />
+                      <span>Requests</span>
+                    </button>
+                    <button className="ov-action-tile" onClick={() => navigatePage('escrow')}>
+                      <Lock size={16} />
+                      <span>Escrow</span>
+                    </button>
+                    <button className="ov-action-tile" onClick={() => navigatePage('funds')}>
+                      <ArrowRightLeft size={16} />
+                      <span>Move</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Quick Start */}
+            <section className="ov-quickstart reveal-section">
+              <div className="ov-section-heading compact" style={{ marginBottom: 20 }}>
+                <div className="ov-label">Quick Start</div>
+                <h2>Try it in 3 steps</h2>
+              </div>
+              <div className="ov-qs-steps">
+                <div className="ov-qs-step">
+                  <div className="ov-qs-num">01</div>
+                  <div className="ov-qs-body">
+                    <strong>Get testnet USDC on Arc</strong>
+                    <p>Use the <button className="ov-qs-link" onClick={() => { navigatePage('funds'); }}>CCTP Bridge</button> to move Sepolia USDC to Arc Testnet, or use the faucet in your profile.</p>
+                  </div>
+                </div>
+                <div className="ov-qs-step">
+                  <div className="ov-qs-num">02</div>
+                  <div className="ov-qs-body">
+                    <strong>Post a request with USDC locked</strong>
+                    <p>Go to <button className="ov-qs-link" onClick={() => { navigatePage('marketplace'); }}>Requests</button>, click Create Request, fill in your task, and post. USDC is locked instantly in ArcEscrow on-chain.</p>
+                  </div>
+                </div>
+                <div className="ov-qs-step">
+                  <div className="ov-qs-num">03</div>
+                  <div className="ov-qs-body">
+                    <strong>Accept, submit, and release</strong>
+                    <p>A second wallet can click "Accept &amp; Claim". After claiming, submit work. The client runs AI review and releases USDC with one click.</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="ov-grant-strip reveal-section">
+              {([
+                { label: 'Circle CCTP V2', title: 'Bridge USDC to Arc, 0 slippage', copy: 'Move USDC from Sepolia to Arc Testnet using Circle CCTP V2. Fast finality, no slippage, native Circle attestation.' },
+                { label: 'Arc Escrow', title: 'USDC locked at post, released on proof', copy: 'ArcEscrow locks USDC when the request is created. No separate funding step. Cancel with refund or 5% fee if matched.' },
+                { label: 'ERC-8183', title: 'Agentic commerce standard on Arc', copy: 'Full ERC-8183 implementation alongside ArcEscrow. Agents can autonomously create jobs, submit work, and trigger USDC payouts.' },
+              ] as const).map((item, i) => (
+                <div className="ov-grant-card" key={item.title} style={{ '--step-i': i } as React.CSSProperties}>
+                  <span>{item.label}</span>
+                  <strong>{item.title}</strong>
+                  <p>{item.copy}</p>
+                </div>
               ))}
-            </div>
-            <div className="bar-legend">
-              {chainBreakdown.map((c) => (
-                <span key={c.id} className="legend-item">
-                  <span className="legend-dot" style={{ background: CHAIN_META[c.id].color }} />
-                  {CHAIN_META[c.id].label} {((c.val / parseFloat(totalUsdc)) * 100).toFixed(1)}%
-                </span>
-              ))}
-            </div>
+            </section>
+
+            {/* Product Explanation */}
+            <section className="ov-explain reveal-section">
+              <div className="ov-section-heading">
+                <div className="ov-label">What It Does</div>
+                <h2>A request marketplace with USDC escrow</h2>
+                <p>
+                  ArcEscrow Market combines Arc escrow, Circle CCTP, and AI review into one workflow.
+                  USDC locks when you post — not after matching. Workers claim on-chain, submit proof,
+                  and AI-assisted review helps approve every payout. NFT OTC swaps and ERC-8183 agentic jobs run in the same marketplace.
+                </p>
+              </div>
+              <div className="ov-explain-grid">
+                {([
+                  { icon: <BookUser size={18} />, title: 'Post & Lock', desc: 'Clients post requests with USDC locked immediately in ArcEscrow. Work, Milestone, and NFT OTC deal types supported.' },
+                  { icon: <Lock size={18} />, title: 'On-chain Match', desc: 'Workers call claimJob on Arc Testnet to accept open requests. The escrow contract records the match immutably.' },
+                  { icon: <Upload size={18} />, title: 'Submit Work', desc: 'Workers upload deliverables to Vercel Blob. The URI is stored on-chain via submitWork() to ensure proof integrity.' },
+                  { icon: <Bot size={18} />, title: 'AI + Release', desc: 'Claude Haiku evaluates the submission and returns approve/reject with reasoning. Client releases USDC after review.' },
+                  { icon: <Zap size={18} />, title: 'Nanopayments', desc: 'Circle Gateway / x402 enables sub-cent per-request fees for listings, AI evaluations, API calls, and agent micropayments.' },
+                ] as const).map((item, i) => (
+                  <div className="ov-explain-card" key={item.title} style={{ '--step-i': i } as React.CSSProperties}>
+                    <div className="ov-explain-icon">{item.icon}</div>
+                    <h3>{item.title}</h3>
+                    <p>{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Money Flow Diagram */}
+            <section className="ov-flow-section reveal-section">
+              <div className="ov-flow-copy">
+                <div className="ov-label">How Funds Move</div>
+                <h2>From request to verified payout</h2>
+                <p>
+                  USDC is locked at post time — no separate funding step. Workers claim on-chain,
+                  submit proof, and AI review helps the client decide whether to release or refund.
+                  Circle CCTP V2 routes USDC from any chain to Arc with zero slippage.
+                </p>
+              </div>
+              <div className="ov-flow-diagram">
+                {([
+                  { title: 'Post', sub: 'USDC locked instantly', tone: 'blue' },
+                  { title: 'Claim', sub: 'Worker on-chain', tone: 'cyan' },
+                  { title: 'Submit', sub: 'Deliverable uploaded', tone: 'blue' },
+                  { title: 'AI Review', sub: 'Claude verdict', tone: 'gold' },
+                  { title: 'Payout', sub: 'USDC → worker', tone: 'green' },
+                ] as const).map((node, i) => (
+                  <div className="ov-flow-node-wrap" key={node.title} style={{ '--step-i': i } as React.CSSProperties}>
+                    <div className={`ov-flow-box ${node.tone}`}>
+                      <strong>{node.title}</strong>
+                      <span>{node.sub}</span>
+                    </div>
+                    {i < 4 && <div className="ov-flow-arrow"><ArrowRight size={16} /></div>}
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Service Modules */}
+            <section className="ov-services reveal-section">
+              <div className="ov-section-heading compact">
+                <div className="ov-label">Service Modules</div>
+                <h2>Built like a financial workspace, not a demo page</h2>
+              </div>
+              <div className="ov-service-grid">
+                {([
+                  { name: 'Requests Marketplace', detail: 'Shared request board with deal types: Work, Milestone, NFT OTC. USDC locked at post, role-aware card actions.' },
+                  { name: 'ArcEscrow', detail: 'Work and Milestone escrow: claimJob, submitWork, approveWork, cancelJob (5% fee if matched), claimRefund.' },
+                  { name: 'NFTOTCEscrow', detail: 'Atomic NFT ↔ USDC swap. Buyer locks USDC, seller proves ownership via ownerOf, either side settles atomically.' },
+                  { name: 'ERC-8183 Agentic Commerce', detail: 'Arc official standard: createJob, setBudget, fund, submit, complete. Enables fully autonomous agent-to-agent workflows.' },
+                  { name: 'Circle CCTP V2', detail: 'Bridge USDC Sepolia → Arc (and reverse) via Circle CCTP V2. Zero slippage. Also App Kit, LI.FI swap, and direct send.' },
+                  { name: 'AI Review (Claude)', detail: 'Claude Haiku evaluates submitted work: approve/reject verdict with one-sentence reasoning before every payout.' },
+                  { name: 'Gateway Nanopayments', detail: 'x402-compatible Circle Gateway layer for sub-cent listing, review, API, and agent micropayment flows.' },
+                  { name: 'Circle Programmable Wallets', detail: 'Server-controlled wallets for custodial agent workflows. Enables agents to transact without holding private keys directly.' },
+                ] as const).map((service, i) => (
+                  <div className="ov-service-card" key={service.name} style={{ '--step-i': i } as React.CSSProperties}>
+                    <span>{String(i + 1).padStart(2, '0')}</span>
+                    <h3>{service.name}</h3>
+                    <p>{service.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Settlement Workflow */}
+            <section className="ov-workflow reveal-section">
+              <div className="ov-label">Settlement Workflow</div>
+              <div className="ov-pipeline">
+                {([
+                  { n: '01', title: 'Post & Lock',     sub: 'Marketplace → escrow',    desc: 'Client posts request — USDC is locked in ArcEscrow immediately via USDC approve + createJob. No separate funding step.' },
+                  { n: '02', title: 'Claim On-chain',  sub: 'claimJob() on Arc',      desc: 'Worker finds the open request and calls claimJob on-chain. Escrow records the worker address and marks the job matched.' },
+                  { n: '03', title: 'Submit + AI',     sub: 'submitWork + Claude',    desc: 'Worker uploads the deliverable to Vercel Blob. Claude Haiku evaluates quality and returns a structured verdict.' },
+                  { n: '04', title: 'Release',         sub: 'approveWork() → USDC',   desc: 'Client sees the AI verdict and approves. USDC transfers directly from ArcEscrow to the worker wallet on Arc Testnet.' },
+                  { n: '05', title: 'NFT & Agents',    sub: 'NFTOTCEscrow / ERC-8183', desc: 'NFT OTC atomic swaps and ERC-8183 agentic jobs run in parallel. Circle CCTP V2 bridges USDC from any chain.' },
+                ] as const).map((s, i) => (
+                  <div key={i} className="ov-pipeline-step" style={{ '--step-i': i } as React.CSSProperties}>
+                    <div className="ov-step-n">{s.n}</div>
+                    <div className="ov-step-title">{s.title}</div>
+                    <div className="ov-step-sub">{s.sub}</div>
+                    <div className="ov-step-desc">{s.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Who Uses It */}
+            <section className="ov-audiences reveal-section">
+              <div className="ov-label">Who Uses It</div>
+              <div className="ov-audience-grid">
+                {([
+                  {
+                    role: 'Clients', tag: 'Fund + Verify',
+                    desc: 'Lock funds, define deliverables, and release payment only after Claude-verified work is confirmed on-chain.',
+                    items: ['Define escrow terms', 'Review Claude verdict', 'One-click payout release'],
+                  },
+                  {
+                    role: 'Workers', tag: 'Work + Earn',
+                    desc: 'Submit proof of work and receive Arc USDC after approval with escrow protection for both parties.',
+                    items: ['Submit result on-chain', 'Get AI-assisted review', 'Receive USDC payout'],
+                  },
+                  {
+                    role: 'Protocols & Agents', tag: 'Build + Scale',
+                    desc: 'Build task markets, agent economies, and service automation on Arc. ERC-8183 enables fully autonomous job creation and payment.',
+                    items: ['Composable escrow API', 'Circle CCTP cross-chain inflow', 'ERC-8183 agentic standard'],
+                  },
+                ] as const).map((a, i) => (
+                  <div key={i} className="ov-audience-card" style={{ '--step-i': i } as React.CSSProperties}>
+                    <div className="ov-audience-header">
+                      <div className="ov-audience-role">{a.role}</div>
+                      <div className="ov-audience-tag">{a.tag}</div>
+                    </div>
+                    <p className="ov-audience-desc">{a.desc}</p>
+                    <ul className="ov-audience-items">
+                      {a.items.map((item, j) => <li key={j}>{item}</li>)}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Architecture */}
+            <section className="ov-arch reveal-section">
+              <div className="ov-label">Circle + Arc Stack</div>
+              <div className="ov-arch-rail">
+                {([
+                  { name: 'USDC',         tech: 'Settlement asset',  color: '#2775ca' },
+                  { name: 'Arc Testnet',  tech: 'Stablecoin L1',     color: '#00c2ff' },
+                  { name: 'CCTP V2',      tech: 'Circle cross-chain', color: '#16a34a' },
+                  { name: 'ArcEscrow',    tech: 'Work / Milestone', color: '#8b5cf6' },
+                  { name: 'NFTOTCEscrow', tech: 'NFT atomic swap',  color: '#ec4899' },
+                  { name: 'AI Review',    tech: 'Claude verdict',   color: '#d4a574' },
+                  { name: 'ERC-8183',     tech: 'Agentic standard', color: '#f59e0b' },
+                ] as const).map((node, i) => (
+                  <div key={i} className="ov-arch-item">
+                    <div className="ov-arch-node">
+                      <div className="ov-arch-name">{node.name}</div>
+                      <div className="ov-arch-tech" style={{ color: node.color }}>{node.tech}</div>
+                    </div>
+                    {i < 5 && <div className="ov-arch-conn"><ArrowRight size={14} /></div>}
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Live Board Teaser */}
+            {marketRequests.length > 0 && (
+              <section className="ov-live-board reveal-section">
+                <div className="ov-section-heading compact">
+                  <div className="ov-label">
+                    <span className="ov-live-dot" />
+                    Live Board
+                  </div>
+                  <h2>Recent requests on Arc</h2>
+                </div>
+                <div className="ov-live-cards">
+                  {marketRequests.slice(0, 3).map((req) => (
+                    <div key={req.id} className="ov-live-card" onClick={() => navigatePage('marketplace')}>
+                      <div className="ov-live-card-top">
+                        <span className={`market-status ${req.status}`}>{req.status}</span>
+                        <span className="ov-live-budget">{req.budget} USDC</span>
+                      </div>
+                      <div className="ov-live-title">{req.title}</div>
+                      <div className="ov-live-meta">
+                        <span>{req.category}</span>
+                        <span>{req.deadlineDays}d deadline</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button className="btn-outline" style={{ marginTop: 16, alignSelf: 'center' }} onClick={() => navigatePage('marketplace')}>
+                  <BookUser size={13} /> View all {marketRequests.length} requests
+                </button>
+              </section>
+            )}
+
+            {/* Final CTA */}
+            <section className="ov-final-cta reveal-section">
+              <div className="ov-final-inner">
+                <h2 className="ov-final-title">Start settling on Arc with USDC</h2>
+                <p className="ov-final-sub">
+                  Bridge USDC from Sepolia, post a request, match with a worker,
+                  submit proof, and release via AI-verified escrow on Arc Testnet.
+                </p>
+                <div className="ov-final-btns">
+                  <button className="btn-primary ov-cta" onClick={() => navigatePage('marketplace')}>
+                    <BookUser size={14} /> Open Requests
+                  </button>
+                  <button className="btn-outline ov-cta" onClick={() => navigatePage('funds')}>
+                    <ArrowRightLeft size={14} /> Move Funds to Arc
+                  </button>
+                  <button className="btn-ghost ov-cta" onClick={() => navigatePage('docs')}>
+                    <BookOpen size={14} /> View Docs
+                  </button>
+                </div>
+              </div>
+            </section>
+
           </div>
         )}
 
-        <div className="content-grid">
-          {/* ─── 왼쪽 패널 ─────────────────────────────────────────── */}
-          <div className="panel">
-            <div className="panel-header">
-              <div className="main-tabs">
-                <button className={`main-tab ${mainTab === 'assets' ? 'active' : ''}`} onClick={() => setMainTab('assets')}>Assets</button>
-                <button className={`main-tab ${mainTab === 'history' ? 'active' : ''}`} onClick={() => setMainTab('history')}>
-                  Activity {history.length > 0 && <span className="history-badge">{history.length}</span>}
-                </button>
-                {networkMode === 'testnet' && (
-                  <button className={`main-tab ${mainTab === 'faucet' ? 'active' : ''}`} onClick={() => setMainTab('faucet')}>Faucet</button>
-                )}
+        {/* ─── AGENT ESCROW ─── */}
+        {activePage === 'marketplace' && (
+          <div className="page marketplace-page">
+            <div className="page-header marketplace-header">
+              <BookUser size={20} style={{ color: 'var(--accent)' }} />
+              <div>
+                <h2 className="page-title">Requests Marketplace</h2>
+                <p className="page-sub">Post a request with USDC locked immediately. Workers claim on-chain. AI-assisted review. Settlement on Arc.</p>
               </div>
-              {mainTab === 'assets' && (
-                <div className="table-controls">
-                  <div className="network-label">
-                    <span className={`net-indicator ${networkMode}`} />
-                    {networkMode === 'mainnet' ? 'Mainnet' : 'Testnet'}
-                    {loadingAssets && <span className="loading-dot" />}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <select className="sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
-                      <option value="value">By value</option>
-                      <option value="symbol">By token</option>
-                      <option value="chain">By chain</option>
-                    </select>
-                    <button className="btn-icon" onClick={loadAssets} disabled={loadingAssets}><RefreshCw size={13} /></button>
-                  </div>
-                </div>
-              )}
+              <div className="marketplace-tabs">
+                <button className={marketTab === 'browse' ? 'active' : ''} onClick={() => setMarketTab('browse')}>Browse</button>
+                <button className={marketTab === 'create' ? 'active' : ''} onClick={() => setMarketTab('create')}>Create Request</button>
+                <button onClick={loadMarketRequestsFromApi} disabled={marketLoading}>{marketLoading ? 'Syncing' : 'Refresh'}</button>
+              </div>
             </div>
 
-            {mainTab === 'assets' ? (
-              !isConnected ? (
-                <div className="connect-prompt">
-                  <div className="connect-prompt-icon"><Wallet size={40} strokeWidth={1.2} /></div>
-                  <p className="connect-prompt-title">Connect your wallet</p>
-                  <p className="connect-prompt-sub">Your assets will appear here once connected</p>
-                  <button className="btn-primary" style={{ maxWidth: 200 }} onClick={() => setShowConnectors(true)}>Connect wallet</button>
+            <div className="marketplace-hero">
+              <div>
+                <span className="market-kicker">Agentic escrow marketplace</span>
+                <h3>Post work. Lock USDC. Release on approval.</h3>
+                <p>Clients publish a request with scope, reward, and deadline. USDC is locked at posting time. Workers accept and claim the job on-chain. AI-assisted review then helps the client approve or reject the final payout.</p>
+                <div className="market-hero-actions">
+                  <button className="btn-primary" onClick={() => setMarketTab('create')}>
+                    <Plus size={14} /> Post Request
+                  </button>
+                  <button className="btn-outline" onClick={() => navigatePage('escrow')}>
+                    <Lock size={14} /> Manage Escrow
+                  </button>
                 </div>
-              ) : (
-                <div className="table-wrap">
-                  <table className="asset-table">
-                    <thead>
-                      <tr>
-                        <th>Token</th><th>Wallet</th>
-                        <th className="text-right">Balance</th>
-                        <th className="text-right">Value</th>
-                        <th className="text-right">24h</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loadingAssets && assets.length === 0 ? <SkeletonRows /> : displayed.length === 0 ? (
-                        <tr><td colSpan={5} className="empty-cell">No assets found on {networkMode}</td></tr>
-                      ) : displayed.map((a, i) => {
-                        const explorer = CHAIN_META[a.chain]?.explorer
-                        return (
-                          <tr key={i} className="asset-tr">
-                            <td>
-                              <div className="token-cell">
-                                <TokenIconWithChain symbol={a.symbol} chainId={a.chain} />
-                                <div>
-                                  <span className="token-name">{a.symbol}</span>
-                                  <span className="token-subname">
-                                    {explorer
-                                      ? <a className="chain-link" href={explorer} target="_blank" rel="noopener noreferrer">{CHAIN_META[a.chain]?.label}</a>
-                                      : CHAIN_META[a.chain]?.label}
-                                  </span>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="wallet-cell">{a.wallet}</td>
-                            <td className="text-right mono">{parseFloat(a.balance).toFixed(4)}</td>
-                            <td className="text-right usdc-val">${a.usdcValue}</td>
-                            <td className="text-right"><Change24h value={a.change24h} /></td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )
-            ) : mainTab === 'history' ? (
-              <div className="history-list">
-                {history.length === 0 ? (
-                  <div className="empty-cell">No transactions yet</div>
-                ) : history.map((h, i) => {
-                  const iconMap = { swap: <Repeat2 size={14} />, bridge: <Layers size={14} />, send: <ArrowUpRight size={14} />, cross: <Zap size={14} /> }
-                  return (
-                    <div key={i} className={`history-row ${h.status}`}>
-                      <div className="history-left">
-                        <span className={`history-icon ${h.type}`}>{iconMap[h.type]}</span>
-                        <div className="history-info">
-                          <span className="history-summary">{h.summary}</span>
-                          <span className="history-time">{new Date(h.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                      </div>
-                      <div className="history-right">
-                        {h.txHash && (
-                          <a className="history-link" href={`https://testnet.arcscan.app/tx/${h.txHash}`} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink size={13} />
-                          </a>
-                        )}
-                        <span className={`history-dot ${h.status}`} />
-                      </div>
-                    </div>
-                  )
-                })}
               </div>
-            ) : (
-              /* 파우셋 탭 */
-              <div className="faucet-list">
-                <div className="faucet-step-card">
-                  <div className="faucet-step-num">1</div>
-                  <div className="faucet-step-body">
-                    <p className="faucet-step-title">Copy your wallet address</p>
-                    {isConnected ? (
-                      <div className="faucet-addr-row">
-                        <span className="faucet-addr-text">{allAddresses[0]}</span>
-                        <button className={`btn-copy ${copiedAddr ? 'copied' : ''}`} onClick={copyAddress}>
-                          {copiedAddr ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="faucet-no-wallet">
-                        <span>Connect a wallet first</span>
-                        <button className="btn-primary" style={{ padding: '6px 14px', fontSize: '12px', width: 'auto' }} onClick={() => setShowConnectors(true)}>Connect</button>
-                      </div>
-                    )}
-                  </div>
+              <div className="market-command-panel">
+                <div className="market-command-head">
+                  <span>Live board</span>
+                  <strong>{marketRequests.length} requests</strong>
                 </div>
-                <div className="faucet-step-card">
-                  <div className="faucet-step-num">2</div>
-                  <div className="faucet-step-body">
-                    <p className="faucet-step-title">Request tokens from a faucet</p>
-                    <p className="faucet-step-sub">Click a faucet — it opens in a new tab. Paste your address and submit.</p>
-                    <div className="faucet-cards">
-                      {FAUCETS.map((f, i) => {
-                        const state = faucetPoll[i] ?? 'idle'
-                        return (
-                          <a key={i} href={f.url} target="_blank" rel="noopener noreferrer"
-                            className={`faucet-card ${state}`}
-                            onClick={() => { if (isConnected && state === 'idle') startFaucetPoll(i) }}>
-                            <div className="faucet-card-top">
-                              <span className="chain-dot" style={{ background: CHAIN_META[f.chainId]?.color }} />
-                              <span className="faucet-card-name">{f.name}</span>
-                              {state === 'idle'    && <ExternalLink size={12} className="faucet-card-arrow" />}
-                              {state === 'polling' && <span className="faucet-spinner" />}
-                              {state === 'received' && <Check size={13} className="faucet-check" />}
-                            </div>
-                            <span className="faucet-card-chain">{f.chain}</span>
-                            <div className="faucet-card-tokens">
-                              {f.tokens.map((t) => <span key={t} className="faucet-token">{t}</span>)}
-                            </div>
-                            {state === 'polling'  && <span className="faucet-status-text">Waiting for deposit...</span>}
-                            {state === 'received' && <span className="faucet-status-text received">Tokens received!</span>}
-                            {state === 'idle'     && <span className="faucet-card-desc">{f.desc}</span>}
-                          </a>
-                        )
-                      })}
+                <div className="market-stat-grid">
+                  <div><span>Open</span><strong>{requestStats.open}</strong></div>
+                  <div><span>Matched</span><strong>{requestStats.matched}</strong></div>
+                  <div><span>Complete</span><strong>{marketRequests.filter((r) => r.status === 'completed').length}</strong></div>
+                  <div><span>Mine</span><strong>{requestStats.mine}</strong></div>
+                </div>
+                <div className="market-flow-mini">
+                  {['Post+Fund', 'Match', 'Submit', 'Review', 'Release'].map((step, i) => (
+                    <div className="market-flow-step" key={step}>
+                      <span>{String(i + 1).padStart(2, '0')}</span>
+                      <strong>{step}</strong>
                     </div>
-                  </div>
+                  ))}
                 </div>
-                <div className="faucet-step-card faucet-step-last">
-                  <div className="faucet-step-num">3</div>
-                  <div className="faucet-step-body">
-                    <p className="faucet-step-title">Check your balance</p>
-                    <p className="faucet-step-sub">Balance updates automatically when tokens arrive.</p>
-                    <button className="btn-outline" style={{ width: 'auto' }} onClick={() => { setMainTab('assets'); loadAssets() }}>
-                      <RefreshCw size={13} /> Refresh assets
-                    </button>
-                  </div>
+              </div>
+            </div>
+
+            {!marketCanAct && (
+              <div className="market-connect-banner">
+                <div className="market-connect-icon"><Wallet size={22} /></div>
+                <div className="market-connect-body">
+                  <strong>Wallet needed for real escrow actions</strong>
+                  <p>Browse without a wallet, or turn on Demo mode to walk through post, accept, submit, and release. Real mode uses Arc Testnet wallet signatures.</p>
                 </div>
+                <button className="btn-primary" onClick={() => { setShowProfileMenu(true); setShowConnectors(true) }}>
+                  Connect Wallet
+                </button>
               </div>
             )}
-          </div>
-
-          {/* ─── 오른쪽 패널 ─────────────────────────────────────────── */}
-          <div className="right-panel">
-
-            {/* ── Transfer 카드 (Send / Pay Hub) ── */}
-            <div className="action-card">
-              <div className="action-card-seg">
-                <button className={`seg ${transferSeg === 'send' ? 'active' : ''}`}
-                  onClick={() => setTransferSeg('send')}>
-                  <ArrowUpRight size={12} /> Send
-                </button>
-                <button className={`seg ${transferSeg === 'pay' ? 'active' : ''}`}
-                  onClick={() => { setTransferSeg('pay'); loadContractInfo() }}>
-                  <Wallet size={12} /> Pay Hub
-                </button>
+            <div className="market-role-strip">
+              <div>
+                <span>Client path</span>
+                <strong>Post the request with USDC locked immediately. Worker matches and claims. Review with AI, release payment.</strong>
               </div>
-
-              <div className="action-card-body">
-                {/* ── SEND ── */}
-                {transferSeg === 'send' && <>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <label className="input-label">Recipient</label>
-                    <button className="btn-book" onClick={() => setShowContacts(true)}>
-                      <BookUser size={12} /> Address book
-                    </button>
-                  </div>
-                  <input className="action-input" type="text" placeholder="0x..." value={recipient}
-                    onChange={(e) => setRecipient(e.target.value)} />
-                  <label className="input-label">Amount (USDC)</label>
-                  <input className="action-input" type="number" placeholder="0.0" value={amount}
-                    onChange={(e) => setAmount(e.target.value)} />
-                  <button className="btn-primary" onClick={openSendConfirm} disabled={txLoading}>
-                    {txLoading ? 'Processing...' : 'Send USDC'}
-                  </button>
-                </>}
-
-                {/* ── PAY HUB ── */}
-                {transferSeg === 'pay' && (() => {
-                  const addrs = connections.flatMap((c) => [...c.accounts] as string[])
-                  const isOwner = addrs.some((a) => a.toLowerCase() === contractOwner)
-                  return <>
-                    <div className="arc-badge"><span className="arc-dot" /> Arc Testnet</div>
-
-                    <div className="pay-hub-contract-row">
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Contract</span>
-                      <a href={`https://testnet.arcscan.app/address/${PAYMENT_HUB_ADDRESS}`}
-                        target="_blank" rel="noopener noreferrer" className="pay-hub-contract-addr">
-                        {PAYMENT_HUB_ADDRESS.slice(0, 8)}...{PAYMENT_HUB_ADDRESS.slice(-6)} <ExternalLink size={10} />
-                      </a>
-                    </div>
-
-                    <div className="pay-hub-balance">
-                      <div>
-                        <div className="pay-hub-balance-label">Contract Balance</div>
-                        {isOwner && <div className="pay-hub-owner-badge"><Check size={11} /> Owner</div>}
-                      </div>
-                      <span className="pay-hub-balance-value">
-                        {contractBalance ? parseFloat(contractBalance).toFixed(4) : '—'}
-                        <span style={{ fontSize: 'var(--text-xs)', marginLeft: 4, color: 'var(--arc)', opacity: 0.7 }}>USDC</span>
-                      </span>
-                    </div>
-
-                    <label className="input-label">Amount (USDC)</label>
-                    <input className="action-input" type="number" placeholder="0.0"
-                      value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
-
-                    <label className="input-label">Memo (optional)</label>
-                    <input className="action-input" type="text" placeholder="Order ID, note..."
-                      value={payNote} onChange={(e) => setPayNote(e.target.value)} />
-
-                    <button className="btn-primary" onClick={payToContract} disabled={txLoading}>
-                      {txLoading ? 'Processing...' : 'Pay to Contract'}
-                    </button>
-
-                    {isOwner && contractBalance && parseFloat(contractBalance) > 0 && (
-                      <button className="btn-outline" onClick={withdrawFromContract} disabled={withdrawLoading}>
-                        {withdrawLoading ? 'Withdrawing...' : `Withdraw ${parseFloat(contractBalance).toFixed(4)} USDC`}
-                      </button>
-                    )}
-                  </>
-                })()}
+              <div>
+                <span>Worker path</span>
+                <strong>Call claimJob on-chain to accept. Submit your result. Receive USDC after AI-assisted approval.</strong>
+              </div>
+              <div>
+                <span>Nanopayment path</span>
+                <strong>Use Gateway/x402 for tiny non-escrow charges: listing extensions, AI review, premium unlocks, paid APIs, and agent actions.</strong>
               </div>
             </div>
 
-            {/* ── DeFi 카드 (Cross / Swap / Bridge) ── */}
-            <div className="action-card">
-              <div className="action-card-label">DeFi</div>
-              <div className="action-card-seg" style={{ margin: '8px 4px 0' }}>
-                <button className={`seg ${defiSeg === 'cross' ? 'active' : ''}`} onClick={() => setDefiSeg('cross')}>
-                  <Zap size={11} /> Cross-chain
-                </button>
-                <button className={`seg ${defiSeg === 'swap' ? 'active' : ''}`} onClick={() => setDefiSeg('swap')}>
-                  <Repeat2 size={11} /> Swap
-                </button>
-                <button className={`seg ${defiSeg === 'bridge' ? 'active' : ''}`} onClick={() => setDefiSeg('bridge')}>
-                  <Layers size={11} /> Bridge
-                </button>
-                <button className={`seg ${defiSeg === 'agent' ? 'active' : ''}`} onClick={() => setDefiSeg('agent')}>
-                  <Bot size={11} /> Agent
-                </button>
+            <section className={`market-demo-panel ${demoMode ? 'active' : ''}`}>
+              <div>
+                <span>Test drive</span>
+                <strong>{demoMode ? `Demo ${demoRole} wallet: ${marketWalletShort}` : 'Try the full marketplace flow without a funded wallet.'}</strong>
+                <small>Demo mode uses local browser data only. Real users still use wallet signatures, Arc Testnet USDC, and the shared request board.</small>
               </div>
+              <div className="market-demo-controls">
+                <button className={demoMode ? 'active' : ''} onClick={() => setDemoMode(!demoMode)}>
+                  {demoMode ? 'Demo On' : 'Turn On Demo'}
+                </button>
+                <div className="demo-role-toggle" aria-label="Demo role">
+                  <button className={demoRole === 'client' ? 'active' : ''} onClick={() => setDemoRole('client')} disabled={!demoMode}>Client</button>
+                  <button className={demoRole === 'worker' ? 'active' : ''} onClick={() => setDemoRole('worker')} disabled={!demoMode}>Worker</button>
+                </div>
+              </div>
+            </section>
 
-              <div className="action-card-body">
-                {/* ── CROSS-CHAIN (LI.FI) ── */}
-                {defiSeg === 'cross' && <>
-                  <div className="lifi-row">
-                    <div className="lifi-col">
-                      <label className="input-label">From</label>
-                      <select className="action-input" value={lifiFromChainId}
-                        onChange={(e) => { setLifiFromChainId(Number(e.target.value)); setLifiFromToken('ETH'); setLifiQuote(null) }}>
-                        {LIFI_CHAINS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-                      </select>
-                    </div>
-                    <div className="lifi-col">
-                      <label className="input-label">Token</label>
-                      <select className="action-input" value={lifiFromToken}
-                        onChange={(e) => { setLifiFromToken(e.target.value); setLifiQuote(null) }}>
-                        {getLifiFromTokens(lifiFromChainId).map((s) => <option key={s} value={s}>{s}</option>)}
-                      </select>
+            {marketTab === 'create' ? (
+              <section className="market-create-card">
+                <div className="market-form-head">
+                  <div>
+                    <span>Create request</span>
+                    <strong>Say what you need done and how much you will pay.</strong>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <small>Clear deliverables make AI review and client approval easier.</small>
+                    <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px', borderRadius: 8 }}
+                      onClick={() => {
+                        setRequestTitle('Write a 300-word summary of the Arc escrow architecture')
+                        setRequestDescription('I need a concise technical summary (300 words) explaining how ArcEscrow works: the create→claim→submit→approve flow, how USDC is locked, and why AI review is useful.')
+                        setRequestDeliverable('A plain text document of exactly 300 words submitted as a text block.')
+                        setRequestBudget('1')
+                        setRequestDays('3')
+                        setRequestCategory('AI Work')
+                        setRequestDealType('work')
+                      }}>
+                      ✨ Try demo request
+                    </button>
+                  </div>
+                </div>
+                <div className="deal-type-grid">
+                  {([
+                    { id: 'work' as const, title: 'Work request', desc: 'Pay for a service, task, review, build, or research deliverable.' },
+                    { id: 'milestone' as const, title: 'Milestone deal', desc: 'Fund an upfront amount plus a completion payment in one proposal.' },
+                    { id: 'nft-otc' as const, title: 'NFT OTC', desc: 'Propose a USDC-for-NFT trade using contract address and token ID checks.' },
+                  ]).map((type) => (
+                    <button key={type.id} className={`deal-type-card ${requestDealType === type.id ? 'active' : ''}`} onClick={() => { setRequestDealType(type.id); if (type.id === 'nft-otc') setRequestNftChain('Arc Testnet') }}>
+                      <span>{type.title}</span>
+                      <strong>{type.desc}</strong>
+                    </button>
+                  ))}
+                </div>
+                <div className="request-type-helper">Choose the broad deal type first. The detail category below is only used to describe the work more clearly.</div>
+                <div className="market-form-section">
+                  <div className="market-form-section-head">
+                    <div>
+                      <span>Request terms</span>
+                      <strong>Title, detailed category, and USDC reward</strong>
                     </div>
                   </div>
-                  <div className="lifi-row">
-                    <div className="lifi-col">
-                      <label className="input-label">To</label>
-                      <select className="action-input" value={lifiToChainId}
-                        onChange={(e) => { setLifiToChainId(Number(e.target.value)); setLifiToToken('USDC'); setLifiQuote(null) }}>
-                        {LIFI_CHAINS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                  <div className="market-form-grid terms-grid">
+                    <label className="pay-field">
+                      <span>Request title</span>
+                      <input className="pay-text-input" value={requestTitle} onChange={(e) => setRequestTitle(e.target.value)} placeholder="Design a settlement workflow diagram" />
+                    </label>
+                    <label className="pay-field">
+                      <span>Detail category</span>
+                      <select className="action-input" value={requestCategory} onChange={(e) => setRequestCategory(e.target.value)}>
+                        <option>AI Work</option><option>Design Review</option><option>Frontend Build</option><option>Research</option><option>Smart Contract</option><option>NFT OTC</option><option>Milestone</option>
                       </select>
-                    </div>
-                    <div className="lifi-col">
-                      <label className="input-label">Receive</label>
-                      <select className="action-input" value={lifiToToken}
-                        onChange={(e) => { setLifiToToken(e.target.value); setLifiQuote(null) }}>
-                        {getLifiFromTokens(lifiToChainId).map((s) => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <label className="input-label">Amount ({lifiFromToken})</label>
-                  <input className="action-input" type="number" placeholder="0.0" value={lifiAmount}
-                    onChange={(e) => { setLifiAmount(e.target.value); setLifiQuote(null) }} />
-                  {lifiError && <div style={{ color: 'var(--error)', fontSize: 'var(--text-xs)', padding: '2px 0' }}>{lifiError}</div>}
-                  {!lifiQuote
-                    ? <button className="btn-primary" onClick={fetchLiFiQuote} disabled={lifiLoading || !lifiAmount}>
-                        {lifiLoading ? 'Getting quote...' : 'Get Quote'}
-                      </button>
-                    : <>
-                      <LiFiQuoteCard />
-                      <button className="btn-primary" onClick={executeLiFiSwap} disabled={lifiExecuting}>
-                        {lifiExecuting ? 'Executing...' : 'Swap via LI.FI'}
-                      </button>
-                      <button className="btn-outline" onClick={() => setLifiQuote(null)}>
-                        <RefreshCw size={12} /> New quote
-                      </button>
-                    </>
-                  }
-                </>}
-
-                {/* ── SWAP (Coming Soon / Arc App Kit) ── */}
-                {defiSeg === 'swap' && <>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 0 8px' }}>
-                    <div className="swap-row">
-                      <div className="swap-badge">ETH</div>
-                      <ArrowRight size={14} className="swap-arrow-icon" />
-                      <div className="swap-badge usdc">USDC</div>
-                    </div>
-                  </div>
-                  <label className="input-label">Amount (ETH)</label>
-                  <input className="action-input" type="number" placeholder="0.0" value={amount}
-                    onChange={(e) => setAmount(e.target.value)} />
-                  <button className="btn-primary" onClick={openSwapConfirm} disabled={txLoading}>
-                    {txLoading ? 'Processing...' : 'Swap to USDC'}
-                  </button>
-                  <div className="coming-soon">
-                    <span className="coming-soon-label">Arc Testnet only</span>
-                    Powered by Circle App Kit
-                  </div>
-                </>}
-
-                {/* ── BRIDGE (CCTP V2 Native) ── */}
-                {defiSeg === 'bridge' && <>
-                  {/* 진행 스텝 표시 */}
-                  {cctpStep !== 'idle' && (
-                    <div className="cctp-steps">
-                      {(['approving','burning','attesting','minting'] as const).map((s, i) => {
-                        const labels = ['Approve','Burn','Attest','Mint']
-                        const idx    = ['approving','burning','attesting','minting'].indexOf(cctpStep)
-                        const status = i < idx ? 'done' : i === idx ? 'active' : 'pending'
-                        return (
-                          <div key={s} className={`cctp-step ${status}`}>
-                            <div className="cctp-dot">
-                              {status === 'done' ? '✓' : i + 1}
-                            </div>
-                            <span>{labels[i]}</span>
+                    </label>
+                    {requestDealType === 'milestone' ? (
+                      <>
+                        <label className="pay-field">
+                          <span>Pay upfront</span>
+                          <div className="pay-amount-input">
+                            <input value={requestUpfront} onChange={(e) => setRequestUpfront(e.target.value)} inputMode="decimal" placeholder="10.00" />
+                            <strong>USDC</strong>
                           </div>
-                        )
-                      })}
+                        </label>
+                        <label className="pay-field">
+                          <span>Pay on completion</span>
+                          <div className="pay-amount-input">
+                            <input value={requestCompletion} onChange={(e) => setRequestCompletion(e.target.value)} inputMode="decimal" placeholder="10.00" />
+                            <strong>USDC</strong>
+                          </div>
+                        </label>
+                      </>
+                    ) : (
+                      <label className="pay-field">
+                        <span>{requestDealType === 'nft-otc' ? 'Offer price' : 'Reward amount'}</span>
+                        <div className="pay-amount-input">
+                          <input value={requestBudget} onChange={(e) => setRequestBudget(e.target.value)} inputMode="decimal" placeholder="0.00" />
+                          <strong>USDC</strong>
+                        </div>
+                      </label>
+                    )}
+                  </div>
+                </div>
+                <div className="market-form-section">
+                  <div className="market-form-section-head">
+                    <div>
+                      <span>Timing</span>
+                      <strong>Work deadline and board visibility</strong>
+                    </div>
+                  </div>
+                  <div className="market-form-grid timing-grid">
+                    <label className="pay-field">
+                      <span>Work deadline</span>
+                      <div className="pay-amount-input">
+                        <input value={requestDays} onChange={(e) => setRequestDays(e.target.value)} inputMode="numeric" placeholder="3" />
+                        <strong>days</strong>
+                      </div>
+                    </label>
+                    <label className="pay-field">
+                      <span>Visible for</span>
+                      <div className="pay-amount-input">
+                        <input value={requestListingDays} onChange={(e) => setRequestListingDays(e.target.value)} inputMode="numeric" placeholder="3" min="1" max="7" />
+                        <strong>days</strong>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+                <div className="market-fee-note">
+                  <span>Listing fee</span>
+                  <strong>{getListingFee(requestListingDays)} USDC</strong>
+                  <small>1-3 days free. 4-7 days add 0.05 USDC per extra day. This is the first natural Gateway nanopayment candidate; the larger reward still belongs in escrow.</small>
+                </div>
+                <div className="nanopay-use-card">
+                  <div>
+                    <span>Suggested nanopayment hooks</span>
+                    <strong>Keep escrow for outcomes. Meter tiny usage around the workflow.</strong>
+                  </div>
+                  <ul>
+                    <li>Listing extension: 0.05 USDC/day after the free window</li>
+                    <li>AI review run: small fee per Claude evaluation</li>
+                    <li>Agent/tool call: pay per API request, dataset access, or workflow step</li>
+                  </ul>
+                </div>
+                {requestDealType === 'nft-otc' && (
+                  <div className="nft-otc-panel">
+                    <div className="nft-otc-head">
+                      <span>On-chain authenticity inputs</span>
+                      <strong>Verify by contract address and token ID, not by image or name.</strong>
+                    </div>
+                    <div className="market-form-grid nft-grid">
+                      <label className="pay-field">
+                        <span>NFT chain</span>
+                        <select className="action-input" value={requestNftChain} onChange={(e) => setRequestNftChain(e.target.value)}>
+                          <option>Arc Testnet</option><option>Ethereum</option><option>Base</option><option>Polygon</option><option>Arbitrum</option><option>Sepolia</option>
+                        </select>
+                      </label>
+                      <label className="pay-field">
+                        <span>NFT contract</span>
+                        <input className="pay-text-input" value={requestNftContract} onChange={(e) => setRequestNftContract(e.target.value)} placeholder="0x collection contract" />
+                      </label>
+                      <label className="pay-field">
+                        <span>Token ID</span>
+                        <input className="pay-text-input" value={requestNftTokenId} onChange={(e) => setRequestNftTokenId(e.target.value)} placeholder="1234" />
+                      </label>
+                      <label className="pay-field">
+                        <span>Seller wallet</span>
+                        <input className="pay-text-input" value={requestNftSeller} onChange={(e) => setRequestNftSeller(e.target.value)} placeholder="0x optional expected owner" />
+                      </label>
+                      <label className="pay-field">
+                        <span>Collection label</span>
+                        <input className="pay-text-input" value={requestNftCollection} onChange={(e) => setRequestNftCollection(e.target.value)} placeholder="Optional display name" />
+                      </label>
+                    </div>
+                    <div className="nft-verify-list">
+                      <span>Future on-chain checks</span>
+                      <strong>ownerOf(tokenId)</strong>
+                      <strong>contract matches official collection</strong>
+                      <strong>escrow approval before settlement</strong>
+                    </div>
+                  </div>
+                )}
+                <label className="pay-field">
+                  <span>Request details</span>
+                  <textarea className="market-textarea" value={requestDescription} onChange={(e) => setRequestDescription(e.target.value)} placeholder="Explain the task, context, quality bar, and any references." />
+                </label>
+                <label className="pay-field">
+                  <span>What should the worker submit?</span>
+                  <textarea className="market-textarea small" value={requestDeliverable} onChange={(e) => setRequestDeliverable(e.target.value)} placeholder="Define exactly what the agent should submit before payment is released." />
+                </label>
+                <button className="btn-primary market-submit" onClick={createMarketRequest} disabled={!marketCanAct || marketLoading}>
+                  <Plus size={14} /> {marketLoading ? 'Posting...' : demoMode ? 'Post Demo Request' : 'Post to Shared Board'}
+                </button>
+                {!marketCanAct && <div className="pay-inline-warning"><Wallet size={14} /> Connect a wallet or turn on Demo mode to post as the request owner.</div>}
+              </section>
+            ) : (
+              <>
+              <section className="market-filter-bar">
+                <div>
+                  <span>Deal type</span>
+                  {([
+                    ['all', 'All'],
+                    ['work', 'Work'],
+                    ['milestone', 'Milestone'],
+                    ['nft-otc', 'NFT OTC'],
+                  ] as const).map(([id, label]) => (
+                    <button key={id} className={marketDealFilter === id ? 'active' : ''} onClick={() => setMarketDealFilter(id)}>{label}</button>
+                  ))}
+                </div>
+                <div>
+                  <span>Scope</span>
+                  {([
+                    ['all', 'All status'],
+                    ['open', 'Open only'],
+                    ['mine', 'My jobs'],
+                  ] as const).map(([id, label]) => (
+                    <button key={id} className={marketScopeFilter === id ? 'active' : ''} onClick={() => setMarketScopeFilter(id)}>{label}</button>
+                  ))}
+                </div>
+              </section>
+              <section className="market-request-grid">
+                {marketLoading && (
+                  <div className="market-loading">
+                    <div className="market-skeleton-card" />
+                    <div className="market-skeleton-card" />
+                    <div className="market-skeleton-card" />
+                  </div>
+                )}
+                {!marketLoading && marketRequests.length === 0 && (
+                  <div className="market-empty">
+                    <BookUser size={24} />
+                    <h3>No requests yet</h3>
+                    <p>Post the first request to test the shared board. Anyone visiting the same deployed site will be able to see it.</p>
+                    <button className="btn-primary" onClick={() => setMarketTab('create')}>Create the first request</button>
+                  </div>
+                )}
+                {!marketLoading && marketRequests.length > 0 && filteredMarketRequests.length === 0 && (
+                  <div className="market-empty">
+                    <BriefcaseBusiness size={24} />
+                    <h3>No matching requests</h3>
+                    <p>Try another deal type or scope filter, or post a new request with the terms you want.</p>
+                    <button className="btn-primary" onClick={() => setMarketTab('create')}>Post a request</button>
+                  </div>
+                )}
+                {filteredMarketRequests.map((request) => {
+                  const isOwner = marketWallet?.toLowerCase() === request.client.toLowerCase()
+                  const isAgent = marketWallet && request.agent?.toLowerCase() === marketWallet.toLowerCase()
+                  const isEscrowFunded = Boolean(request.escrowJobId)
+                  const cardRole = isOwner ? 'Client' : isAgent ? 'Worker' : 'Observer'
+                  const roleClass = isOwner ? 'client' : isAgent ? 'worker' : 'observer'
+                  const dealType = request.dealType ?? 'work'
+                  const dealLabel = dealType === 'nft-otc' ? 'NFT OTC' : dealType === 'milestone' ? 'Milestone' : 'Work'
+                  const demoRequest = isDemoRequest(request)
+                  const isExpiredRequest = Boolean(request.expiresAt && new Date(request.expiresAt).getTime() <= Date.now())
+                  const isCancelled = request.status === 'cancelled'
+                  const isCompleted = request.status === 'completed'
+                  const nextStep = isCancelled
+                    ? 'Cancelled'
+                    : isCompleted
+                      ? 'Deal complete'
+                      : request.status === 'open'
+                        ? (isOwner ? 'Waiting for a worker' : demoMode ? 'Accept as demo worker' : 'Accept & claim on-chain')
+                        : (isAgent
+                            ? (request.resultSubmittedAt ? 'Waiting for client release' : dealType === 'nft-otc' ? 'Approve NFT then settle' : 'Submit result')
+                            : isOwner ? (request.resultSubmittedAt ? 'Review and release payment' : dealType === 'nft-otc' ? 'Wait for seller to approve NFT' : 'Wait for worker result') : 'Matched')
+                  const flowSteps = [
+                    { label: 'Post + Fund', done: true },
+                    { label: 'Match', done: Boolean(request.agent) },
+                    { label: dealType === 'nft-otc' ? 'Approve' : 'Submit', done: Boolean(request.resultSubmittedAt) || isCompleted },
+                    { label: 'Release', done: isCompleted },
+                  ]
+                  return (
+                    <article className={`market-request-card ${roleClass}`} key={request.id}>
+                      <div className="market-card-top">
+                        <span className={`market-status ${request.status}`}>{request.status.replace('-', ' ')}</span>
+                        <span className="market-budget">{request.budget} USDC</span>
+                      </div>
+                      <div className="market-card-tags">
+                        <span className={`deal-badge ${dealType}`}>{dealLabel}</span>
+                        {demoRequest && <span className="deal-badge demo">Demo local</span>}
+                        <span className="market-category">{request.category}</span>
+                      </div>
+                      <h3>{request.title}</h3>
+                      <p>{request.description}</p>
+                      {dealType === 'milestone' && (
+                        <div className="deal-detail-strip">
+                          <div><span>Upfront</span><strong>{request.upfrontAmount ?? '0.00'} USDC</strong></div>
+                          <div><span>Completion</span><strong>{request.completionAmount ?? request.budget} USDC</strong></div>
+                        </div>
+                      )}
+                      {dealType === 'nft-otc' && (
+                        <div className="nft-card-box">
+                          <div className="nft-card-head">
+                            <span>{request.nftCollection || 'NFT asset'}</span>
+                            <strong>{request.nftChain ?? 'Arc Testnet'} / Token #{request.nftTokenId}</strong>
+                          </div>
+                          <div className="nft-card-meta">
+                            <span>Contract</span>
+                            <code>{request.nftContract ? `${request.nftContract.slice(0, 8)}...${request.nftContract.slice(-6)}` : 'Not set'}</code>
+                          </div>
+                          {request.nftSeller && (
+                            <div className="nft-card-meta">
+                              <span>Expected seller</span>
+                              <code>{request.nftSeller.slice(0, 8)}...{request.nftSeller.slice(-6)}</code>
+                            </div>
+                          )}
+                          <div className="nft-auth-note">Authenticity should be verified with ownerOf(tokenId), official contract address, and escrow approval.</div>
+                        </div>
+                      )}
+                      <div className="market-deliverable">
+                        <span>{dealType === 'nft-otc' ? 'Seller must provide' : 'Deliverable'}</span>
+                        <strong>{request.deliverable}</strong>
+                      </div>
+                      {request.resultSummary && (
+                        <div className="market-result-note">
+                          <span>Submitted result</span>
+                          <strong>{request.resultSummary}</strong>
+                        </div>
+                      )}
+                      <div className="market-role-next">
+                        <div>
+                          <span>Your role</span>
+                          <strong>{cardRole}</strong>
+                        </div>
+                        <div>
+                          <span>Next action</span>
+                          <strong>{nextStep}</strong>
+                        </div>
+                      </div>
+                      <div className="market-card-progress" aria-label="Request workflow progress">
+                        {flowSteps.map((step, i) => (
+                          <div className={`market-progress-step ${step.done ? 'done' : ''}`} key={step.label}>
+                            <span>{i + 1}</span>
+                            <strong>{step.label}</strong>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="market-meta-row">
+                        <span>Client {request.client.startsWith('0x') ? `${request.client.slice(0, 6)}...${request.client.slice(-4)}` : request.client}</span>
+                        <span>{request.deadlineDays} days</span>
+                      </div>
+                      <div className="market-meta-row">
+                        <span>Visible {request.listingDays ?? '3'} days</span>
+                        <span>{formatTimeLeft(request.expiresAt)}</span>
+                      </div>
+                      <div className="market-meta-row">
+                        <span>Listing fee</span>
+                        <strong>{request.listingFee ?? getListingFee(request.listingDays ?? '3')} USDC</strong>
+                      </div>
+                      {request.agent && (
+                        <div className="market-meta-row agent">
+                          <span>Matched agent</span>
+                          <strong>{request.agent.slice(0, 6)}...{request.agent.slice(-4)}</strong>
+                        </div>
+                      )}
+                      {request.escrowJobId && (
+                        <div className="market-meta-row agent">
+                          <span>Escrow job</span>
+                          <strong>#{request.escrowJobId}</strong>
+                        </div>
+                      )}
+                      <div className="market-card-actions">
+                        {isCompleted ? (
+                          <span className="deal-complete-badge">
+                            {dealType === 'nft-otc'
+                              ? (isOwner ? 'NFT received' : isAgent ? 'USDC received' : 'Deal settled')
+                              : 'Deal complete'}
+                          </span>
+                        ) : isCancelled ? (
+                          <span className="deal-cancelled-badge">Cancelled — refund processed</span>
+                        ) : (
+                          <>
+                            {/* Accept / Claim on-chain — only for open requests, not owner */}
+                            {!isCancelled && (
+                              <button className="btn-outline"
+                                onClick={() => acceptMarketRequest(request.id, dealType, request.escrowJobId)}
+                                disabled={!marketCanAct || marketLoading || request.status !== 'open' || isOwner || !request.escrowJobId}>
+                                {demoMode && request.status === 'open' ? 'Accept as Worker' : request.status === 'open' ? 'Accept & Claim' : 'Matched'}
+                              </button>
+                            )}
+                            {/* Cancel — only owner, only while open or matched */}
+                            {isOwner && !isCancelled && (request.status === 'open' || request.status === 'matched') && (
+                              <button className="btn-ghost"
+                                onClick={() => cancelMarketRequest(request.id, dealType, request.escrowJobId)}
+                                disabled={marketLoading}
+                                title={request.status === 'matched' ? '5% cancellation fee goes to matched worker' : 'Full refund'}>
+                                {request.status === 'matched' ? 'Cancel (5% fee)' : 'Cancel'}
+                              </button>
+                            )}
+                            {/* NFT OTC seller actions — shown in the card to the matched seller */}
+                            {demoMode && isAgent && request.status === 'matched' && !request.resultSubmittedAt && (
+                              <button className="btn-primary" onClick={() => submitDemoResult(request.id)}>
+                                {dealType === 'nft-otc' ? 'Approve NFT (Demo)' : 'Submit Result (Demo)'}
+                              </button>
+                            )}
+                            {demoMode && isOwner && request.status === 'matched' && request.resultSubmittedAt && (
+                              <button className="btn-primary" onClick={() => releaseDemoRequest(request.id)}>
+                                Release Payment (Demo)
+                              </button>
+                            )}
+                            {!demoMode && dealType === 'nft-otc' && isAgent && request.status === 'matched' && request.escrowJobId && (
+                              <>
+                                <button className="btn-outline"
+                                  onClick={() => approveNftForEscrow(request.nftContract ?? '', request.nftTokenId ?? '')}>
+                                  Approve NFT
+                                </button>
+                                <button className="btn-primary"
+                                  onClick={() => settleNftOtcDeal(request.id, request.escrowJobId!)}>
+                                  Settle Deal
+                                </button>
+                              </>
+                            )}
+                            {/* Work/Milestone: agent submits result */}
+                            {!demoMode && dealType !== 'nft-otc' && isAgent && request.escrowJobId && request.status === 'matched' && (
+                              <button className="btn-primary" onClick={() => openEscrowSubmission(request)}>
+                                Submit Result
+                              </button>
+                            )}
+                            {/* Work/Milestone: client manages job (review + release) */}
+                            {!demoMode && dealType !== 'nft-otc' && isOwner && request.escrowJobId && request.status === 'matched' && (
+                              <button className="btn-outline" onClick={() => viewRequestEscrow(request)}>
+                                <Lock size={12} /> Review &amp; Release
+                              </button>
+                            )}
+                            {isExpiredRequest && (
+                              <button className="btn-ghost" onClick={() => deleteExpiredMarketRequest(request.id)} disabled={marketLoading}>
+                                Remove expired
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </article>
+                  )
+                })}
+              </section>
+              </>
+            )}
+
+
+          </div>
+        )}
+
+        {activePage === 'escrow' && (
+          <div className="page escrow-page">
+            <div className="page-header">
+              <Bot size={20} style={{ color: 'var(--accent)' }} />
+              <div>
+                <h2 className="page-title">Escrow & Settlement</h2>
+                <p className="page-sub">Manage ArcEscrow jobs, ERC-8183 agentic contracts, and NFT OTC deals on Arc Testnet.</p>
+              </div>
+            </div>
+            <div className="section-layout">
+              <div className="section-main">
+                <div className="panel">
+                  <div className="escrow-workspace-head">
+                    <div>
+                      <span>Escrow Workspace</span>
+                      <strong>Look up and manage on-chain escrow jobs. New requests are posted from the Marketplace.</strong>
+                    </div>
+                    <button className="btn-outline" onClick={() => navigatePage('marketplace')}>
+                      <BookUser size={13} /> Open Requests
+                    </button>
+                  </div>
+                  <div className="escrow-protocol-tabs">
+                    <button
+                      className={`escrow-protocol-tab ${escrowProtocol === 'arc-escrow' ? 'active' : ''}`}
+                      onClick={() => setEscrowProtocol('arc-escrow')}>
+                      <Lock size={12} /> ArcEscrow
+                    </button>
+                    <button
+                      className={`escrow-protocol-tab ${escrowProtocol === 'erc8183' ? 'active' : ''}`}
+                      onClick={() => setEscrowProtocol('erc8183')}>
+                      <Bot size={12} /> ERC-8183
+                    </button>
+                  </div>
+                  {escrowProtocol === 'arc-escrow' ? (
+                    <div className="escrow-flow-note">
+                      <div><span>01</span><strong>USDC locked at post</strong></div>
+                      <div><span>02</span><strong>Worker claims on-chain</strong></div>
+                      <div><span>03</span><strong>Worker submits result</strong></div>
+                      <div><span>04</span><strong>AI review + release</strong></div>
+                    </div>
+                  ) : (
+                    <div className="escrow-flow-note">
+                      <div><span>01</span><strong>createJob</strong></div>
+                      <div><span>02</span><strong>setBudget + fund</strong></div>
+                      <div><span>03</span><strong>submit</strong></div>
+                      <div><span>04</span><strong>complete</strong></div>
                     </div>
                   )}
 
-                  {cctpStep === 'done' ? (
-                    <div className="cctp-done">
-                      <div style={{ fontSize: 24, marginBottom: 6 }}>✅</div>
-                      <div style={{ fontWeight: 600, marginBottom: 2 }}>Bridged to Arc!</div>
-                      <div style={{ opacity: 0.5, fontSize: 'var(--text-xs)' }}>{cctpAmount} USDC → Arc Testnet</div>
-                      <button className="btn-ghost" style={{ marginTop: 10 }} onClick={() => { setCctpStep('idle'); setCctpBurnHash('') }}>
-                        Bridge again
-                      </button>
+                  {escrowProtocol === 'erc8183' && (
+                    <div className="e8183-panel">
+                      <div className="e8183-tabs">
+                        <button className={e8183Tab === 'create' ? 'active' : ''} onClick={() => setE8183Tab('create')}>+ Create Job</button>
+                        <button className={e8183Tab === 'lookup' ? 'active' : ''} onClick={() => setE8183Tab('lookup')}>Lookup / Manage</button>
+                      </div>
+
+                      {e8183Tab === 'create' ? (
+                        <div className="e8183-form">
+                          <div className="escrow-form-group">
+                            <label>Worker payout wallet</label>
+                            <small className="field-helper">Choose where the worker payout should go after the client approves the result.</small>
+                            <div className="wallet-receive-toggle">
+                              <button className={e8183PayoutMode === 'connected' ? 'active' : ''} onClick={() => setE8183PayoutMode('connected')}>
+                                Connected wallet
+                              </button>
+                              <button className={e8183PayoutMode === 'custom' ? 'active' : ''} onClick={() => setE8183PayoutMode('custom')}>
+                                Different wallet
+                              </button>
+                            </div>
+                            {e8183PayoutMode === 'connected' ? (
+                              <div className={`connected-wallet-card ${activeWallet ? '' : 'empty'}`}>
+                                <Wallet size={15} />
+                                <div>
+                                  <strong>{activeWallet ? activeWalletShort : 'No wallet connected'}</strong>
+                                  <span>{activeWallet ? 'This connected wallet will receive USDC.' : 'Connect a wallet first, or choose a different wallet.'}</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <input className="action-input" placeholder="0x..." value={e8183Provider}
+                                onChange={(e) => setE8183Provider(e.target.value)} />
+                            )}
+                          </div>
+                          <div className="escrow-form-row">
+                            <div className="escrow-form-group">
+                              <label>Budget</label>
+                              <div className="escrow-input-suffix">
+                                <input className="action-input" inputMode="decimal" placeholder="0.00" value={e8183Amount}
+                                  onChange={(e) => setE8183Amount(e.target.value)} />
+                                <span>USDC</span>
+                              </div>
+                            </div>
+                            <div className="escrow-form-group">
+                              <label>Deadline</label>
+                              <div className="escrow-input-suffix">
+                                <input className="action-input" inputMode="numeric" placeholder="3" value={e8183Days}
+                                  onChange={(e) => setE8183Days(e.target.value)} />
+                                <span>days</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="escrow-form-group">
+                            <label>Job Description</label>
+                            <input className="action-input" placeholder="Describe the task..." value={e8183Desc}
+                              onChange={(e) => setE8183Desc(e.target.value)} />
+                          </div>
+                          <button className="btn-primary escrow-submit-btn" onClick={e8183CreateAndFund} disabled={e8183Loading}>
+                            <Lock size={13} /> {e8183Loading ? (e8183Step === 'creating' ? 'Creating...' : 'Funding...') : 'Create & Fund Job'}
+                          </button>
+                          <div className="escrow-hint">
+                            ArcEscrow is the main demo flow for human clients and workers.
+                            ERC-8183 is the experimental agent-standard lane: an agent wallet can call <code>createJob -&gt; setBudget -&gt; fund -&gt; submit -&gt; complete</code>.
+                            Use ArcEscrow for judging the marketplace demo; use ERC-8183 when explaining autonomous agent-to-agent commerce.
+                          </div>
+                          {e8183JobId && (
+                            <div className="e8183-job-id-pill">Job ID: <strong>#{e8183JobId}</strong></div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="e8183-lookup">
+                          <div className="escrow-form-group">
+                            <label>Job ID</label>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <input className="action-input" placeholder="e.g. 0" value={e8183JobId}
+                                onChange={(e) => setE8183JobId(e.target.value)} style={{ flex: 1 }} />
+                              <button className="btn-ghost" onClick={() => e8183LookupJob()} disabled={e8183Loading}>
+                                {e8183Loading ? '...' : 'Fetch'}
+                              </button>
+                            </div>
+                          </div>
+                          {e8183Job && (
+                            <div className="e8183-job-card">
+                              <div className="e8183-job-row"><span>Status</span><span className={`e8183-status s${e8183Job.status}`}>
+                                {['Created','Funded','Submitted','Completed','Rejected','Expired'][e8183Job.status] ?? e8183Job.status}
+                              </span></div>
+                              <div className="e8183-job-row"><span>Client</span><span className="addr-mono">{e8183Job.client.slice(0,10)}…</span></div>
+                              <div className="e8183-job-row"><span>Provider</span><span className="addr-mono">{e8183Job.provider.slice(0,10)}…</span></div>
+                              <div className="e8183-job-row"><span>Budget</span><span>{(Number(e8183Job.budget) / 1e6).toFixed(2)} USDC</span></div>
+                              <div className="e8183-job-row"><span>Description</span><span style={{ maxWidth: 220, textAlign: 'right', wordBreak: 'break-word' }}>{e8183Job.description}</span></div>
+                              {/* Provider: submit deliverable */}
+                              {e8183Job.status === 1 && (
+                                <div className="e8183-action-block">
+                                  <label className="input-label">Deliverable URI (hashed on-chain)</label>
+                                  <input className="action-input" placeholder="https://... or ipfs://..." value={e8183DelivUri}
+                                    onChange={(e) => setE8183DelivUri(e.target.value)} />
+                                  <button className="btn-primary escrow-submit-btn" onClick={e8183Submit} disabled={e8183Loading}>
+                                    {e8183Loading && e8183Step === 'submitting' ? 'Submitting...' : 'Submit Deliverable'}
+                                  </button>
+                                </div>
+                              )}
+                              {/* Evaluator (client): approve or reject */}
+                              {e8183Job.status === 2 && (
+                                <div className="e8183-action-block">
+                                  <div style={{ display: 'flex', gap: 8 }}>
+                                    <button className="btn-primary" style={{ flex: 1 }} onClick={() => e8183Complete(true)} disabled={e8183Loading}>
+                                      {e8183Loading && e8183Step === 'completing' ? '...' : '✓ Approve & Pay'}
+                                    </button>
+                                    <button className="btn-ghost" style={{ flex: 1, color: 'var(--error)' }} onClick={() => e8183Complete(false)} disabled={e8183Loading}>
+                                      ✕ Reject
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  ) : <>
-                    <label className="input-label">From chain</label>
-                    <div className="cctp-chain-badge">
-                      <span className="arc-dot" style={{ background: '#627eea' }} />
-                      Ethereum Sepolia → Arc Testnet
-                    </div>
+                  )}
 
-                    <label className="input-label">Amount (USDC)</label>
-                    <input className="action-input" type="number" placeholder="0.0"
-                      value={cctpAmount} onChange={(e) => setCctpAmount(e.target.value)}
-                      disabled={cctpStep !== 'idle'} />
-
-                    <label className="input-label">Arc recipient (optional)</label>
-                    <input className="action-input" placeholder="0x… (default: your wallet)"
-                      value={cctpRecipient} onChange={(e) => setCctpRecipient(e.target.value)}
-                      disabled={cctpStep !== 'idle'} />
-
-                    <button className="btn-primary" style={{ marginTop: 4 }}
-                      onClick={executeCCTPBridge}
-                      disabled={cctpStep !== 'idle' && cctpStep !== 'error'}>
-                      {cctpStep === 'idle'      ? 'Bridge to Arc'          :
-                       cctpStep === 'approving' ? 'Approving USDC...'      :
-                       cctpStep === 'burning'   ? 'Burning on Sepolia...'  :
-                       cctpStep === 'attesting' ? 'Waiting attestation...' :
-                       cctpStep === 'minting'   ? 'Minting on Arc...'      :
-                       cctpStep === 'error'     ? 'Retry Bridge'           : '...'}
-                    </button>
-
-                    <div className="coming-soon" style={{ marginTop: 6 }}>
-                      <span className="coming-soon-label">CCTP V2</span>
-                      Circle 공식 브릿지 · 슬리피지 0 · 1:1 발행
-                    </div>
-
-                    {cctpBurnHash && (
-                      <a className="cctp-tx-link"
-                        href={`https://sepolia.etherscan.io/tx/${cctpBurnHash}`}
-                        target="_blank" rel="noreferrer">
-                        Burn tx ↗
-                      </a>
-                    )}
-                  </>}
-                </>}
-
-                {/* ── AGENT ESCROW ── */}
-                {defiSeg === 'agent' && (
-                  <div className="escrow-board">
-                    {/* 탭 헤더 */}
+                  {escrowProtocol === 'arc-escrow' && <div className="escrow-board">
                     <div className="escrow-board-tabs">
-                      <button className={escrowMyTab === 'new' ? 'active' : ''} onClick={() => setEscrowMyTab('new')}>
-                        + New Job
-                      </button>
                       <button className={escrowMyTab === 'jobs' ? 'active' : ''} onClick={() => setEscrowMyTab('jobs')}>
                         My Jobs {recentJobIds.length > 0 && <span className="escrow-badge-count">{recentJobIds.length}</span>}
+                      </button>
+                      <button className={escrowMyTab === 'new' ? 'active' : ''} onClick={() => setEscrowMyTab('new')}>
+                        Advanced Manual Escrow
                       </button>
                     </div>
 
                     {escrowMyTab === 'new' ? (
                       <div className="escrow-form">
-                        <div className="escrow-form-group">
-                          <label>Verification Method</label>
-                          <div className="escrow-board-tabs">
-                            <button className={escrowNewJobType === 'ai' ? 'active' : ''} onClick={() => setEscrowNewJobType('ai')}>
-                              ✦ AI-Judged
-                            </button>
-                            <button className={escrowNewJobType === 'onchain' ? 'active' : ''} onClick={() => setEscrowNewJobType('onchain')}>
-                              ⛓ Onchain Condition
-                            </button>
-                          </div>
-                          <div className="escrow-hint">
-                            {escrowNewJobType === 'ai'
-                              ? 'Agent submits a result; Claude reads it and you approve/reject.'
-                              : 'Agent must satisfy an onchain condition (e.g. a token balance threshold). No AI, no approval — the contract settles automatically once the condition is true.'}
-                          </div>
+                        <div className="manual-escrow-note">
+                          <strong>Manual mode</strong>
+                          <span>This is mainly for testing a raw ArcEscrow job. Normal users should start from Requests so the worker match, escrow job, submission, and activity stay connected.</span>
                         </div>
                         <div className="escrow-form-group">
-                          <label>Agent Wallet Address</label>
-                          <input className="action-input" placeholder="0x..." value={escrowAgent}
-                            onChange={(e) => setEscrowAgent(e.target.value)} />
+                          <label>Worker payout wallet</label>
+                          <small className="field-helper">Enter the wallet address of the person who should receive USDC after approval. In normal Requests flow, this is filled from the accepted worker.</small>
+                          <div className="wallet-receive-toggle">
+                            <button className={escrowPayoutMode === 'connected' ? 'active' : ''} onClick={() => setEscrowPayoutMode('connected')}>
+                              Connected wallet
+                            </button>
+                            <button className={escrowPayoutMode === 'custom' ? 'active' : ''} onClick={() => setEscrowPayoutMode('custom')}>
+                              Different wallet
+                            </button>
+                          </div>
+                          {escrowPayoutMode === 'connected' ? (
+                            <div className={`connected-wallet-card ${activeWallet ? '' : 'empty'}`}>
+                              <Wallet size={15} />
+                              <div>
+                                <strong>{activeWallet ? activeWalletShort : 'No wallet connected'}</strong>
+                                <span>{activeWallet ? 'This connected wallet will receive USDC.' : 'Connect a wallet first, or choose a different wallet.'}</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <input className="action-input" placeholder="0x..." value={escrowAgent}
+                              onChange={(e) => setEscrowAgent(e.target.value)} />
+                          )}
                         </div>
                         <div className="escrow-form-row">
                           <div className="escrow-form-group">
@@ -1951,65 +3920,57 @@ export default function App() {
                           <input className="action-input" placeholder="Describe the task clearly..." value={escrowDesc}
                             onChange={(e) => setEscrowDesc(e.target.value)} />
                         </div>
-                        {escrowNewJobType === 'onchain' && (
-                          <>
-                            <div className="escrow-form-group">
-                              <label>Condition Token Address</label>
-                              <input className="action-input" placeholder="0x... (e.g. Arc USDC precompile)" value={escrowCondToken}
-                                onChange={(e) => setEscrowCondToken(e.target.value)} />
-                            </div>
-                            <div className="escrow-form-group">
-                              <label>Recipient Address (whose balance is checked)</label>
-                              <input className="action-input" placeholder="0x..." value={escrowCondRecipient}
-                                onChange={(e) => setEscrowCondRecipient(e.target.value)} />
-                            </div>
-                            <div className="escrow-form-row">
-                              <div className="escrow-form-group">
-                                <label>Comparator</label>
-                                <select className="action-input" value={escrowCondComparator}
-                                  onChange={(e) => setEscrowCondComparator(e.target.value as 'gte' | 'lte' | 'eq')}>
-                                  <option value="gte">≥ (at least)</option>
-                                  <option value="lte">≤ (at most)</option>
-                                  <option value="eq">= (exactly)</option>
-                                </select>
-                              </div>
-                              <div className="escrow-form-group">
-                                <label>Threshold</label>
-                                <div className="escrow-input-suffix">
-                                  <input className="action-input" inputMode="decimal" placeholder="0.00" value={escrowCondThreshold}
-                                    onChange={(e) => setEscrowCondThreshold(e.target.value)} />
-                                  <span>tokens</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="escrow-hint">
-                              Example: token = USDC precompile, recipient = client address, comparator = ≥, threshold = 105 → settles once the recipient holds at least 105 tokens.
-                            </div>
-                          </>
-                        )}
                         <button className="btn-primary escrow-submit-btn" onClick={escrowCreateJob} disabled={escrowLoading}>
-                          {escrowLoading ? 'Processing...' : '🔒 Lock USDC & Post Job'}
+                          <Lock size={13} /> {escrowLoading ? 'Processing...' : 'Lock USDC & Post Job'}
                         </button>
-                        <div className="escrow-hint">USDC is held in the ArcEscrow contract until the job is settled.</div>
+                        <div className="escrow-hint">USDC stays in the ArcEscrow contract. The worker cannot receive it until you approve the submitted result.</div>
                       </div>
                     ) : (
                       <div className="escrow-jobs-panel">
-                        {/* 최근 잡 목록 */}
+                        {escrowRelatedRequests.length > 0 && (
+                          <div className="matched-request-jobs">
+                            <span>Request-linked jobs</span>
+                            {escrowRelatedRequests.map((request) => {
+                              const isOwner = activeWallet?.toLowerCase() === request.client.toLowerCase()
+                              const isWorker = activeWallet && request.agent?.toLowerCase() === activeWallet.toLowerCase()
+                              return (
+                                <div className="matched-request-job" key={request.id}>
+                                  <div>
+                                    <strong>{request.escrowJobId ? `Job #${request.escrowJobId}` : 'Matched request'}</strong>
+                                    <small>{request.title}</small>
+                                  </div>
+                                  {request.escrowJobId ? (
+                                    <button onClick={() => escrowLookupJob(Number(request.escrowJobId))}>View</button>
+                                  ) : (
+                                    <button onClick={() => viewRequestEscrow(request)} disabled={!request.escrowJobId}>View escrow</button>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
                         {recentJobIds.length > 0 && (
                           <div className="escrow-job-list">
                             {recentJobIds.map(id => (
                               <button key={id}
                                 className={`escrow-job-row ${escrowJobId === String(id) ? 'selected' : ''}`}
-                                onClick={() => escrowLookupJob(id)}>
+                                onClick={() => {
+                                  if (escrowJobId === String(id) && escrowJob) {
+                                    setEscrowJob(null)
+                                    setEscrowJobId('')
+                                    setAiVerdict(null)
+                                  } else {
+                                    void escrowLookupJob(id)
+                                  }
+                                }}>
                                 <span className="escrow-job-row-id">#{id}</span>
                                 <span className="escrow-job-row-label">Job #{id}</span>
-                                <span className="escrow-job-row-arrow">→</span>
+                                <span className="escrow-job-row-arrow">{escrowJobId === String(id) && escrowJob ? 'Hide' : 'View'}</span>
                               </button>
                             ))}
                           </div>
                         )}
 
-                        {/* Job ID 조회 */}
                         <div className="escrow-search-block">
                           <label className="escrow-search-label">Search by Job ID</label>
                           <input
@@ -2031,7 +3992,6 @@ export default function App() {
                           </button>
                         </div>
 
-                        {/* 잡 상세 카드 */}
                         {escrowJob && (() => {
                           const STATUS_LABEL = ['Open', 'Submitted', 'Approved', 'Refunded']
                           const STATUS_COLOR = ['#f5a623', '#2775ca', '#27ae60', '#e74c3c']
@@ -2047,7 +4007,6 @@ export default function App() {
                           const deadlineDate = new Date(Number(escrowJob.deadline) * 1000)
                           return (
                             <div className="escrow-detail-card">
-                              {/* 헤더 */}
                               <div className="escrow-detail-header">
                                 <div>
                                   <div className="escrow-detail-id">Job #{escrowJobId}</div>
@@ -2058,7 +4017,6 @@ export default function App() {
                                 </span>
                               </div>
 
-                              {/* 메타 */}
                               <div className="escrow-detail-meta">
                                 <div className="escrow-meta-item">
                                   <span className="escrow-meta-label">Amount</span>
@@ -2075,68 +4033,71 @@ export default function App() {
                                 <div className="escrow-meta-item">
                                   <span className="escrow-meta-label">Role</span>
                                   <span className="escrow-meta-value">
-                                    {isClient ? 'Client' : isAgent ? 'Agent' : 'Observer'}
+                                    {isClient ? 'Client' : isAgent ? 'Worker' : 'Observer'}
                                   </span>
                                 </div>
                               </div>
 
-                              {/* 주소 */}
                               <div className="escrow-detail-addrs">
                                 <div><span>Client</span><code>{escrowJob.client.slice(0,8)}…{escrowJob.client.slice(-6)}</code></div>
-                                <div><span>Agent</span><code>{escrowJob.agent.slice(0,8)}…{escrowJob.agent.slice(-6)}</code></div>
+                                <div><span>Worker</span><code>{escrowJob.agent.slice(0,8)}…{escrowJob.agent.slice(-6)}</code></div>
                               </div>
 
-                              {/* 결과물 링크 */}
-                              {escrowJob.jobType === 0 && escrowJob.resultUri && (
-                                <a className="escrow-result-link" href={escrowJob.resultUri} target="_blank" rel="noreferrer">
-                                  📎 View Result ↗
-                                </a>
-                              )}
+                              <div className={`escrow-role-banner ${isClient ? 'client' : isAgent ? 'worker' : 'observer'}`}>
+                                <span>{isClient ? 'Client action' : isAgent ? 'Worker action' : 'Observer view'}</span>
+                                <strong>
+                                  {isClient
+                                    ? escrowJob.status === 1 ? 'Review the submitted result, run AI review, then release or wait.'
+                                      : escrowJob.status === 0 ? 'Escrow is funded. Wait for the worker to submit a result.'
+                                      : 'This escrow is no longer waiting for client action.'
+                                    : isAgent
+                                      ? escrowJob.status === 0 ? 'Submit your completed work to request payment.'
+                                        : escrowJob.status === 1 ? 'Result submitted. Wait for client review.'
+                                        : 'This escrow is no longer waiting for worker action.'
+                                      : 'Connect the client or worker wallet to take action on this escrow.'}
+                                </strong>
+                              </div>
 
-                              {/* 온체인 조건 요약 */}
-                              {escrowJob.jobType === 1 && escrowCondition && (
-                                <div className="escrow-condition-summary">
-                                  <div className="escrow-meta-item">
-                                    <span className="escrow-meta-label">Condition Target</span>
-                                    <code>{escrowCondition.conditionTarget.slice(0, 8)}…{escrowCondition.conditionTarget.slice(-6)}</code>
-                                  </div>
-                                  <div className="escrow-meta-item">
-                                    <span className="escrow-meta-label">Rule</span>
-                                    <span className="escrow-meta-value">
-                                      balanceOf(recipient) {['≥', '≤', '='][escrowCondition.comparator] ?? '?'} {(Number(escrowCondition.conditionThreshold) / 1e6).toFixed(2)}
-                                    </span>
-                                  </div>
+                              {escrowJob.resultUri && (
+                                <div className="escrow-result-actions">
+                                  <button className="escrow-result-link" onClick={() => openResultPreview(escrowJob.resultUri)}>
+                                    View Result
+                                  </button>
+                                  <a className="escrow-result-raw" href={escrowJob.resultUri} target="_blank" rel="noreferrer" title="Open raw result">
+                                    <ExternalLink size={13} />
+                                  </a>
                                 </div>
                               )}
 
-                              {/* 액션 영역 */}
                               <div className="escrow-actions">
-                                {/* 온체인 조건: 누구나 조건 확인 후 자동 정산 */}
-                                {escrowJob.jobType === 1 && escrowJob.status === 0 && !expired && (isAgent || isClient) && (
-                                  <div className="escrow-action-group">
-                                    <div className="escrow-submit-hint">
-                                      No AI, no approval — anyone can trigger settlement once the condition above is objectively true onchain.
-                                    </div>
-                                    <button className="btn-primary" onClick={escrowCheckAndSettle} disabled={escrowLoading}>
-                                      {escrowLoading ? 'Checking...' : '⛓ Check & Settle'}
-                                    </button>
+                                {escrowJob.status === 0 && !expired && !isAgent && (
+                                  <div className="escrow-action-group escrow-waiting-panel">
+                                    <div className="escrow-submit-label">Waiting for worker result</div>
+                                    <p>
+                                      The submit form is only shown to the worker wallet:
+                                      <code>{escrowJob.agent.slice(0, 8)}...{escrowJob.agent.slice(-6)}</code>
+                                    </p>
+                                    {isClient ? (
+                                      <small>You are connected as the client. The client funds escrow and releases payment after review, but cannot submit the worker result.</small>
+                                    ) : (
+                                      <small>Connect the matched worker wallet to submit the deliverable for this job.</small>
+                                    )}
                                   </div>
                                 )}
 
-                                {/* 에이전트: 결과 제출 (AI-Judged only) */}
-                                {escrowJob.jobType === 0 && isAgent && escrowJob.status === 0 && !expired && (
+                                {isAgent && escrowJob.status === 0 && !expired && (
                                   <div className="escrow-action-group">
-                                    <div className="escrow-submit-label">결과물 제출</div>
+                                    <div className="escrow-submit-label">Submit Work Result</div>
                                     <textarea
                                       className="escrow-work-textarea"
-                                      placeholder="완료한 작업 내용을 상세히 작성하세요. Claude가 실제로 읽고 평가합니다."
+                                      placeholder="Describe the completed work in detail. Claude will read and evaluate it."
                                       value={escrowWorkText}
                                       onChange={(e) => setEscrowWorkText(e.target.value)}
                                       rows={4}
                                     />
                                     <div className="escrow-file-upload">
                                       <label className="escrow-file-label" htmlFor="escrow-file-input">
-                                        {escrowWorkFile ? `📎 ${escrowWorkFile.name}` : '+ 파일 첨부 (이미지 · PDF · TXT)'}
+                                        {escrowWorkFile ? `${escrowWorkFile.name}` : '+ Attach file (image · PDF · TXT)'}
                                       </label>
                                       <input
                                         id="escrow-file-input"
@@ -2150,20 +4111,19 @@ export default function App() {
                                       )}
                                     </div>
                                     <div className="escrow-submit-hint">
-                                      업로드 후 Claude가 실제 내용을 읽어 평가합니다.
+                                      Claude reads the actual content after upload and evaluates it.
                                     </div>
                                     <button className="btn-primary" onClick={escrowSubmitWork}
                                       disabled={escrowLoading || escrowWorkUploading || (!escrowWorkText.trim() && !escrowWorkFile)}>
-                                      {escrowWorkUploading ? '업로드 중...' : escrowLoading ? '제출 중...' : 'Submit Work'}
+                                      <Upload size={13} /> {escrowWorkUploading ? 'Uploading...' : escrowLoading ? 'Submitting...' : 'Submit Work Result'}
                                     </button>
                                   </div>
                                 )}
 
-                                {/* 클라이언트: AI 평가 + 승인 (AI-Judged only) */}
-                                {escrowJob.jobType === 0 && isClient && escrowJob.status === 1 && (
+                                {isClient && escrowJob.status === 1 && (
                                   <div className="escrow-action-group">
                                     <button className="escrow-ai-btn" onClick={evaluateWithAI} disabled={aiLoading || escrowLoading}>
-                                      {aiLoading ? '✦ Evaluating...' : '✦ Ask Claude to Evaluate'}
+                                      <Bot size={13} /> {aiLoading ? 'Evaluating...' : 'Run Claude Review'}
                                     </button>
 
                                     {aiVerdict && (
@@ -2172,16 +4132,18 @@ export default function App() {
                                           {aiVerdict.verdict === 'approve' ? '✓ Claude recommends Approve' : '✗ Claude recommends Reject'}
                                         </div>
                                         <div className="escrow-verdict-reason">{aiVerdict.reasoning}</div>
+                                        <div className="escrow-verdict-note">
+                                          Claude is advisory only. The client can still inspect the submitted result and release payment manually.
+                                        </div>
                                       </div>
                                     )}
 
                                     <button className="btn-primary" onClick={escrowApproveWork} disabled={escrowLoading}>
-                                      {escrowLoading ? 'Approving...' : 'Approve & Release USDC'}
+                                      <CircleDollarSign size={13} /> {escrowLoading ? 'Releasing...' : 'Release Payment'}
                                     </button>
                                   </div>
                                 )}
 
-                                {/* 클라이언트: 환불 */}
                                 {isClient && (escrowJob.status === 0 || escrowJob.status === 1) && expired && (
                                   <button className="btn-outline" onClick={escrowClaimRefund} disabled={escrowLoading}>
                                     {escrowLoading ? 'Refunding...' : 'Claim Refund'}
@@ -2194,58 +4156,945 @@ export default function App() {
                       </div>
                     )}
                   </div>
-                )}
+                  }
+                </div>
+              </div>
+
+              {/* ─── SIDEBAR ─── */}
+              <div className="section-sidebar">
+                <div className="sidebar-card">
+                  <div className="sidebar-card-title"><Wallet size={13} /> Wallet Summary</div>
+                  {isConnected ? (
+                    <>
+                      <div className="sidebar-balance">
+                        ${parseFloat(totalUsdc).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <div className="sidebar-balance-label">Total Balance (USD)</div>
+                      {parseFloat(totalUsdc) > 0 && (
+                        <div className="sidebar-breakdown">
+                          <div className="sidebar-breakdown-item">
+                            <span style={{ color: '#627eea' }}>●</span> ETH
+                            <span>${ethValue.toFixed(2)}</span>
+                          </div>
+                          <div className="sidebar-breakdown-item">
+                            <span style={{ color: '#2775ca' }}>●</span> USDC
+                            <span>${usdcTotalVal.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      )}
+                      <button className="btn-ghost sidebar-refresh" onClick={loadAssets} disabled={loadingAssets}>
+                        <RefreshCw size={11} /> {loadingAssets ? 'Loading...' : 'Refresh'}
+                      </button>
+                    </>
+                  ) : (
+                    <div className="sidebar-no-wallet">
+                      <p>Connect a wallet to see balances</p>
+                      <button className="btn-primary" style={{ fontSize: 12, padding: '8px 16px' }} onClick={() => { setShowProfileMenu(true); setShowConnectors(true) }}>
+                        Connect
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="sidebar-card">
+                  <div className="sidebar-card-title"><Check size={13} /> Escrow Steps</div>
+                  <div className="demo-checklist">
+                    {[
+                      { label: 'Connect wallet on Arc Testnet', done: isConnected && activeChainId === arcTestnet.id },
+                      { label: 'Post request — USDC locked at creation', done: recentJobIds.length > 0 },
+                      { label: 'Worker calls claimJob on-chain', done: Boolean(escrowJob?.agent && escrowJob.agent !== '0x0000000000000000000000000000000000000000') },
+                      { label: 'Worker submits result (Vercel Blob URI)', done: Boolean(escrowJob?.resultUri) },
+                      { label: 'AI review → client releases USDC', done: Boolean(escrowJob?.status && escrowJob.status >= 2) },
+                    ].map((item, i) => (
+                      <div key={i} className={`checklist-item ${item.done ? 'done' : ''}`}>
+                        <span className="checklist-icon">{item.done ? '✓' : ''}</span>
+                        <span>{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="sidebar-card">
+                  <div className="sidebar-card-title"><ShieldCheck size={13} /> Deployed Contracts</div>
+                  <div className="contract-list">
+                    <div className="contract-item">
+                      <div className="contract-name">ArcEscrow</div>
+                      <div className="contract-chain">Arc Testnet</div>
+                      <a className="contract-addr" href={`https://testnet.arcscan.app/address/${ARC_ESCROW}`} target="_blank" rel="noreferrer">
+                        {ARC_ESCROW.slice(0,8)}…{ARC_ESCROW.slice(-6)} <ExternalLink size={10} />
+                      </a>
+                    </div>
+                    <div className="contract-item">
+                      <div className="contract-name">ArcOnboarder</div>
+                      <div className="contract-chain">Ethereum Sepolia</div>
+                      <a className="contract-addr" href={`https://sepolia.etherscan.io/address/${ARC_ONBOARDER}`} target="_blank" rel="noreferrer">
+                        {ARC_ONBOARDER.slice(0,8)}…{ARC_ONBOARDER.slice(-6)} <ExternalLink size={10} />
+                      </a>
+                    </div>
+                    <div className="contract-item">
+                      <div className="contract-name">NFTOTCEscrow</div>
+                      <div className="contract-chain">Arc Testnet · NFT OTC</div>
+                      <a className="contract-addr" href={`https://testnet.arcscan.app/address/${NFT_OTC_ESCROW}`} target="_blank" rel="noreferrer">
+                        {NFT_OTC_ESCROW.slice(0,8)}…{NFT_OTC_ESCROW.slice(-6)} <ExternalLink size={10} />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── MOVE FUNDS ─── */}
+        {activePage === 'funds' && (
+          <div className="page funds-page">
+            <div className="page-header">
+              <ArrowRightLeft size={20} style={{ color: 'var(--accent)' }} />
+              <div>
+                <h2 className="page-title">Move Funds to Arc</h2>
+                <p className="page-sub">Circle CCTP V2 bridge (0 slippage) · LI.FI cross-chain swap · Direct USDC send to Arc</p>
               </div>
             </div>
 
-            {/* ── 가스 카드 ── */}
-            {Object.keys(gasPrices).length > 0 && (
-              <div className="gas-card">
-                <div className="gas-card-label"><Fuel size={11} /> Gas</div>
-                {CHAINS
-                  .filter((c) => gasPrices[c.id] && (networkMode === 'mainnet' ? MAINNET_IDS.has(c.id) : TESTNET_IDS.has(c.id)))
-                  .slice(0, 4)
-                  .map((c) => (
-                    <div key={c.id} className="gas-item" title={CHAIN_META[c.id].label}>
-                      <span className="gas-dot" style={{ background: CHAIN_META[c.id].color }} />
-                      {gasPrices[c.id]}
-                    </div>
-                  ))}
-                <span className="gas-unit">Gwei</span>
-              </div>
-            )}
+            <div className="move-funds-tabs">
+              <button className={`move-tab ${moveFundsTab === 'bridge' ? 'active' : ''}`} onClick={() => setMoveFundsTab('bridge')}>
+                <Layers size={13} /> CCTP Bridge
+              </button>
+              <button className={`move-tab ${moveFundsTab === 'cross' ? 'active' : ''}`} onClick={() => setMoveFundsTab('cross')}>
+                <Zap size={13} /> LI.FI Swap
+              </button>
+              <button className={`move-tab ${moveFundsTab === 'send' ? 'active' : ''}`} onClick={() => setMoveFundsTab('send')}>
+                <ArrowUpRight size={13} /> Send USDC
+              </button>
+            </div>
 
-            {/* ── 가격 카드 ── */}
-            {Object.keys(prices).length > 0 && (
-              <div className="action-card prices-card">
-                <div className="action-card-label">Live Prices</div>
-                <div className="action-card-body">
-                  {[
-                    { id: 'ethereum',     label: 'ETH'  },
-                    { id: 'usd-coin',     label: 'USDC' },
-                    { id: 'matic-network', label: 'POL'  },
-                    { id: 'avalanche-2',  label: 'AVAX' },
-                  ].filter((p) => prices[p.id]).map((p) => (
-                    <div key={p.id} className="price-item">
-                      <span className="price-symbol">{p.label}</span>
-                      <span className="price-value">
-                        ${prices[p.id].usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                      <Change24h value={prices[p.id].change24h} />
+            <div className="move-funds-content">
+              {moveFundsTab === 'bridge' && (
+                <div className="action-card move-funds-card">
+                  <div className="action-card-label">Sepolia USDC → Arc Testnet USDC · Circle CCTP V2 · 0 slippage</div>
+                  <div className="action-card-body">
+                    {cctpStep !== 'idle' && (
+                      <div className="cctp-steps">
+                        {(['approving','burning','attesting','minting'] as const).map((s, i) => {
+                          const labels = ['Approve','Burn','Attest','Mint']
+                          const idx    = ['approving','burning','attesting','minting'].indexOf(cctpStep)
+                          const status = i < idx ? 'done' : i === idx ? 'active' : 'pending'
+                          return (
+                            <div key={s} className={`cctp-step ${status}`}>
+                              <div className="cctp-dot">{status === 'done' ? '✓' : i + 1}</div>
+                              <span>{labels[i]}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                    {/* Pending bridge claim card */}
+                    {pendingBridge && cctpStep === 'idle' && (
+                      <div className="cctp-pending-card">
+                        <div className="cctp-pending-header">
+                          <span className="cctp-pending-dot" />
+                          Pending Bridge
+                        </div>
+                        <div className="cctp-pending-info">
+                          <span>{pendingBridge.amount} USDC → {pendingBridge.direction === 'to-arc' ? 'Arc Testnet' : 'Sepolia'}</span>
+                          <span className="cctp-pending-age">{Math.round((Date.now() - pendingBridge.savedAt) / 60000)} min ago</span>
+                        </div>
+                        <div className="cctp-pending-actions">
+                          <button className="btn-primary" style={{ flex: 1 }} onClick={claimPendingBridge} disabled={claimLoading}>
+                            {claimLoading ? 'Checking...' : 'Check & Claim'}
+                          </button>
+                          <button className="btn-ghost" onClick={() => { localStorage.removeItem('cctp_pending_bridge'); setPendingBridge(null) }}>
+                            Dismiss
+                          </button>
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                          Circle attestation takes ~15 min on testnet. Click "Check & Claim" when ready.
+                        </div>
+                      </div>
+                    )}
+                    {/* Recover a stuck Arc->Sepolia bridge by burn tx hash */}
+                    {cctpStep === 'idle' && (
+                      <details className="cctp-recover">
+                        <summary>Recover a stuck Arc → Sepolia bridge</summary>
+                        <div className="cctp-recover-body">
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            Paste the Arc burn tx hash. We re-fetch the Circle attestation and complete the mint on Sepolia.
+                          </div>
+                          <input className="action-input" placeholder="Arc burn tx hash (0x…)"
+                            value={recoverHash} onChange={(e) => setRecoverHash(e.target.value)} />
+                          <button className="btn-primary" onClick={recoverStuckBridge} disabled={claimLoading}>
+                            {claimLoading ? 'Working…' : 'Recover USDC'}
+                          </button>
+                        </div>
+                      </details>
+                    )}
+                    {/* Direction toggle */}
+                    <div className="cctp-direction-toggle">
+                      <button
+                        className={`cctp-dir-btn ${cctpDirection === 'to-arc' ? 'active' : ''}`}
+                        onClick={() => { setCctpDirection('to-arc'); setCctpStep('idle'); setCctpBurnHash('') }}
+                        disabled={cctpStep !== 'idle' && cctpStep !== 'error' && cctpStep !== 'done'}>
+                        Sepolia → Arc
+                      </button>
+                      <button
+                        className={`cctp-dir-btn ${cctpDirection === 'to-sepolia' ? 'active' : ''}`}
+                        onClick={() => { setCctpDirection('to-sepolia'); setCctpStep('idle'); setCctpBurnHash('') }}
+                        disabled={cctpStep !== 'idle' && cctpStep !== 'error' && cctpStep !== 'done'}>
+                        Arc → Sepolia
+                      </button>
                     </div>
+                    {cctpStep === 'done' ? (
+                      <div className="cctp-done">
+                        <div style={{ fontSize: 24, marginBottom: 6 }}>✅</div>
+                        <div style={{ fontWeight: 600, marginBottom: 2 }}>
+                          {cctpDirection === 'to-arc' ? 'Bridged to Arc!' : 'Bridged to Sepolia!'}
+                        </div>
+                        <div style={{ opacity: 0.5, fontSize: 'var(--text-xs)' }}>
+                          {cctpAmount} USDC → {cctpDirection === 'to-arc' ? 'Arc Testnet' : 'Sepolia'}
+                        </div>
+                        <button className="btn-ghost" style={{ marginTop: 10 }} onClick={() => { setCctpStep('idle'); setCctpBurnHash('') }}>
+                          Bridge again
+                        </button>
+                      </div>
+                    ) : <>
+                      <div className="cctp-balance-row">
+                        <div className="cctp-bal-item">
+                          <span className="cctp-bal-chain">
+                            <span className="arc-dot" style={{ background: cctpDirection === 'to-arc' ? '#627eea' : '#00c2ff' }} />
+                            {cctpDirection === 'to-arc' ? 'Sepolia' : 'Arc Testnet'}
+                          </span>
+                          <span className="cctp-bal-val">
+                            {cctpDirection === 'to-arc'
+                              ? (cctpBalances.sepolia !== '—' ? `${cctpBalances.sepolia} USDC` : '—')
+                              : (cctpBalances.arc !== '—' ? `${cctpBalances.arc} USDC` : '—')}
+                          </span>
+                        </div>
+                        <div className="cctp-bal-arrow">→</div>
+                        <div className="cctp-bal-item">
+                          <span className="cctp-bal-chain">
+                            <span className="arc-dot" style={{ background: cctpDirection === 'to-arc' ? '#00c2ff' : '#627eea' }} />
+                            {cctpDirection === 'to-arc' ? 'Arc Testnet' : 'Sepolia'}
+                          </span>
+                          <span className="cctp-bal-val">
+                            {cctpDirection === 'to-arc'
+                              ? (cctpBalances.arc !== '—' ? `${cctpBalances.arc} USDC` : '—')
+                              : (cctpBalances.sepolia !== '—' ? `${cctpBalances.sepolia} USDC` : '—')}
+                          </span>
+                        </div>
+                        {cctpBalances.loading
+                          ? <span className="cctp-bal-loading"><RefreshCw size={10} /></span>
+                          : <button className="btn-ghost cctp-bal-refresh" onClick={loadCctpBalances} title="Refresh balances"><RefreshCw size={10} /></button>
+                        }
+                      </div>
+                      <label className="input-label">Amount (USDC)</label>
+                      <input className="action-input" type="number" placeholder="0.0"
+                        value={cctpAmount} onChange={(e) => setCctpAmount(e.target.value)}
+                        disabled={cctpStep !== 'idle'} />
+                      <label className="input-label">Recipient (optional — default: your wallet)</label>
+                      <input className="action-input" placeholder="0x…"
+                        value={cctpRecipient} onChange={(e) => setCctpRecipient(e.target.value)}
+                        disabled={cctpStep !== 'idle'} />
+                      <button className="btn-primary" style={{ marginTop: 4 }}
+                        onClick={cctpDirection === 'to-arc' ? executeCCTPBridge : executeCCTPBridgeArcToSepolia}
+                        disabled={cctpStep !== 'idle' && cctpStep !== 'error'}>
+                        {cctpStep === 'idle'      ? (cctpDirection === 'to-arc' ? 'Bridge to Arc' : 'Bridge to Sepolia') :
+                         cctpStep === 'approving' ? 'Approving USDC...'      :
+                         cctpStep === 'burning'   ? (cctpDirection === 'to-arc' ? 'Burning on Sepolia...' : 'Burning on Arc...') :
+                         cctpStep === 'attesting' ? 'Waiting Circle attestation...' :
+                         cctpStep === 'minting'   ? (cctpDirection === 'to-arc' ? 'Minting on Arc...' : 'Minting on Sepolia...') :
+                         cctpStep === 'error'     ? 'Retry Bridge'           : '...'}
+                      </button>
+                      {cctpStep === 'attesting' && (
+                        <div className="cctp-attest-note">
+                          <AlertTriangle size={12} style={{ flexShrink: 0 }} />
+                          Circle attestation takes 15–20 min on testnet. Keep this tab open — it polls automatically.
+                        </div>
+                      )}
+                      <div className="coming-soon" style={{ marginTop: 6 }}>
+                        <span className="coming-soon-label">CCTP V2</span>
+                        Official Circle bridge · 0 slippage · 1:1 mint · bidirectional
+                      </div>
+                      {cctpBurnHash && (
+                        <a className="cctp-tx-link"
+                          href={cctpDirection === 'to-arc'
+                            ? `https://sepolia.etherscan.io/tx/${cctpBurnHash}`
+                            : `https://explorer.testnet.arc.network/tx/${cctpBurnHash}`}
+                          target="_blank" rel="noreferrer">
+                          Burn tx ↗
+                        </a>
+                      )}
+                    </>}
+                  </div>
+                </div>
+              )}
+
+              {moveFundsTab === 'cross' && (
+                <div className="action-card move-funds-card">
+                  <div className="action-card-label">LI.FI swap across ETH · Base · Polygon · Arbitrum · Optimism · Avalanche</div>
+                  <div className="action-card-body">
+                    <div className="lifi-row">
+                      <div className="lifi-col">
+                        <label className="input-label">From</label>
+                        <select className="action-input" value={lifiFromChainId}
+                          onChange={(e) => { setLifiFromChainId(Number(e.target.value)); setLifiFromToken('ETH'); setLifiQuote(null) }}>
+                          {LIFI_CHAINS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                        </select>
+                      </div>
+                      <div className="lifi-col">
+                        <label className="input-label">Token</label>
+                        <select className="action-input" value={lifiFromToken}
+                          onChange={(e) => { setLifiFromToken(e.target.value); setLifiQuote(null) }}>
+                          {getLifiFromTokens(lifiFromChainId).map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="lifi-row">
+                      <div className="lifi-col">
+                        <label className="input-label">To</label>
+                        <select className="action-input" value={lifiToChainId}
+                          onChange={(e) => { setLifiToChainId(Number(e.target.value)); setLifiToToken('USDC'); setLifiQuote(null) }}>
+                          {LIFI_CHAINS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                        </select>
+                      </div>
+                      <div className="lifi-col">
+                        <label className="input-label">Receive</label>
+                        <select className="action-input" value={lifiToToken}
+                          onChange={(e) => { setLifiToToken(e.target.value); setLifiQuote(null) }}>
+                          {getLifiFromTokens(lifiToChainId).map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <label className="input-label">Amount ({lifiFromToken})</label>
+                    <input className="action-input" type="number" placeholder="0.0" value={lifiAmount}
+                      onChange={(e) => { setLifiAmount(e.target.value); setLifiQuote(null) }} />
+                    {lifiError && <div style={{ color: 'var(--error)', fontSize: 'var(--text-xs)', padding: '2px 0' }}>{lifiError}</div>}
+                    {!lifiQuote
+                      ? <button className="btn-primary" onClick={fetchLiFiQuote} disabled={lifiLoading || !lifiAmount}>
+                          {lifiLoading ? 'Getting quote...' : 'Get Quote'}
+                        </button>
+                      : <>
+                        <LiFiQuoteCard />
+                        <button className="btn-primary" onClick={executeLiFiSwap} disabled={lifiExecuting}>
+                          {lifiExecuting ? 'Executing...' : 'Swap via LI.FI'}
+                        </button>
+                        <button className="btn-outline" onClick={() => setLifiQuote(null)}>
+                          <RefreshCw size={12} /> New quote
+                        </button>
+                      </>
+                    }
+                  </div>
+                </div>
+              )}
+
+              {moveFundsTab === 'send' && (
+                <div className="action-card move-funds-card">
+                  <div className="action-card-label">Send USDC via Circle App Kit · Arc Testnet</div>
+                  <div className="action-card-body">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <label className="input-label">Recipient</label>
+                      <button className="btn-book" onClick={() => setShowContacts(true)}>
+                        <BookUser size={12} /> Address book
+                      </button>
+                    </div>
+                    <input className="action-input" type="text" placeholder="0x..." value={recipient}
+                      onChange={(e) => setRecipient(e.target.value)} />
+                    <label className="input-label">Amount (USDC)</label>
+                    <input className="action-input" type="number" placeholder="0.0" value={amount}
+                      onChange={(e) => setAmount(e.target.value)} />
+                    <button className="btn-primary" onClick={openSendConfirm} disabled={txLoading}>
+                      {txLoading ? 'Processing...' : 'Send USDC'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ─── PORTFOLIO ─── */}
+        {activePage === 'portfolio' && (
+          <div className="page portfolio-page">
+            <div className="page-header">
+              <Wallet size={20} style={{ color: 'var(--accent)' }} />
+              <div>
+                <h2 className="page-title">Portfolio</h2>
+                <p className="page-sub">Assets across {networkMode === 'mainnet' ? '6 mainnet chains' : '3 testnet chains'}</p>
+              </div>
+            </div>
+
+            {chainBreakdown.length > 0 && parseFloat(totalUsdc) > 0 && (
+              <div className="portfolio-bar-wrap">
+                <div className="portfolio-bar">
+                  {chainBreakdown.map((c) => (
+                    <div key={c.id} className="bar-seg" title={`${CHAIN_META[c.id].label}: $${c.val.toFixed(2)}`}
+                      style={{ width: `${(c.val / parseFloat(totalUsdc)) * 100}%`, background: CHAIN_META[c.id].color }} />
+                  ))}
+                </div>
+                <div className="bar-legend">
+                  {chainBreakdown.map((c) => (
+                    <span key={c.id} className="legend-item">
+                      <span className="legend-dot" style={{ background: CHAIN_META[c.id].color }} />
+                      {CHAIN_META[c.id].label} {((c.val / parseFloat(totalUsdc)) * 100).toFixed(1)}%
+                    </span>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* ── 보안 안내 ── */}
-            <div className="security-note">
-              <ShieldCheck size={12} style={{ opacity: 0.4, flexShrink: 0, marginTop: 1 }} />
-              Never stores your private keys. Always verify transactions before signing.
+            <div className="portfolio-layout">
+              <div className="portfolio-main">
+                <div className="panel">
+                  <div className="panel-header">
+                    <div className="main-tabs">
+                      <button className={`main-tab ${mainTab === 'assets' ? 'active' : ''}`} onClick={() => setMainTab('assets')}>Assets</button>
+                      {networkMode === 'testnet' && (
+                        <button className={`main-tab ${mainTab === 'faucet' ? 'active' : ''}`} onClick={() => setMainTab('faucet')}>Faucet</button>
+                      )}
+                    </div>
+                    {mainTab === 'assets' && (
+                      <div className="table-controls">
+                        <div className="network-label">
+                          <span className={`net-indicator ${networkMode}`} />
+                          {networkMode === 'mainnet' ? 'Mainnet' : 'Testnet'}
+                          {loadingAssets && <span className="loading-dot" />}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <select className="sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
+                            <option value="value">By value</option>
+                            <option value="symbol">By token</option>
+                            <option value="chain">By chain</option>
+                          </select>
+                          <button className="btn-icon" onClick={loadAssets} disabled={loadingAssets}><RefreshCw size={13} /></button>
+                          {displayed.length > 0 && (
+                            <button className="btn-icon" onClick={exportCSV} title="Export CSV"><Download size={13} /></button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {mainTab === 'assets' ? (
+                    !isConnected ? (
+                      <div className="connect-prompt">
+                        <div className="connect-prompt-icon"><Wallet size={40} strokeWidth={1.2} /></div>
+                        <p className="connect-prompt-title">Connect your wallet</p>
+                        <p className="connect-prompt-sub">Your assets will appear here once connected</p>
+                        <button className="btn-primary" style={{ maxWidth: 200 }} onClick={() => { setShowProfileMenu(true); setShowConnectors(true) }}>Connect wallet</button>
+                      </div>
+                    ) : (
+                      <div className="table-wrap">
+                        <table className="asset-table">
+                          <thead>
+                            <tr>
+                              <th>Token</th><th>Wallet</th>
+                              <th className="text-right">Balance</th>
+                              <th className="text-right">Value</th>
+                              <th className="text-right">24h</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {loadingAssets && assets.length === 0 ? <SkeletonRows /> : displayed.length === 0 ? (
+                              <tr><td colSpan={5} className="empty-cell">No assets found on {networkMode}</td></tr>
+                            ) : displayed.map((a, i) => {
+                              const explorer = CHAIN_META[a.chain]?.explorer
+                              return (
+                                <tr key={i} className="asset-tr">
+                                  <td>
+                                    <div className="token-cell">
+                                      <TokenIconWithChain symbol={a.symbol} chainId={a.chain} />
+                                      <div>
+                                        <span className="token-name">{a.symbol}</span>
+                                        <span className="token-subname">
+                                          {explorer
+                                            ? <a className="chain-link" href={explorer} target="_blank" rel="noopener noreferrer">{CHAIN_META[a.chain]?.label}</a>
+                                            : CHAIN_META[a.chain]?.label}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="wallet-cell">{a.wallet}</td>
+                                  <td className="text-right mono">{parseFloat(a.balance).toFixed(4)}</td>
+                                  <td className="text-right usdc-val">${a.usdcValue}</td>
+                                  <td className="text-right"><Change24h value={a.change24h} /></td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
+                  ) : (
+                    <div className="faucet-list">
+                      <div className="in-app-faucet-card">
+                        <div className="in-app-faucet-head">
+                          <div>
+                            <span className="faucet-card-chain">Circle faucet link</span>
+                            <p className="faucet-step-title">Open the official faucet with your active wallet ready</p>
+                            <p className="faucet-step-sub">{IN_APP_FAUCETS[inAppFaucetChain].desc}</p>
+                          </div>
+                          <span className="arc-badge"><span className="arc-dot" /> Official link</span>
+                        </div>
+                        <div className="in-app-faucet-controls">
+                          <select className="action-input" value={inAppFaucetChain}
+                            onChange={(e) => { setInAppFaucetChain(e.target.value as InAppFaucetChain); setInAppFaucetMessage('') }}>
+                            {Object.entries(IN_APP_FAUCETS).map(([id, f]) => (
+                              <option key={id} value={id}>{f.label} · {f.token}</option>
+                            ))}
+                          </select>
+                          <button className="btn-primary" onClick={requestInAppFaucet} disabled={!isConnected || inAppFaucetLoading}>
+                            {inAppFaucetLoading ? 'Opening...' : 'Open Circle Faucet'}
+                          </button>
+                        </div>
+                        {inAppFaucetMessage && (
+                          <div className={`in-app-faucet-message ${inAppFaucetMessage.toLowerCase().includes('error') || inAppFaucetMessage.toLowerCase().includes('key') ? 'error' : ''}`}>
+                            {inAppFaucetMessage}
+                          </div>
+                        )}
+                        {!isConnected && (
+                          <div className="in-app-faucet-message">Connect a wallet to copy the active address and watch for incoming faucet funds.</div>
+                        )}
+                      </div>
+                      <div className="faucet-step-card">
+                        <div className="faucet-step-num">1</div>
+                        <div className="faucet-step-body">
+                          <p className="faucet-step-title">Copy your wallet address</p>
+                          {isConnected ? (
+                            <div className="faucet-addr-row">
+                              <span className="faucet-addr-text">{allAddresses[0]}</span>
+                              <button className={`btn-copy ${copiedAddr ? 'copied' : ''}`} onClick={copyAddress}>
+                                {copiedAddr ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="faucet-no-wallet">
+                              <span>Connect a wallet first</span>
+                              <button className="btn-primary" style={{ padding: '6px 14px', fontSize: '12px', width: 'auto' }} onClick={() => { setShowProfileMenu(true); setShowConnectors(true) }}>Connect</button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="faucet-step-card">
+                        <div className="faucet-step-num">2</div>
+                        <div className="faucet-step-body">
+                          <p className="faucet-step-title">Request tokens from a faucet</p>
+                          <p className="faucet-step-sub">Click a faucet — it opens in a new tab. Paste your address and submit.</p>
+                          <div className="faucet-cards">
+                            {FAUCETS.map((f, i) => {
+                              const state = faucetPoll[i] ?? 'idle'
+                              return (
+                                <a key={i} href={f.url} target="_blank" rel="noopener noreferrer"
+                                  className={`faucet-card ${state}`}
+                                  onClick={() => { if (isConnected && state === 'idle') startFaucetPoll(i) }}>
+                                  <div className="faucet-card-top">
+                                    <span className="chain-dot" style={{ background: CHAIN_META[f.chainId]?.color }} />
+                                    <span className="faucet-card-name">{f.name}</span>
+                                    {state === 'idle'     && <ExternalLink size={12} className="faucet-card-arrow" />}
+                                    {state === 'polling'  && <span className="faucet-spinner" />}
+                                    {state === 'received' && <Check size={13} className="faucet-check" />}
+                                  </div>
+                                  <span className="faucet-card-chain">{f.chain}</span>
+                                  <div className="faucet-card-tokens">
+                                    {f.tokens.map((t) => <span key={t} className="faucet-token">{t}</span>)}
+                                  </div>
+                                  {state === 'polling'  && <span className="faucet-status-text">Waiting for deposit...</span>}
+                                  {state === 'received' && <span className="faucet-status-text received">Tokens received!</span>}
+                                  {state === 'idle'     && <span className="faucet-card-desc">{f.desc}</span>}
+                                </a>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="faucet-step-card faucet-step-last">
+                        <div className="faucet-step-num">3</div>
+                        <div className="faucet-step-body">
+                          <p className="faucet-step-title">Check your balance</p>
+                          <p className="faucet-step-sub">Balance updates automatically when tokens arrive.</p>
+                          <button className="btn-outline" style={{ width: 'auto' }} onClick={() => { setMainTab('assets'); loadAssets() }}>
+                            <RefreshCw size={13} /> Refresh assets
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="portfolio-sidebar">
+                {Object.keys(gasPrices).length > 0 && (
+                  <div className="gas-card">
+                    <div className="gas-card-label"><Fuel size={11} /> Gas</div>
+                    {CHAINS
+                      .filter((c) => gasPrices[c.id] && (networkMode === 'mainnet' ? MAINNET_IDS.has(c.id) : TESTNET_IDS.has(c.id)))
+                      .slice(0, 4)
+                      .map((c) => (
+                        <div key={c.id} className="gas-item" title={CHAIN_META[c.id].label}>
+                          <span className="gas-dot" style={{ background: CHAIN_META[c.id].color }} />
+                          {gasPrices[c.id]}
+                        </div>
+                      ))}
+                    <span className="gas-unit">Gwei</span>
+                  </div>
+                )}
+
+                {Object.keys(prices).length > 0 && (
+                  <div className="action-card prices-card">
+                    <div className="action-card-label">Live Prices</div>
+                    <div className="action-card-body">
+                      {[
+                        { id: 'ethereum',      label: 'ETH'  },
+                        { id: 'usd-coin',      label: 'USDC' },
+                        { id: 'polygon-ecosystem-token', label: 'POL'  },
+                        { id: 'avalanche-2',   label: 'AVAX' },
+                      ].filter((p) => prices[p.id]).map((p) => (
+                        <div key={p.id} className="price-item">
+                          <span className="price-symbol">{p.label}</span>
+                          <span className="price-value">
+                            ${prices[p.id].usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <Change24h value={prices[p.id].change24h} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="security-note">
+                  <ShieldCheck size={12} style={{ opacity: 0.4, flexShrink: 0, marginTop: 1 }} />
+                  Never stores your private keys. Always verify transactions before signing.
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* ─── ACTIVITY ─── */}
+        {activePage === 'activity' && (
+          <div className="page activity-page">
+            <div className="page-header">
+              <Network size={20} style={{ color: 'var(--accent)' }} />
+              <div>
+                <h2 className="page-title">Settlement Activity</h2>
+                <p className="page-sub">On-chain settlement history — USDC releases, refunds, NFT OTC settlements, and bridge activity.</p>
+              </div>
+            </div>
+            <div className="activity-summary-grid">
+              <div className="activity-summary-card primary">
+                <span>Completed settlements</span>
+                <strong>{completedSettlementCount}</strong>
+                <small>Released payments or refunds recorded locally</small>
+              </div>
+              <div className="activity-summary-card">
+                <span>Escrow events</span>
+                <strong>{settlementHistory.length}</strong>
+                <small>Funding, submission, release, and refund actions</small>
+              </div>
+              <div className="activity-summary-card">
+                <span>All movement</span>
+                <strong>{history.length}</strong>
+                <small>Bridge, send, swap, cross-chain, and escrow actions</small>
+              </div>
+            </div>
+            <div className="activity-ledger">
+              <div className="activity-ledger-head">
+                <div>
+                  <span>Primary ledger</span>
+                  <strong>Escrow settlement history</strong>
+                </div>
+                <button className="btn-outline" onClick={() => navigatePage('marketplace')}>
+                  <BookUser size={13} /> Open Requests
+                </button>
+              </div>
+              <div className="history-list">
+                {settlementHistory.length === 0 ? (
+                  <div className="activity-empty">
+                    <ShieldCheck size={36} strokeWidth={1.2} style={{ opacity: 0.35 }} />
+                    <p>No escrow settlements yet</p>
+                    <p style={{ opacity: 0.6, fontSize: 'var(--text-xs)' }}>Fund an escrow, submit work, release payment, or claim a refund to build the settlement ledger.</p>
+                  </div>
+                ) : settlementHistory.map((h, i) => {
+                  return (
+                    <div key={i} className={`history-row ${h.status}`}>
+                      <div className="history-left">
+                        <span className={`history-icon ${h.type}`}><Lock size={14} /></span>
+                        <div className="history-info">
+                          <span className="history-summary">{h.summary}</span>
+                          <span className="history-time">{new Date(h.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      </div>
+                      <div className="history-right">
+                        {h.txHash && (
+                          <a className="history-link" href={`https://testnet.arcscan.app/tx/${h.txHash}`} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink size={13} />
+                          </a>
+                        )}
+                        <span className={`history-dot ${h.status}`} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+            {history.some((h) => h.type !== 'escrow') && (
+              <div className="activity-supporting">
+                <div className="activity-ledger-head compact">
+                  <div>
+                    <span>Supporting movement</span>
+                    <strong>Bridge, swap, send, and route history</strong>
+                  </div>
+                </div>
+                <div className="history-list">
+                  {history.filter((h) => h.type !== 'escrow').map((h, i) => {
+                    const iconMap = { swap: <Repeat2 size={14} />, bridge: <Layers size={14} />, send: <ArrowUpRight size={14} />, cross: <Zap size={14} />, escrow: <Lock size={14} /> }
+                    return (
+                      <div key={i} className={`history-row ${h.status}`}>
+                        <div className="history-left">
+                          <span className={`history-icon ${h.type}`}>{iconMap[h.type]}</span>
+                          <div className="history-info">
+                            <span className="history-summary">{h.summary}</span>
+                            <span className="history-time">{new Date(h.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        </div>
+                        <div className="history-right">
+                          {h.txHash && (
+                            <a className="history-link" href={`https://testnet.arcscan.app/tx/${h.txHash}`} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink size={13} />
+                            </a>
+                          )}
+                          <span className={`history-dot ${h.status}`} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── DOCS ─── */}
+        {activePage === 'docs' && (
+          <div className="page docs-page">
+            <div className="page-header">
+              <BookOpen size={20} style={{ color: 'var(--accent)' }} />
+              <div>
+                <h2 className="page-title">Docs & Contracts</h2>
+                <p className="page-sub">Live Arc Testnet contracts, Circle CCTP infrastructure, ERC-8183 agentic commerce standard, and resources</p>
+              </div>
+            </div>
+
+            <div className="docs-grid">
+              <div className="docs-section">
+                <div className="docs-section-title">Arc Testnet Contracts</div>
+                <div className="contract-list docs-contracts">
+                  <div className="contract-item">
+                    <div className="contract-name">ArcEscrow</div>
+                    <div className="contract-chain">Arc Testnet · chainId 5042002</div>
+                    <a className="contract-addr" href={`https://testnet.arcscan.app/address/${ARC_ESCROW}`} target="_blank" rel="noreferrer">
+                      {ARC_ESCROW} <ExternalLink size={10} />
+                    </a>
+                  </div>
+                  <div className="contract-item">
+                    <div className="contract-name">Arc USDC</div>
+                    <div className="contract-chain">Arc Testnet</div>
+                    <a className="contract-addr" href="https://testnet.arcscan.app/address/0x3600000000000000000000000000000000000000" target="_blank" rel="noreferrer">
+                      0x3600000000000000000000000000000000000000 <ExternalLink size={10} />
+                    </a>
+                  </div>
+                  <div className="contract-item">
+                    <div className="contract-name">NFTOTCEscrow</div>
+                    <div className="contract-chain">Arc Testnet · NFT OTC settlement</div>
+                    <a className="contract-addr" href={`https://testnet.arcscan.app/address/${NFT_OTC_ESCROW}`} target="_blank" rel="noreferrer">
+                      {NFT_OTC_ESCROW} <ExternalLink size={10} />
+                    </a>
+                  </div>
+                  <div className="contract-item">
+                    <div className="contract-name">ERC-8183 AgenticCommerce</div>
+                    <div className="contract-chain">Arc Testnet · official agentic standard</div>
+                    <a className="contract-addr" href={`https://testnet.arcscan.app/address/${ERC8183_CONTRACT}`} target="_blank" rel="noreferrer">
+                      {ERC8183_CONTRACT} <ExternalLink size={10} />
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              <div className="docs-section">
+                <div className="docs-section-title">Ethereum Sepolia Contracts</div>
+                <div className="contract-list docs-contracts">
+                  <div className="contract-item">
+                    <div className="contract-name">ArcOnboarder</div>
+                    <div className="contract-chain">Ethereum Sepolia · CCTP V2 entry</div>
+                    <a className="contract-addr" href={`https://sepolia.etherscan.io/address/${ARC_ONBOARDER}`} target="_blank" rel="noreferrer">
+                      {ARC_ONBOARDER} <ExternalLink size={10} />
+                    </a>
+                  </div>
+                  <div className="contract-item">
+                    <div className="contract-name">Sepolia USDC</div>
+                    <div className="contract-chain">Ethereum Sepolia</div>
+                    <a className="contract-addr" href="https://sepolia.etherscan.io/address/0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" target="_blank" rel="noreferrer">
+                      0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238 <ExternalLink size={10} />
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              <div className="docs-section docs-arch">
+                <div className="docs-section-title">Architecture Flow</div>
+                <div className="arch-diagram">
+                  <div className="arch-row">
+                    <div className="arch-node arch-client">Client</div>
+                    <div className="arch-conn">→</div>
+                    <div className="arch-node arch-contract">ArcEscrow<span>Arc Testnet</span></div>
+                    <div className="arch-conn">→</div>
+                    <div className="arch-node arch-agent">Agent</div>
+                  </div>
+                  <div className="arch-row arch-row-mid">
+                    <div className="arch-node arch-ai">Claude Haiku<span>AI Judge</span></div>
+                    <div className="arch-conn">↑</div>
+                    <div className="arch-node arch-blob">Vercel Blob<span>Work result</span></div>
+                    <div className="arch-conn">←</div>
+                    <div className="arch-node arch-agent">Agent</div>
+                  </div>
+                  <div className="arch-row">
+                    <div className="arch-node arch-cctp">CCTP V2<span>Sepolia → Arc</span></div>
+                    <div className="arch-conn">→</div>
+                    <div className="arch-node arch-contract">Arc USDC<span>0x3600…</span></div>
+                    <div className="arch-conn">→</div>
+                    <div className="arch-node arch-contract">ArcEscrow</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="docs-section">
+                <div className="docs-section-title">Gateway Nanopayments Direction</div>
+                <div className="docs-note-list">
+                  <p>Use two payment lanes instead of forcing every action into escrow:</p>
+                  <span>1. ArcEscrow holds the main request reward until the client approves the submitted result.</span>
+                  <span>2. Gateway/x402 can meter small usage around the job: listing extensions, AI review, paid APIs, premium unlocks, and agent tool calls.</span>
+                  <span>3. Buyers keep a Gateway balance, sign offchain payment authorizations, and settlement can be batched instead of paying gas per tiny action.</span>
+                  <span>4. The product pitch becomes outcome escrow plus usage-priced agent commerce on Arc.</span>
+                </div>
+              </div>
+
+              <div className="docs-section">
+                <div className="docs-section-title">External Resources</div>
+                <div className="docs-links">
+                  <a className="docs-link" href="https://testnet.arcscan.app" target="_blank" rel="noreferrer">
+                    <ExternalLink size={13} /> ArcScan Explorer
+                  </a>
+                  <a className="docs-link" href="https://faucet.circle.com" target="_blank" rel="noreferrer">
+                    <ExternalLink size={13} /> Circle USDC Faucet
+                  </a>
+                  <a className="docs-link" href="https://developers.circle.com/stablecoins/cctp-getting-started" target="_blank" rel="noreferrer">
+                    <ExternalLink size={13} /> Circle CCTP V2 Docs
+                  </a>
+                  <a className="docs-link" href="https://li.fi/sdk" target="_blank" rel="noreferrer">
+                    <ExternalLink size={13} /> LI.FI SDK Docs
+                  </a>
+                  <a className="docs-link" href="https://developers.circle.com/w3s/programmable-wallets" target="_blank" rel="noreferrer">
+                    <ExternalLink size={13} /> Circle Programmable Wallets
+                  </a>
+                  <a className="docs-link" href="https://eips.ethereum.org/EIPS/eip-8183" target="_blank" rel="noreferrer">
+                    <ExternalLink size={13} /> ERC-8183 Agentic Commerce
+                  </a>
+                  <a className="docs-link" href="https://docs.arc.network" target="_blank" rel="noreferrer">
+                    <ExternalLink size={13} /> Arc Network Docs
+                  </a>
+                  <a className="docs-link" href="https://github.com/ds4316/usdc-portal" target="_blank" rel="noreferrer">
+                    <ExternalLink size={13} /> GitHub Repository
+                  </a>
+                </div>
+              </div>
+
+              <div className="docs-section">
+                <div className="docs-section-title">ERC-8183 vs ArcEscrow</div>
+                <div className="docs-note-list">
+                  <p>For the demo, ArcEscrow is the product workflow. ERC-8183 is a separate standards track for agent wallets and autonomous job contracts.</p>
+                  <span>1. <strong>ArcEscrow</strong> - request marketplace flow: post, claim, submit work, AI review, release USDC.</span>
+                  <span>2. <strong>ERC-8183</strong> - agentic commerce flow: createJob, setBudget, fund, submit, complete.</span>
+                  <span>3. <strong>Why both?</strong> ArcEscrow is easier for judges and users. ERC-8183 maps the same idea to an agent-to-agent standard.</span>
+                  <span>4. <strong>Status</strong> - keep ArcEscrow as the primary demo path; present ERC-8183 as an experimental/testnet lane.</span>
+                  <a className="docs-link" href="https://eips.ethereum.org/EIPS/eip-8183" target="_blank" rel="noreferrer">
+                    <ExternalLink size={13} /> ERC-8183 Specification
+                  </a>
+                </div>
+              </div>
+
+              <div className="docs-section">
+                <div className="docs-section-title">NFT OTC Settlement</div>
+                <div className="docs-note-list">
+                  <p>Atomic NFT ↔ USDC swap via NFTOTCEscrow:</p>
+                  <span>1. Buyer posts deal with USDC locked immediately (seller=0x0 for open market)</span>
+                  <span>2. NFT holder calls <strong>claimDeal</strong> — ownerOf check proves ownership on-chain</span>
+                  <span>3. Seller calls <strong>approve</strong> on NFT contract (NFTOTCEscrow as spender)</span>
+                  <span>4. Either party calls <strong>settle</strong> — NFT transfers to buyer, USDC releases to seller atomically</span>
+                </div>
+              </div>
+
+              <div className="docs-section">
+                <div className="docs-section-title">Circle Programmable Wallets</div>
+                <div className="docs-note-list">
+                  <p>Server-side custodial wallets for autonomous agent-to-agent commerce on Arc:</p>
+                  <span>1. <strong>Create a wallet via API</strong> — Circle provisions an EVM wallet server-side (no browser wallet needed)</span>
+                  <span>2. <strong>Fund with USDC</strong> — send Arc USDC to the programmable wallet address via CCTP V2 or direct transfer</span>
+                  <span>3. <strong>Agent signs transactions</strong> — the server signs ERC-8183 <code>createJob</code> and <code>fund</code> calls without MetaMask</span>
+                  <span>4. <strong>Full autonomy</strong> — an AI agent can post requests, fund escrow, and complete jobs with no human approval flow</span>
+                  <a className="docs-link" href="https://developers.circle.com/w3s/programmable-wallets" target="_blank" rel="noreferrer">
+                    <ExternalLink size={13} /> Circle Programmable Wallets Docs
+                  </a>
+                </div>
+              </div>
+
+              <div className="docs-section docs-hackathon">
+                <div className="docs-section-title">Circle + Arc · Feature Map</div>
+                <div className="docs-feature-map">
+                  {([
+                    { tool: 'Circle CCTP V2', usage: 'Sepolia → Arc bridge, 0 slippage', page: 'funds', badge: 'Live' },
+                    { tool: 'Circle USDC', usage: 'Settlement asset for all escrow flows', page: 'marketplace', badge: 'Live' },
+                    { tool: 'Circle App Kit', usage: 'Wallet connect, chain switching, UI', page: 'overview', badge: 'Live' },
+                    { tool: 'Circle Programmable Wallets', usage: 'Server-controlled agent wallets (custodial)', page: 'docs', badge: 'UI' },
+                    { tool: 'Circle Gateway / x402', usage: 'Nanopayment layer for micropayments', page: 'marketplace', badge: 'Arch' },
+                    { tool: 'ArcEscrow', usage: 'Work + Milestone escrow, AI release', page: 'escrow', badge: 'Live' },
+                    { tool: 'NFTOTCEscrow', usage: 'Atomic NFT ↔ USDC atomic swap', page: 'marketplace', badge: 'Live' },
+                    { tool: 'ERC-8183', usage: 'Arc agentic commerce standard', page: 'escrow', badge: 'Live' },
+                    { tool: 'Claude Haiku AI', usage: 'Deliverable evaluation before payout', page: 'escrow', badge: 'Live' },
+                    { tool: 'Vercel Blob', usage: 'Work result storage (URI proof on-chain)', page: 'escrow', badge: 'Live' },
+                  ] as const).map((item, i) => (
+                    <div key={i} className="docs-feature-row">
+                      <span className={`docs-feature-badge ${item.badge.toLowerCase()}`}>{item.badge}</span>
+                      <div className="docs-feature-name">{item.tool}</div>
+                      <div className="docs-feature-usage">{item.usage}</div>
+                      <button className="docs-feature-goto" onClick={() => navigatePage(item.page as Parameters<typeof navigatePage>[0])}>
+                        Try → <ExternalLink size={10} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
+
+      {/* ─── FOOTER ─── */}
+      <footer className="site-footer">
+        <div className="footer-inner">
+          <div className="footer-left">
+            <span className="footer-logo">
+              <CircleDollarSign size={14} style={{ verticalAlign: 'middle', marginRight: 4, color: 'var(--accent)' }} />
+              ArcEscrow Market
+            </span>
+            <span className="footer-tag">Arc × Circle Stablecoin Hackathon · Agentic Commerce Track</span>
+          </div>
+          <div className="footer-links">
+            <a href="https://testnet.arcscan.app" target="_blank" rel="noreferrer">ArcScan</a>
+            <a href="https://faucet.circle.com" target="_blank" rel="noreferrer">Circle Faucet</a>
+            <a href="https://developers.circle.com" target="_blank" rel="noreferrer">Circle Docs</a>
+          </div>
+          <div className="footer-disclaimer">Testnet demo only · Not financial advice</div>
+        </div>
+      </footer>
     </div>
   )
 }
