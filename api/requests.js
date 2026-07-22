@@ -45,14 +45,17 @@ async function streamToText(stream) {
   return Buffer.concat(chunks).toString('utf8')
 }
 
-// Public blobs ignore Vercel's `useCache: false` option (it's private-blob
-// only), so a `get()` right after a `put()` can still return CDN-cached,
-// pre-write content for an unpredictable stretch — re-reading to "confirm" a
-// write landed doesn't actually prove anything on this path. Read the etag
-// alongside the content instead, so writes can use real compare-and-swap.
+// This board is only ever read/written through this API (the frontend never
+// fetches the blob URL directly), so it's stored as a private blob rather
+// than public. That matters because Vercel's `useCache: false` read option
+// is silently ignored for public blobs — a get() right after a put() could
+// return CDN-cached pre-write content for an unpredictable stretch, which
+// broke both write-conflict detection and plain read-your-writes (a request
+// PATCHed immediately after being POSTed could 404 as "not found"). Private
+// blobs honor useCache: false and read straight from origin storage.
 async function readRequestsWithEtag(token) {
   try {
-    const result = await get(PATH, { access: 'public', token })
+    const result = await get(PATH, { access: 'private', token, useCache: false })
     if (!result || result.statusCode !== 200) return { requests: [], etag: undefined }
     const text = await streamToText(result.stream)
     const data = JSON.parse(text)
@@ -88,7 +91,7 @@ async function mutateRequests(token, mutate) {
     const next = mutate(current)
     try {
       await put(PATH, JSON.stringify({ requests: next, updatedAt: new Date().toISOString() }), {
-        access: 'public',
+        access: 'private',
         allowOverwrite: true,
         addRandomSuffix: false,
         contentType: 'application/json',
