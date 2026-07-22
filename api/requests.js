@@ -1,6 +1,14 @@
 import { get, put } from '@vercel/blob'
 
 const PATH = 'marketplace/requests.json'
+const MAX_WRITE_ATTEMPTS = 4
+
+class RequestBoardError extends Error {
+  constructor(status, message) {
+    super(message)
+    this.status = status
+  }
+}
 
 function listingFee(days) {
   const d = Math.max(1, Math.min(7, Number(days) || 3))
@@ -48,15 +56,43 @@ async function readRequests(token) {
   }
 }
 
-async function writeRequests(requests, token) {
-  await put(PATH, JSON.stringify({ requests, updatedAt: new Date().toISOString() }), {
-    access: 'public',
-    allowOverwrite: true,
-    addRandomSuffix: false,
-    contentType: 'application/json',
-    cacheControlMaxAge: 0,
-    token,
-  })
+// Vercel Blob overwrites have no compare-and-swap: two requests hitting this
+// API close together can each read the same snapshot, and whichever writes
+// last silently discards the other's change (observed in practice — a
+// request posted seconds before being accepted came back "not found"
+// because the accept's write had clobbered the post's write).
+//
+// `mutate(freshRequests)` must be a pure function that either returns the
+// new full array, or throws a RequestBoardError for a business-rule failure
+// (not found / already resolved / etc) — those are NOT retried. After
+// writing, we re-read and use `getTarget` to confirm the specific row we
+// just wrote is actually present with the expected shape; if a concurrent
+// writer clobbered it, we retry the whole read-mutate-write cycle from a
+// fresh read.
+async function mutateRequests(token, mutate, getTarget) {
+  let expectedTarget
+  for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt++) {
+    const current = await readRequests(token)
+    const next = mutate(current)
+    expectedTarget = getTarget(next)
+
+    await put(PATH, JSON.stringify({ requests: next, updatedAt: new Date().toISOString() }), {
+      access: 'public',
+      allowOverwrite: true,
+      addRandomSuffix: false,
+      contentType: 'application/json',
+      cacheControlMaxAge: 0,
+      token,
+    })
+
+    const confirmed = await readRequests(token)
+    const confirmedTarget = getTarget(confirmed)
+    if (confirmedTarget && expectedTarget && JSON.stringify(confirmedTarget) === JSON.stringify(expectedTarget)) {
+      return confirmed
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200 + attempt * 250))
+  }
+  throw new RequestBoardError(503, 'Could not save changes to the request board — please retry')
 }
 
 export default async function handler(req, res) {
@@ -64,9 +100,8 @@ export default async function handler(req, res) {
   if (!token) return res.status(500).json({ error: 'Blob storage is not configured' })
 
   try {
-    const requests = await readRequests(token)
-
     if (req.method === 'GET') {
+      const requests = await readRequests(token)
       return res.status(200).json({ requests })
     }
 
@@ -125,82 +160,86 @@ export default async function handler(req, res) {
         createdAt: createdAt.toISOString(),
         expiresAt: new Date(createdAt.getTime() + visibleDays * 86400_000).toISOString(),
       }
-      const updated = [next, ...requests]
-      await writeRequests(updated, token)
-      return res.status(201).json({ request: next, requests: updated })
+
+      const requests = await mutateRequests(
+        token,
+        (current) => [next, ...current],
+        (list) => list.find((request) => request.id === next.id),
+      )
+      return res.status(201).json({ request: next, requests })
     }
 
     if (req.method === 'PATCH') {
       const { id, action, agent, client, escrowJobId } = req.body ?? {}
-      const target = requests.find((request) => request.id === id)
-      if (!target) return res.status(404).json({ error: 'Request not found' })
 
-      if (action === 'deleteExpired') {
-        if (!isExpired(target)) return res.status(409).json({ error: 'Request is not expired' })
-        const updated = requests.filter((request) => request.id !== id)
-        await writeRequests(updated, token)
-        return res.status(200).json({ requests: updated })
-      }
+      const requests = await mutateRequests(
+        token,
+        (current) => {
+          const target = current.find((request) => request.id === id)
+          if (!target) throw new RequestBoardError(404, 'Request not found')
 
-      if (action === 'cancel') {
-        // Allow cancellation in open or matched state
-        if (!isAddress(client) || target.client.toLowerCase() !== client.toLowerCase()) {
-          return res.status(403).json({ error: 'Only the request owner can cancel' })
-        }
-        if (target.status === 'cancelled' || target.status === 'completed') {
-          return res.status(409).json({ error: 'Request is already resolved' })
-        }
-        const updated = requests.map((request) => request.id === id
-          ? { ...request, status: 'cancelled', cancelledAt: new Date().toISOString() }
-          : request)
-        await writeRequests(updated, token)
-        return res.status(200).json({ request: updated.find((r) => r.id === id), requests: updated })
-      }
+          if (action === 'deleteExpired') {
+            if (!isExpired(target)) throw new RequestBoardError(409, 'Request is not expired')
+            return current.filter((request) => request.id !== id)
+          }
 
-      if (action === 'complete') {
-        if (target.status === 'cancelled' || target.status === 'completed') {
-          return res.status(409).json({ error: 'Request is already resolved' })
-        }
-        const updated = requests.map((request) => request.id === id
-          ? { ...request, status: 'completed', completedAt: new Date().toISOString() }
-          : request)
-        await writeRequests(updated, token)
-        return res.status(200).json({ request: updated.find((r) => r.id === id), requests: updated })
-      }
+          if (action === 'cancel') {
+            if (!isAddress(client) || target.client.toLowerCase() !== client.toLowerCase()) {
+              throw new RequestBoardError(403, 'Only the request owner can cancel')
+            }
+            if (target.status === 'cancelled' || target.status === 'completed') {
+              throw new RequestBoardError(409, 'Request is already resolved')
+            }
+            return current.map((request) => request.id === id
+              ? { ...request, status: 'cancelled', cancelledAt: new Date().toISOString() }
+              : request)
+          }
 
-      if (isExpired(target)) return res.status(410).json({ error: 'Request has expired' })
+          if (action === 'complete') {
+            if (target.status === 'cancelled' || target.status === 'completed') {
+              throw new RequestBoardError(409, 'Request is already resolved')
+            }
+            return current.map((request) => request.id === id
+              ? { ...request, status: 'completed', completedAt: new Date().toISOString() }
+              : request)
+          }
 
-      let updated
-      if (action === 'accept') {
-        if (!isAddress(agent)) return res.status(400).json({ error: 'Valid agent wallet required' })
-        if (target.status !== 'open') return res.status(409).json({ error: 'Request is already matched' })
-        if (target.client.toLowerCase?.() === agent.toLowerCase()) return res.status(400).json({ error: 'Client cannot accept their own request' })
-        updated = requests.map((request) => request.id === id
-          ? { ...request, agent, status: 'matched', acceptedAt: new Date().toISOString() }
-          : request)
-      } else if (action === 'fund') {
-        // Legacy: attach escrow job id after the fact (kept for backward compatibility)
-        if (!isAddress(client) || target.client.toLowerCase() !== client.toLowerCase()) {
-          return res.status(403).json({ error: 'Only the request owner can attach escrow' })
-        }
-        if (!target.agent) return res.status(409).json({ error: 'Request has no matched worker' })
-        if (!Number.isInteger(Number(escrowJobId)) || Number(escrowJobId) < 0) {
-          return res.status(400).json({ error: 'Valid escrow job id required' })
-        }
-        updated = requests.map((request) => request.id === id
-          ? { ...request, status: 'matched', escrowJobId: String(escrowJobId), escrowFundedAt: new Date().toISOString() }
-          : request)
-      } else {
-        return res.status(400).json({ error: 'Unsupported action' })
-      }
+          if (isExpired(target)) throw new RequestBoardError(410, 'Request has expired')
 
-      await writeRequests(updated, token)
-      return res.status(200).json({ request: updated.find((request) => request.id === id), requests: updated })
+          if (action === 'accept') {
+            if (!isAddress(agent)) throw new RequestBoardError(400, 'Valid agent wallet required')
+            if (target.status !== 'open') throw new RequestBoardError(409, 'Request is already matched')
+            if (target.client.toLowerCase?.() === agent.toLowerCase()) throw new RequestBoardError(400, 'Client cannot accept their own request')
+            return current.map((request) => request.id === id
+              ? { ...request, agent, status: 'matched', acceptedAt: new Date().toISOString() }
+              : request)
+          }
+
+          if (action === 'fund') {
+            // Legacy: attach escrow job id after the fact (kept for backward compatibility)
+            if (!isAddress(client) || target.client.toLowerCase() !== client.toLowerCase()) {
+              throw new RequestBoardError(403, 'Only the request owner can attach escrow')
+            }
+            if (!target.agent) throw new RequestBoardError(409, 'Request has no matched worker')
+            if (!Number.isInteger(Number(escrowJobId)) || Number(escrowJobId) < 0) {
+              throw new RequestBoardError(400, 'Valid escrow job id required')
+            }
+            return current.map((request) => request.id === id
+              ? { ...request, status: 'matched', escrowJobId: String(escrowJobId), escrowFundedAt: new Date().toISOString() }
+              : request)
+          }
+
+          throw new RequestBoardError(400, 'Unsupported action')
+        },
+        (list) => list.find((request) => request.id === id) ?? (action === 'deleteExpired' ? { deleted: id } : undefined),
+      )
+      return res.status(200).json({ request: requests.find((request) => request.id === id), requests })
     }
 
     res.setHeader('Allow', 'GET, POST, PATCH')
     return res.status(405).json({ error: 'Method not allowed' })
   } catch (e) {
+    if (e instanceof RequestBoardError) return res.status(e.status).json({ error: e.message })
     return res.status(500).json({ error: e instanceof Error ? e.message : 'Request board failed' })
   }
 }
