@@ -1,55 +1,26 @@
-import { createPublicClient, http } from 'viem'
-
-const ARC_TESTNET_RPC = 'https://rpc.testnet.arc.network'
-// NOTE: keep in sync with ARC_ESCROW in src/App.tsx
-const ARC_ESCROW = '0x7420C7A3459B532Dee36Fc1e22badBe262BaD571'
-
-const GET_JOB_ABI = [{
-  type: 'function', name: 'getJob', stateMutability: 'view',
-  inputs: [{ name: 'jobId', type: 'uint256' }],
-  outputs: [
-    { name: 'client', type: 'address' }, { name: 'agent', type: 'address' },
-    { name: 'amount', type: 'uint256' }, { name: 'deadline', type: 'uint256' },
-    { name: 'description', type: 'string' }, { name: 'resultUri', type: 'string' },
-    { name: 'status', type: 'uint8' }, { name: 'jobType', type: 'uint8' },
-  ],
-}]
-
 const RESULT_HOST_SUFFIX = '.public.blob.vercel-storage.com'
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024 // 5MB
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { jobId } = req.body ?? {}
-  if (jobId === undefined || jobId === null || jobId === '') {
-    return res.status(400).json({ error: 'jobId is required' })
+  const { jobDescription, resultUri } = req.body ?? {}
+  if (!jobDescription || !resultUri) {
+    return res.status(400).json({ error: 'jobDescription and resultUri are required' })
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) return res.status(500).json({ error: 'API key not configured' })
 
-  // Independently read the job from chain instead of trusting client-supplied
-  // description/resultUri — prevents SSRF-via-arbitrary-URL and API-quota abuse
-  // by callers who don't have a real submitted job.
-  let description, resultUri, status
-  try {
-    const client = createPublicClient({ transport: http(ARC_TESTNET_RPC) })
-    ;[, , , , description, resultUri, status] = await client.readContract({
-      address: ARC_ESCROW, abi: GET_JOB_ABI, functionName: 'getJob', args: [BigInt(jobId)],
-    })
-  } catch {
-    return res.status(400).json({ error: 'Could not read job from chain' })
-  }
-
-  if (Number(status) !== 1) return res.status(400).json({ error: 'Job is not in Submitted state' })
-  if (!resultUri) return res.status(400).json({ error: 'Job has no result submitted' })
-
+  // Only fetch results hosted on our own Vercel Blob storage — prevents this
+  // endpoint from being used as an open SSRF proxy for arbitrary URLs.
   let resultHost = ''
   try { resultHost = new URL(resultUri).hostname } catch { /* invalid URL */ }
   if (!resultHost.endsWith(RESULT_HOST_SUFFIX)) {
     return res.status(400).json({ error: 'Result URI host not allowed' })
   }
+
+  const description = jobDescription
 
   // Fetch the actual content at resultUri
   let messageContent = []
