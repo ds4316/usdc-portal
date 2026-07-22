@@ -1,7 +1,8 @@
 import { get, put } from '@vercel/blob'
 
 const PATH = 'marketplace/requests.json'
-const MAX_WRITE_ATTEMPTS = 4
+const MAX_WRITE_ATTEMPTS = 5
+const RETRY_DELAYS_MS = [250, 500, 1000, 1500]
 
 class RequestBoardError extends Error {
   constructor(status, message) {
@@ -85,12 +86,18 @@ async function mutateRequests(token, mutate, getTarget) {
       token,
     })
 
+    // Vercel Blob's public read path is CDN-backed — even with
+    // cacheControlMaxAge: 0, a fresh overwrite can take a beat to propagate,
+    // so give it a moment before confirming.
+    await new Promise((resolve) => setTimeout(resolve, 150))
     const confirmed = await readRequests(token)
     const confirmedTarget = getTarget(confirmed)
     if (confirmedTarget && expectedTarget && JSON.stringify(confirmedTarget) === JSON.stringify(expectedTarget)) {
       return confirmed
     }
-    await new Promise((resolve) => setTimeout(resolve, 200 + attempt * 250))
+    if (attempt < MAX_WRITE_ATTEMPTS - 1) {
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt] ?? 1500))
+    }
   }
   throw new RequestBoardError(503, 'Could not save changes to the request board — please retry')
 }
