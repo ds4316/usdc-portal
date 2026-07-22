@@ -1,13 +1,25 @@
 import { put, head, BlobPreconditionFailedError } from '@vercel/blob'
 
 const PATH = 'marketplace/requests.json'
-const MAX_WRITE_ATTEMPTS = 5
-const RETRY_DELAYS_MS = [150, 300, 600, 1000]
+const MAX_WRITE_ATTEMPTS = 6
+const RETRY_DELAYS_MS = [200, 400, 800, 1500, 2500]
 
 class RequestBoardError extends Error {
   constructor(status, message) {
     super(message)
     this.status = status
+  }
+}
+
+// A fresh read not finding the target row is ambiguous on this store: it
+// might genuinely not exist, or it might have been written moments ago and
+// just hasn't propagated to whichever edge this read hit yet (observed lag
+// of several, occasionally 10+, seconds even with cache-busted reads). Treat
+// it as retryable like a precondition failure rather than failing instantly
+// — if it's still missing after the retry budget, it really is a 404.
+class NotYetVisibleError extends RequestBoardError {
+  constructor(message) {
+    super(404, message)
   }
 }
 
@@ -80,9 +92,9 @@ async function readRequests(token) {
 // reliable check anyway, see above).
 async function mutateRequests(token, mutate) {
   for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt++) {
-    const { requests: current, etag } = await readRequestsWithEtag(token)
-    const next = mutate(current)
     try {
+      const { requests: current, etag } = await readRequestsWithEtag(token)
+      const next = mutate(current)
       await put(PATH, JSON.stringify({ requests: next, updatedAt: new Date().toISOString() }), {
         access: 'public',
         allowOverwrite: true,
@@ -94,7 +106,8 @@ async function mutateRequests(token, mutate) {
       })
       return next
     } catch (e) {
-      if (e instanceof BlobPreconditionFailedError && attempt < MAX_WRITE_ATTEMPTS - 1) {
+      const retryable = e instanceof BlobPreconditionFailedError || e instanceof NotYetVisibleError
+      if (retryable && attempt < MAX_WRITE_ATTEMPTS - 1) {
         await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt] ?? 1000))
         continue
       }
@@ -181,7 +194,7 @@ export default async function handler(req, res) {
         token,
         (current) => {
           const target = current.find((request) => request.id === id)
-          if (!target) throw new RequestBoardError(404, 'Request not found')
+          if (!target) throw new NotYetVisibleError('Request not found')
 
           if (action === 'deleteExpired') {
             if (!isExpired(target)) throw new RequestBoardError(409, 'Request is not expired')
