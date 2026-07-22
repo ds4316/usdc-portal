@@ -1,8 +1,8 @@
-import { get, put } from '@vercel/blob'
+import { get, put, BlobPreconditionFailedError } from '@vercel/blob'
 
 const PATH = 'marketplace/requests.json'
 const MAX_WRITE_ATTEMPTS = 5
-const RETRY_DELAYS_MS = [250, 500, 1000, 1500]
+const RETRY_DELAYS_MS = [150, 300, 600, 1000]
 
 class RequestBoardError extends Error {
   constructor(status, message) {
@@ -45,58 +45,64 @@ async function streamToText(stream) {
   return Buffer.concat(chunks).toString('utf8')
 }
 
-async function readRequests(token) {
+// Public blobs ignore Vercel's `useCache: false` option (it's private-blob
+// only), so a `get()` right after a `put()` can still return CDN-cached,
+// pre-write content for an unpredictable stretch — re-reading to "confirm" a
+// write landed doesn't actually prove anything on this path. Read the etag
+// alongside the content instead, so writes can use real compare-and-swap.
+async function readRequestsWithEtag(token) {
   try {
     const result = await get(PATH, { access: 'public', token })
-    if (!result || result.statusCode !== 200) return []
+    if (!result || result.statusCode !== 200) return { requests: [], etag: undefined }
     const text = await streamToText(result.stream)
     const data = JSON.parse(text)
-    return Array.isArray(data.requests) ? data.requests.filter((request) => !isExpired(request)) : []
+    const requests = Array.isArray(data.requests) ? data.requests.filter((request) => !isExpired(request)) : []
+    return { requests, etag: result.etag }
   } catch {
-    return []
+    return { requests: [], etag: undefined }
   }
 }
 
-// Vercel Blob overwrites have no compare-and-swap: two requests hitting this
-// API close together can each read the same snapshot, and whichever writes
-// last silently discards the other's change (observed in practice — a
-// request posted seconds before being accepted came back "not found"
-// because the accept's write had clobbered the post's write).
+async function readRequests(token) {
+  return (await readRequestsWithEtag(token)).requests
+}
+
+// Vercel Blob overwrites otherwise have no compare-and-swap: two requests
+// hitting this API close together can each read the same snapshot, and
+// whichever writes last silently discards the other's change (observed in
+// practice — a request posted seconds before being accepted came back "not
+// found" because the accept's write had clobbered the post's write).
 //
 // `mutate(freshRequests)` must be a pure function that either returns the
 // new full array, or throws a RequestBoardError for a business-rule failure
-// (not found / already resolved / etc) — those are NOT retried. After
-// writing, we re-read and use `getTarget` to confirm the specific row we
-// just wrote is actually present with the expected shape; if a concurrent
-// writer clobbered it, we retry the whole read-mutate-write cycle from a
-// fresh read.
-async function mutateRequests(token, mutate, getTarget) {
-  let expectedTarget
+// (not found / already resolved / etc) — those are NOT retried. The write
+// uses `ifMatch` against the etag we just read; if another writer landed a
+// change in between, Vercel Blob rejects it with BlobPreconditionFailedError
+// and we retry the whole read-mutate-write cycle from a fresh read. Once
+// `put()` resolves without that error, the write is authoritative — no need
+// to re-read (and re-reading a public blob right after writing it isn't a
+// reliable check anyway, see above).
+async function mutateRequests(token, mutate) {
   for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt++) {
-    const current = await readRequests(token)
+    const { requests: current, etag } = await readRequestsWithEtag(token)
     const next = mutate(current)
-    expectedTarget = getTarget(next)
-
-    await put(PATH, JSON.stringify({ requests: next, updatedAt: new Date().toISOString() }), {
-      access: 'public',
-      allowOverwrite: true,
-      addRandomSuffix: false,
-      contentType: 'application/json',
-      cacheControlMaxAge: 0,
-      token,
-    })
-
-    // Vercel Blob's public read path is CDN-backed — even with
-    // cacheControlMaxAge: 0, a fresh overwrite can take a beat to propagate,
-    // so give it a moment before confirming.
-    await new Promise((resolve) => setTimeout(resolve, 150))
-    const confirmed = await readRequests(token)
-    const confirmedTarget = getTarget(confirmed)
-    if (confirmedTarget && expectedTarget && JSON.stringify(confirmedTarget) === JSON.stringify(expectedTarget)) {
-      return confirmed
-    }
-    if (attempt < MAX_WRITE_ATTEMPTS - 1) {
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt] ?? 1500))
+    try {
+      await put(PATH, JSON.stringify({ requests: next, updatedAt: new Date().toISOString() }), {
+        access: 'public',
+        allowOverwrite: true,
+        addRandomSuffix: false,
+        contentType: 'application/json',
+        cacheControlMaxAge: 0,
+        token,
+        ...(etag ? { ifMatch: etag } : {}),
+      })
+      return next
+    } catch (e) {
+      if (e instanceof BlobPreconditionFailedError && attempt < MAX_WRITE_ATTEMPTS - 1) {
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt] ?? 1000))
+        continue
+      }
+      throw e
     }
   }
   throw new RequestBoardError(503, 'Could not save changes to the request board — please retry')
@@ -168,11 +174,7 @@ export default async function handler(req, res) {
         expiresAt: new Date(createdAt.getTime() + visibleDays * 86400_000).toISOString(),
       }
 
-      const requests = await mutateRequests(
-        token,
-        (current) => [next, ...current],
-        (list) => list.find((request) => request.id === next.id),
-      )
+      const requests = await mutateRequests(token, (current) => [next, ...current])
       return res.status(201).json({ request: next, requests })
     }
 
@@ -238,7 +240,6 @@ export default async function handler(req, res) {
 
           throw new RequestBoardError(400, 'Unsupported action')
         },
-        (list) => list.find((request) => request.id === id) ?? (action === 'deleteExpired' ? { deleted: id } : undefined),
       )
       return res.status(200).json({ request: requests.find((request) => request.id === id), requests })
     }
