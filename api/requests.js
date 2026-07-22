@@ -1,4 +1,4 @@
-import { get, put, BlobPreconditionFailedError } from '@vercel/blob'
+import { put, head, BlobPreconditionFailedError } from '@vercel/blob'
 
 const PATH = 'marketplace/requests.json'
 const MAX_WRITE_ATTEMPTS = 5
@@ -33,34 +33,27 @@ function cleanText(value, max = 1200) {
   return String(value ?? '').trim().slice(0, max)
 }
 
-async function streamToText(stream) {
-  if (!stream) return ''
-  const reader = stream.getReader()
-  const chunks = []
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    chunks.push(value)
-  }
-  return Buffer.concat(chunks).toString('utf8')
-}
-
-// This board is only ever read/written through this API (the frontend never
-// fetches the blob URL directly), so it's stored as a private blob rather
-// than public. That matters because Vercel's `useCache: false` read option
-// is silently ignored for public blobs — a get() right after a put() could
-// return CDN-cached pre-write content for an unpredictable stretch, which
-// broke both write-conflict detection and plain read-your-writes (a request
-// PATCHed immediately after being POSTed could 404 as "not found"). Private
-// blobs honor useCache: false and read straight from origin storage.
+// This store is provisioned as a public blob store (a Vercel project-level
+// setting the API can't override — attempting access: 'private' here fails
+// outright with "Cannot use private access on a public store"). Public reads
+// via the SDK's get() go through a CDN edge, and Vercel's useCache: false
+// option is documented as ignored on that path — a get() right after a
+// put() could return cached pre-write content for an unpredictable stretch,
+// which broke both write-conflict detection and plain read-your-writes (a
+// request PATCHed immediately after being POSTed could 404 as "not found").
+//
+// head() hits Vercel's blob metadata API rather than the CDN, so it reliably
+// returns the current etag. Combined with a cache-busted, no-store fetch of
+// the actual content, this reads fresh instead of a stale edge copy.
 async function readRequestsWithEtag(token) {
   try {
-    const result = await get(PATH, { access: 'private', token, useCache: false })
-    if (!result || result.statusCode !== 200) return { requests: [], etag: undefined }
-    const text = await streamToText(result.stream)
-    const data = JSON.parse(text)
+    const meta = await head(PATH, { token })
+    if (!meta?.url) return { requests: [], etag: undefined }
+    const res = await fetch(`${meta.url}?_cb=${Date.now()}`, { cache: 'no-store' })
+    if (!res.ok) return { requests: [], etag: meta.etag }
+    const data = await res.json()
     const requests = Array.isArray(data.requests) ? data.requests.filter((request) => !isExpired(request)) : []
-    return { requests, etag: result.etag }
+    return { requests, etag: meta.etag }
   } catch {
     return { requests: [], etag: undefined }
   }
@@ -91,7 +84,7 @@ async function mutateRequests(token, mutate) {
     const next = mutate(current)
     try {
       await put(PATH, JSON.stringify({ requests: next, updatedAt: new Date().toISOString() }), {
-        access: 'private',
+        access: 'public',
         allowOverwrite: true,
         addRandomSuffix: false,
         contentType: 'application/json',
