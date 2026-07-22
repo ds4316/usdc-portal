@@ -3739,6 +3739,11 @@ export default function App() {
                       <Bot size={12} /> ERC-8183
                     </button>
                   </div>
+                  <div className="escrow-protocol-hint">
+                    {escrowProtocol === 'arc-escrow'
+                      ? 'ArcEscrow is the contract behind the Requests marketplace — this is what jobs posted from Requests use.'
+                      : 'ERC-8183 is a separate, standalone protocol for direct agent-to-agent jobs. It is not connected to the Requests board.'}
+                  </div>
                   {escrowProtocol === 'arc-escrow' ? (
                     <div className="escrow-flow-note">
                       <div><span>01</span><strong>USDC locked at post</strong></div>
@@ -3967,9 +3972,15 @@ export default function App() {
                             })}
                           </div>
                         )}
-                        {recentJobIds.length > 0 && (
+                        {(() => {
+                          const linkedJobIds = new Set(escrowRelatedRequests.map((r) => r.escrowJobId).filter(Boolean))
+                          const unlinkedJobIds = recentJobIds.filter((id) => !linkedJobIds.has(String(id)))
+                          return unlinkedJobIds.length > 0 && (
                           <div className="escrow-job-list">
-                            {recentJobIds.map(id => (
+                            {unlinkedJobIds.length > 0 && escrowRelatedRequests.length > 0 && (
+                              <span className="matched-request-jobs-caption">Other jobs (not linked to a Request)</span>
+                            )}
+                            {unlinkedJobIds.map(id => (
                               <button key={id}
                                 className={`escrow-job-row ${escrowJobId === String(id) ? 'selected' : ''}`}
                                 onClick={() => {
@@ -3987,7 +3998,8 @@ export default function App() {
                               </button>
                             ))}
                           </div>
-                        )}
+                          )
+                        })()}
 
                         <div className="escrow-search-block">
                           <label className="escrow-search-label">Search by Job ID</label>
