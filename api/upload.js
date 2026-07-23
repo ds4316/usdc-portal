@@ -1,7 +1,7 @@
 import { put } from '@vercel/blob'
 
 const MAX_BYTES = 8 * 1024 * 1024 // 8MB
-const ALLOWED_CONTENT_TYPES = [/^image\//, /^text\/plain$/, /^application\/pdf$/]
+const ALLOWED_BASE_TYPES = new Set(['text/plain', 'application/pdf'])
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -9,8 +9,10 @@ export default async function handler(req, res) {
   const { filename, contentType, data } = req.body ?? {}
   if (!data) return res.status(400).json({ error: 'No data provided' })
 
-  const type = contentType ?? 'text/plain'
-  if (!ALLOWED_CONTENT_TYPES.some((re) => re.test(type))) {
+  // Compare only the base MIME type — the app itself sends params like
+  // "text/plain; charset=utf-8", which a strict full-string match rejects.
+  const baseType = String(contentType ?? 'text/plain').split(';')[0].trim().toLowerCase()
+  if (!baseType.startsWith('image/') && !ALLOWED_BASE_TYPES.has(baseType)) {
     return res.status(400).json({ error: 'Unsupported content type' })
   }
 
